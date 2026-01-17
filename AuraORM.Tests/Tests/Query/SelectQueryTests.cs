@@ -1,16 +1,26 @@
+using AuraORM.Tests.Fixtures;
+using AuraORM.Tests.Tests.Generators.Models;
+
 namespace AuraORM.Tests.Tests.Query;
 
 public class SelectQueryTests
 {
+    private static readonly UserTable UserTable = UserTable.Instance;
+
+    private readonly TestFixture _fixture = new();
+
     [Fact]
     public void Selectで何もしていない場合はFrom句で指定したテーブルのデータを全件取得できる()
     {
         // Arrange
 
         // Act
-        // _fixture.Db.Select().From(UserTable).ToListAsync();
+        var (sqlText, parameters) = _fixture.Db.Select().From(UserTable).Build();
 
         // Assert
+        // SQLテキストが SELECT * FROM users; になる
+        Assert.Equal("SELECT * FROM users;", sqlText);
+        Assert.Empty(parameters);
     }
 
     [Fact]
@@ -19,9 +29,12 @@ public class SelectQueryTests
         // Arrange
 
         // Act
-        // _fixture.Db.Select(UserTable.Name).From(UserTable).ToArrayAsync();
+        var (sqlText, parameters) = _fixture.Db.Select(UserTable.Name).From(UserTable).Build();
 
         // Assert
+        // SQLテキストが SELECT name FROM users; になる
+        Assert.Equal("SELECT name FROM users;", sqlText);
+        Assert.Empty(parameters);
     }
 
     [Fact]
@@ -30,8 +43,11 @@ public class SelectQueryTests
         // Arrange
         
         // Act
-        // _fixture.Db.Select(UserTable.Name, UserTable.Age).From(UserTable).ToArrayAsync();
+        var (sqlText, parameters) = _fixture.Db.Select(UserTable.Name, UserTable.Age).From(UserTable).Build();
         
         // Assert
+        // SQLテキストが SELECT name, age FROM users; になる
+        Assert.Equal("SELECT name, age FROM users;", sqlText);
+        Assert.Empty(parameters);
     }
 }

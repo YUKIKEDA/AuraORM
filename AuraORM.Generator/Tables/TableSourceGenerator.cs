@@ -259,6 +259,9 @@ public class TableSourceGenerator : IIncrementalGenerator
 
         // テーブルクラスを生成
         GenerateTableClass(sb, tableInfo);
+        sb.AppendLine();
+        // クエリビルダー拡張メソッドを生成
+        GenerateQueryBuilderExtensions(sb, tableInfo);
 
         // -------------------------------------------------------
 
@@ -286,43 +289,79 @@ public class TableSourceGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}{{");
 
         // シングルトンインスタンス
-        sb.AppendLine($"{indent}{indent}public static readonly {tableInfo.TypeName}Table Instance = new {tableInfo.TypeName}Table();");
+        sb.AppendLine($"{indent}    public static readonly {tableInfo.TypeName}Table Instance = new {tableInfo.TypeName}Table();");
         sb.AppendLine();
 
         // テーブル名
-        sb.AppendLine($"{indent}{indent}public string TableName => \"{tableInfo.TableName}\";");
+        sb.AppendLine($"{indent}    public string TableName => \"{tableInfo.TableName}\";");
         sb.AppendLine();
 
         // カラム名配列
         var columnNames = string.Join(", ", tableInfo.Columns.Select(c => $"\"{c.ColumnName}\""));
-        sb.AppendLine($"{indent}{indent}public string[] ColumnNames => new[] {{ {columnNames} }};");
+        sb.AppendLine($"{indent}    public string[] ColumnNames => new[] {{ {columnNames} }};");
         sb.AppendLine();
 
         // プライマリキー情報
         var pkColumn = tableInfo.Columns.FirstOrDefault(c => c.IsPrimaryKey);
         var pkColumnName = pkColumn != null ? $"\"{pkColumn.ColumnName}\"" : "null";
-        sb.AppendLine($"{indent}{indent}public string? PrimaryKeyColumnName => {pkColumnName};");
+        sb.AppendLine($"{indent}    public string? PrimaryKeyColumnName => {pkColumnName};");
         sb.AppendLine();
 
         // AutoIncrement情報
         var isAutoIncrement = tableInfo.Columns.Any(c => c.IsAutoIncrement);
-        sb.AppendLine($"{indent}{indent}public bool IsAutoIncrement => {(isAutoIncrement ? "true" : "false")};");
+        sb.AppendLine($"{indent}    public bool IsAutoIncrement => {(isAutoIncrement ? "true" : "false")};");
         sb.AppendLine();
 
         // INSERT時に使用するカラム名（AutoIncrement列を除く）
         var insertColumnNames = string.Join(", ", tableInfo.Columns
             .Where(c => !c.IsAutoIncrement)
             .Select(c => $"\"{c.ColumnName}\""));
-        sb.AppendLine($"{indent}{indent}public string[] InsertColumnNames => new[] {{ {insertColumnNames} }};");
+        sb.AppendLine($"{indent}    public string[] InsertColumnNames => new[] {{ {insertColumnNames} }};");
         sb.AppendLine();
 
         // 各カラム
         foreach (var column in tableInfo.Columns)
         {
-            sb.AppendLine($"{indent}{indent}/// <summary>{column.ColumnName}カラム</summary>");
-            sb.AppendLine($"{indent}{indent}public static readonly Column<{column.TypeName}> {column.PropertyName} = new Column<{column.TypeName}>(\"{column.ColumnName}\", {column.Ordinal});");
+            sb.AppendLine($"{indent}    /// <summary>{column.ColumnName}カラム</summary>");
+            sb.AppendLine($"{indent}    public static readonly Column<{column.TypeName}> {column.PropertyName} = new Column<{column.TypeName}>(\"{column.ColumnName}\", {column.Ordinal});");
         }
         
         sb.AppendLine($"{indent}}}");
+    }
+
+    private static void GenerateQueryBuilderExtensions(StringBuilder sb, TableInfo tableInfo)
+    {
+        var indent = tableInfo.Namespace != null ? "    " : "";
+
+        sb.AppendLine($"{indent}/// <summary>");
+        sb.AppendLine($"{indent}/// {tableInfo.TypeName}用のクエリビルダー拡張メソッド");
+        sb.AppendLine($"{indent}/// </summary>");
+        sb.AppendLine($"{indent}public static class {tableInfo.TypeName}QueryBuilderExtensions");
+        sb.AppendLine($"{indent}{{");
+
+        // Select句拡張メソッド
+        GenerateSelectQueryExtensions(sb, tableInfo);
+
+        sb.AppendLine($"{indent}}}");
+    }
+
+    private static void GenerateSelectQueryExtensions(StringBuilder sb, TableInfo tableInfo)
+    {
+        var typeName = tableInfo.TypeName;
+        var tableTypeName = $"{typeName}Table";
+
+        var indent = tableInfo.Namespace != null ? "    " : "";
+
+        sb.AppendLine($"{indent}    /// <summary>");
+        sb.AppendLine($"{indent}    /// {tableInfo.TypeName}テーブルを指定してクエリビルダを生成");
+        sb.AppendLine($"{indent}    /// </summary>");
+        sb.AppendLine($"{indent}    /// <param name=\"query\">SELECTクエリビルダー</param>");
+        sb.AppendLine($"{indent}    /// <param name=\"table\">テーブル</param>");
+        sb.AppendLine($"{indent}    /// <returns>SELECTクエリビルダー</returns>");
+        sb.AppendLine($"{indent}    public static AuraORM.Builder.Query.SelectQuery<{typeName}, {tableTypeName}> From(this AuraORM.Builder.Query.SelectQuery builder, {tableTypeName} table)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        return new AuraORM.Builder.Query.SelectQuery<{typeName}, {tableTypeName}>(table, builder.GetContext(), builder.GetColumns());");
+        sb.AppendLine($"{indent}    }}");
+        sb.AppendLine();
     }
 }
