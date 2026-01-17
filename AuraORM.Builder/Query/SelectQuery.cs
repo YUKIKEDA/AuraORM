@@ -9,7 +9,7 @@ namespace AuraORM.Builder.Query;
 /// <summary>
 /// SELECTクエリを表すクラス
 /// </summary>
-public class SelectQuery
+public sealed class SelectQuery
 {
     private readonly DbContext? _context;
     private readonly Column[] _columns;
