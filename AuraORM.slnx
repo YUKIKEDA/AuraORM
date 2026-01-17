@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="AuraORM.Builder/AuraORM.Builder.csproj" />
+  <Project Path="AuraORM.Generator/AuraORM.Generator.csproj" />
+  <Project Path="AuraORM.Tests/AuraORM.Tests.csproj" />
+</Solution>
