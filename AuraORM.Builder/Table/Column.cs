@@ -121,6 +121,54 @@ public class Column<T> : Column
         return new WhereCondition(Name, "LIKE", pattern);
     }
 
+    /// <summary>
+    /// IN演算子を使用したWHERE句の条件を表すクラス
+    /// </summary>
+    /// <param name="values">値の配列</param>
+    /// <returns>WHERE句の条件</returns>
+    public WhereCondition In(params T[] values)
+    {
+        return new WhereInCondition(Name, values?.Cast<object>().ToArray() ?? []);
+    }
+
+    /// <summary>
+    /// NOT IN演算子を使用したWHERE句の条件を表すクラス
+    /// </summary>
+    /// <param name="values">値の配列</param>
+    /// <returns>WHERE句の条件</returns>
+    public WhereCondition NotIn(params T[] values)
+    {
+        return new WhereNotInCondition(Name, values?.Cast<object>().ToArray() ?? []);
+    }
+
+    /// <summary>
+    /// IS NULL演算子を使用したWHERE句の条件を表すクラス
+    /// </summary>
+    /// <returns>WHERE句の条件</returns>
+    public WhereCondition IsNull()
+    {
+        return new WhereIsNullCondition(Name);
+    }
+
+    /// <summary>
+    /// IS NOT NULL演算子を使用したWHERE句の条件を表すクラス
+    /// </summary>
+    /// <returns>WHERE句の条件</returns>
+    public WhereCondition IsNotNull()
+    {
+        return new WhereIsNotNullCondition(Name);
+    }
+
+    /// <summary>
+    /// BETWEEN演算子を使用したWHERE句の条件を表すクラス
+    /// </summary>
+    /// <param name="min">最小値</param>
+    /// <param name="max">最大値</param>
+    /// <returns>WHERE句の条件</returns>
+    public WhereCondition Between(T min, T max)
+    {
+        return new WhereBetweenCondition(Name, min, max);
+    }
 
     /// <summary>
     /// 等しいかどうかを比較します。

@@ -62,6 +62,7 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     private readonly DbContext? _dbContext;
     private readonly Column[]? _columns;
     private readonly List<WhereCondition> _conditions = [];
+    private readonly List<OrderByCondition> _orderByConditions = [];
 
     /// <summary>
     /// コンストラクタ
@@ -90,6 +91,17 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     public SelectQuery<TEntity, TTable> Where(WhereCondition condition)
     {
         _conditions.Add(condition);
+        return this;
+    }
+
+    /// <summary>
+    /// ORDER BY句を追加します。
+    /// </summary>
+    /// <param name="orderBy">ORDER BY句</param>
+    /// <returns>SELECTクエリビルダー</returns>
+    public SelectQuery<TEntity, TTable> OrderBy(OrderByCondition orderBy)
+    {
+        _orderByConditions.Add(orderBy);
         return this;
     }
 
@@ -207,6 +219,69 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
             sqlBuilder.Append(" ");
             BuildWhereCondition(sqlBuilder, composite.Right, parameters, dialect, ref parameterIndex);
             sqlBuilder.Append(")");
+        }
+        else if (condition is WhereInCondition inCondition)
+        {
+            sqlBuilder.Append(dialect.QuoteIdentifier(inCondition.ColumnName));
+            sqlBuilder.Append(" IN (");
+            
+            for (int i = 0; i < inCondition.Values.Length; i++)
+            {
+                if (i > 0)
+                {
+                    sqlBuilder.Append(", ");
+                }
+                var parameterName = dialect.GetParameterPlaceholder(parameterIndex);
+                sqlBuilder.Append(parameterName);
+                parameters.Add((parameterName, inCondition.Values[i]));
+                parameterIndex++;
+            }
+            
+            sqlBuilder.Append(")");
+        }
+        else if (condition is WhereNotInCondition notInCondition)
+        {
+            sqlBuilder.Append(dialect.QuoteIdentifier(notInCondition.ColumnName));
+            sqlBuilder.Append(" NOT IN (");
+            
+            for (int i = 0; i < notInCondition.Values.Length; i++)
+            {
+                if (i > 0)
+                {
+                    sqlBuilder.Append(", ");
+                }
+                var parameterName = dialect.GetParameterPlaceholder(parameterIndex);
+                sqlBuilder.Append(parameterName);
+                parameters.Add((parameterName, notInCondition.Values[i]));
+                parameterIndex++;
+            }
+            
+            sqlBuilder.Append(")");
+        }
+        else if (condition is WhereIsNullCondition)
+        {
+            sqlBuilder.Append(dialect.QuoteIdentifier(condition.ColumnName));
+            sqlBuilder.Append(" IS NULL");
+        }
+        else if (condition is WhereIsNotNullCondition)
+        {
+            sqlBuilder.Append(dialect.QuoteIdentifier(condition.ColumnName));
+            sqlBuilder.Append(" IS NOT NULL");
+        }
+        else if (condition is WhereBetweenCondition betweenCondition)
+        {
+            var minParameterName = dialect.GetParameterPlaceholder(parameterIndex);
+            var maxParameterName = dialect.GetParameterPlaceholder(parameterIndex + 1);
+            
+            sqlBuilder.Append(dialect.QuoteIdentifier(betweenCondition.ColumnName));
+            sqlBuilder.Append(" BETWEEN ");
+            sqlBuilder.Append(minParameterName);
+            sqlBuilder.Append(" AND ");
+            sqlBuilder.Append(maxParameterName);
+            
+            parameters.Add((minParameterName, betweenCondition.Min));
+            parameters.Add((maxParameterName, betweenCondition.Max));
+            parameterIndex += 2;
         }
         else
         {
