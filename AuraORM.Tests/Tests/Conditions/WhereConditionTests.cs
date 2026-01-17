@@ -112,7 +112,7 @@ public class WhereConditionTests
         // Arrange
 
         // Act
-        var query = _fixture.Db.Select().From(UserTable).Where(UserTable.Name == "John" && UserTable.Age > 20);
+        var query = _fixture.Db.Select().From(UserTable).Where((UserTable.Name == "John").And(UserTable.Age > 20));
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -126,7 +126,7 @@ public class WhereConditionTests
         // Arrange
 
         // Act
-        var query = _fixture.Db.Select().From(UserTable).Where(UserTable.Name == "John" || UserTable.Age > 20);
+        var query = _fixture.Db.Select().From(UserTable).Where((UserTable.Name == "John").Or(UserTable.Age > 20));
         var (sqlText, parameters) = query.Build();
 
         // Assert

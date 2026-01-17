@@ -34,45 +34,23 @@ public class WhereCondition
     }
 
     /// <summary>
-    /// AND演算子をオーバーロードします。
+    /// AND条件で結合
     /// </summary>
-    /// <param name="left">左側の条件</param>
-    /// <param name="right">右側の条件</param>
+    /// <param name="other">条件</param>
     /// <returns>複合条件</returns>
-    public static WhereCondition operator &(WhereCondition left, WhereCondition right)
+    public WhereCondition And(WhereCondition other)
     {
-        return new WhereCompositeCondition(left, "AND", right);
+        return new WhereCompositeCondition(this, "AND", other);
     }
 
     /// <summary>
-    /// OR演算子をオーバーロードします。
+    /// OR条件で結合
     /// </summary>
-    /// <param name="left">左側の条件</param>
-    /// <param name="right">右側の条件</param>
+    /// <param name="other">条件</param>
     /// <returns>複合条件</returns>
-    public static WhereCondition operator |(WhereCondition left, WhereCondition right)
+    public WhereCondition Or(WhereCondition other)
     {
-        return new WhereCompositeCondition(left, "OR", right);
-    }
-
-    /// <summary>
-    /// true演算子をオーバーロードします（&&演算子で使用されます）。
-    /// </summary>
-    /// <param name="condition">条件</param>
-    /// <returns>短絡評価を防ぐため常にfalse</returns>
-    public static bool operator true(WhereCondition condition)
-    {
-        return false;
-    }
-
-    /// <summary>
-    /// false演算子をオーバーロードします（&&演算子で使用されます）。
-    /// </summary>
-    /// <param name="condition">条件</param>
-    /// <returns>常にfalse</returns>
-    public static bool operator false(WhereCondition condition)
-    {
-        return false;
+        return new WhereCompositeCondition(this, "OR", other);
     }
 
 }
