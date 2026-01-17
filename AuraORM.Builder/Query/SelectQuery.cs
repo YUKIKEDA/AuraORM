@@ -124,6 +124,9 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
         var parameters = new List<(string Name, object? Value)>();
         BuildWhereClause(sqlBuilder, parameters, dialect);
 
+        // ORDER BY句の構築
+        BuildOrderByClause(sqlBuilder, dialect);
+
         sqlBuilder.Append(";");
         
         return (sqlBuilder.ToString(), parameters);
@@ -295,6 +298,32 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
             
             parameters.Add((parameterName, condition.Value));
             parameterIndex++;
+        }
+    }
+
+    /// <summary>
+    /// ORDER BY句を構築します。
+    /// </summary>
+    /// <param name="sqlBuilder">SQLビルダー</param>
+    /// <param name="dialect">SQL方言</param>
+    private void BuildOrderByClause(StringBuilder sqlBuilder, ISqlDialect dialect)
+    {
+        if (_orderByConditions.Count == 0)
+        {
+            return;
+        }
+
+        sqlBuilder.Append(" ORDER BY ");
+
+        for (int i = 0; i < _orderByConditions.Count; i++)
+        {
+            if (i > 0)
+            {
+                sqlBuilder.Append(", ");
+            }
+            var condition = _orderByConditions[i];
+            sqlBuilder.Append(dialect.QuoteIdentifier(condition.ColumnName));
+            sqlBuilder.Append(condition.Descending ? " DESC" : " ASC");
         }
     }
 }

@@ -25,13 +25,4 @@ public class OrderByCondition
         ColumnName = columnName;
         Descending = descending;
     }
-
-    /// <summary>
-    /// SQLに変換します。
-    /// </summary>
-    /// <returns>SQL</returns>
-    public virtual string ToSql()
-    {
-        return Descending ? $"{ColumnName} DESC" : $"{ColumnName} ASC";
-    }
 }
