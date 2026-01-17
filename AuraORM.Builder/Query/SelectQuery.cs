@@ -62,7 +62,9 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     private readonly DbContext? _dbContext;
     private readonly Column[]? _columns;
     private readonly List<WhereCondition> _conditions = [];
-    private readonly List<OrderByCondition> _orderByConditions = [];
+    private readonly List<OrderByCondition> _orderByConditions = [];    
+    private int? _limit;
+    private int? _offset;
 
     /// <summary>
     /// コンストラクタ
@@ -106,6 +108,28 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     }
 
     /// <summary>
+    /// 取得件数を設定します。
+    /// </summary>
+    /// <param name="limit">取得件数</param>
+    /// <returns>SELECTクエリビルダー</returns>
+    public SelectQuery<TEntity, TTable> Limit(int limit)
+    {
+        _limit = limit;
+        return this;
+    }
+
+    /// <summary>
+    /// 取得開始位置を設定します。
+    /// </summary>
+    /// <param name="offset">取得開始位置</param>
+    /// <returns>SELECTクエリビルダー</returns>
+    public SelectQuery<TEntity, TTable> Offset(int offset)
+    {
+        _offset = offset;
+        return this;
+    }
+
+    /// <summary>
     /// 構築されたSELECTクエリをSQLテキストとパラメータのリストに変換します。
     /// </summary>
     /// <returns>SQLテキストとパラメータのリストを含むタプル。</returns>
@@ -126,6 +150,13 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
 
         // ORDER BY句の構築
         BuildOrderByClause(sqlBuilder, dialect);
+
+        // LIMIT/OFFSET句の構築
+        var limitOffsetClause = dialect.BuildLimitOffset(_limit, _offset);
+        if (!string.IsNullOrEmpty(limitOffsetClause))
+        {
+            sqlBuilder.Append(limitOffsetClause);
+        }
 
         sqlBuilder.Append(";");
         
