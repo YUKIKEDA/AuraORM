@@ -329,6 +329,11 @@ public class TableSourceGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}}}");
     }
 
+    /// <summary>
+    /// クエリビルダー拡張メソッドを生成する
+    /// </summary>
+    /// <param name="sb">StringBuilder</param>
+    /// <param name="tableInfo">テーブル情報</param>
     private static void GenerateQueryBuilderExtensions(StringBuilder sb, TableInfo tableInfo)
     {
         var indent = tableInfo.Namespace != null ? "    " : "";
@@ -345,6 +350,11 @@ public class TableSourceGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}}}");
     }
 
+    /// <summary>
+    /// SELECT句拡張メソッドを生成する
+    /// </summary>
+    /// <param name="sb">StringBuilder</param>
+    /// <param name="tableInfo">テーブル情報</param>
     private static void GenerateSelectQueryExtensions(StringBuilder sb, TableInfo tableInfo)
     {
         var typeName = tableInfo.TypeName;

@@ -67,10 +67,10 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     public DbContext? GetDbContext() => _dbContext;
 
     /// <summary>
-    /// 
+    /// テーブルを指定してSELECTクエリを生成します。
     /// </summary>
-    /// <param name="table"></param>
-    /// <returns></returns>
+    /// <param name="table">テーブル</param>
+    /// <returns>SELECTクエリ</returns>
     public SelectQuery<TEntity, TTable> From(TTable table)
     {
         return new SelectQuery<TEntity, TTable>(table, _dbContext, _columns);
