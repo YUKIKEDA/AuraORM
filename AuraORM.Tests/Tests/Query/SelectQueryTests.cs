@@ -15,7 +15,8 @@ public class SelectQueryTests
         // Arrange
 
         // Act
-        var (sqlText, parameters) = _fixture.Db.Select().From(UserTable).Build();
+        var query = _fixture.Db.Select().From(UserTable);
+        var (sqlText, parameters) = query.Build();
 
         // Assert
         // SQLテキストが SELECT * FROM users; になる
@@ -29,7 +30,8 @@ public class SelectQueryTests
         // Arrange
 
         // Act
-        var (sqlText, parameters) = _fixture.Db.Select(UserTable.Name).From(UserTable).Build();
+        var query = _fixture.Db.Select(UserTable.Name).From(UserTable);
+        var (sqlText, parameters) = query.Build();
 
         // Assert
         // SQLテキストが SELECT name FROM users; になる
@@ -43,7 +45,8 @@ public class SelectQueryTests
         // Arrange
         
         // Act
-        var (sqlText, parameters) = _fixture.Db.Select(UserTable.Name, UserTable.Age).From(UserTable).Build();
+        var query = _fixture.Db.Select(UserTable.Name, UserTable.Age).From(UserTable);
+        var (sqlText, parameters) = query.Build();
         
         // Assert
         // SQLテキストが SELECT name, age FROM users; になる
