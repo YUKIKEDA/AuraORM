@@ -19,8 +19,8 @@ public class SelectQueryTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        // SQLテキストが SELECT * FROM users; になる
-        Assert.Equal("SELECT * FROM users;", sqlText);
+        // SQLテキストが SELECT * FROM "users"; になる
+        Assert.Equal("SELECT * FROM \"users\";", sqlText);
         Assert.Empty(parameters);
     }
 
@@ -34,8 +34,8 @@ public class SelectQueryTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        // SQLテキストが SELECT name FROM users; になる
-        Assert.Equal("SELECT name FROM users;", sqlText);
+        // SQLテキストが SELECT "name" FROM "users"; になる
+        Assert.Equal("SELECT \"name\" FROM \"users\";", sqlText);
         Assert.Empty(parameters);
     }
 
@@ -49,8 +49,8 @@ public class SelectQueryTests
         var (sqlText, parameters) = query.Build();
         
         // Assert
-        // SQLテキストが SELECT name, age FROM users; になる
-        Assert.Equal("SELECT name, age FROM users;", sqlText);
+        // SQLテキストが SELECT "name", "age" FROM "users"; になる
+        Assert.Equal("SELECT \"name\", \"age\" FROM \"users\";", sqlText);
         Assert.Empty(parameters);
     }
 }

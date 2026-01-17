@@ -9,8 +9,6 @@
 
   <ItemGroup>
     <Folder Include="Aggregates\" />
-    <Folder Include="Conditions\" />
-    <Folder Include="Dialect\" />
   </ItemGroup>
 
 </Project>

@@ -370,7 +370,7 @@ public class TableSourceGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}    /// <returns>SELECTクエリビルダー</returns>");
         sb.AppendLine($"{indent}    public static AuraORM.Builder.Query.SelectQuery<{typeName}, {tableTypeName}> From(this AuraORM.Builder.Query.SelectQuery builder, {tableTypeName} table)");
         sb.AppendLine($"{indent}    {{");
-        sb.AppendLine($"{indent}        return new AuraORM.Builder.Query.SelectQuery<{typeName}, {tableTypeName}>(table, builder.GetContext(), builder.GetColumns());");
+        sb.AppendLine($"{indent}        return builder.From<{typeName}, {tableTypeName}>(table);");
         sb.AppendLine($"{indent}    }}");
         sb.AppendLine();
     }

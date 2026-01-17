@@ -1,5 +1,7 @@
 using System.Text;
 
+using AuraORM.Builder.Conditions;
+using AuraORM.Builder.Dialect;
 using AuraORM.Builder.Table;
 
 namespace AuraORM.Builder.Query;
@@ -34,6 +36,19 @@ public class SelectQuery
     /// </summary>
     /// <returns>カラムの配列</returns>
     public Column[] GetColumns() => _columns;
+
+    /// <summary>
+    /// テーブルを指定してSELECTクエリを生成します。
+    /// </summary>
+    /// <typeparam name="TEntity">エンティティの型</typeparam>
+    /// <typeparam name="TTable">テーブルの型</typeparam>
+    /// <param name="table">テーブル</param>
+    /// <returns>SELECTクエリビルダー</returns>
+    public SelectQuery<TEntity, TTable> From<TEntity, TTable>(TTable table)
+        where TTable : ITable
+    {
+        return new SelectQuery<TEntity, TTable>(table, _context, _columns);
+    }
 }
 
 /// <summary>
@@ -46,6 +61,7 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     private readonly TTable _table;
     private readonly DbContext? _dbContext;
     private readonly Column[]? _columns;
+    private readonly List<WhereCondition> _conditions = [];
 
     /// <summary>
     /// コンストラクタ
@@ -67,13 +83,14 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     public DbContext? GetDbContext() => _dbContext;
 
     /// <summary>
-    /// テーブルを指定してSELECTクエリを生成します。
+    /// WHERE句を追加します。
     /// </summary>
-    /// <param name="table">テーブル</param>
-    /// <returns>SELECTクエリ</returns>
-    public SelectQuery<TEntity, TTable> From(TTable table)
+    /// <param name="condition">WHERE句の条件</param>
+    /// <returns>SELECTクエリビルダー</returns>
+    public SelectQuery<TEntity, TTable> Where(WhereCondition condition)
     {
-        return new SelectQuery<TEntity, TTable>(table, _dbContext, _columns);
+        _conditions.Add(condition);
+        return this;
     }
 
     /// <summary>
@@ -83,6 +100,30 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     public (string SqlText, List<(string Name, object? Value)> Parameters) Build()
     {
         var sqlBuilder = new StringBuilder();
+        var dialect = _dbContext?.Dialect ?? DialectProvider.Default;
+
+        // SELECT句の構築
+        BuildSelectClause(sqlBuilder, dialect);
+
+        // FROM句の構築
+        BuildFromClause(sqlBuilder, dialect);
+
+        // WHERE句の構築
+        var parameters = new List<(string Name, object? Value)>();
+        BuildWhereClause(sqlBuilder, parameters, dialect);
+
+        sqlBuilder.Append(";");
+        
+        return (sqlBuilder.ToString(), parameters);
+    }
+
+    /// <summary>
+    /// SELECT句を構築します。
+    /// </summary>
+    /// <param name="sqlBuilder">SQLビルダー</param>
+    /// <param name="dialect">SQL方言</param>
+    private void BuildSelectClause(StringBuilder sqlBuilder, ISqlDialect dialect)
+    {
         sqlBuilder.Append("SELECT ");
         
         if (_columns != null && _columns.Length > 0)
@@ -93,19 +134,92 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
                 {
                     sqlBuilder.Append(", ");
                 }
-                sqlBuilder.Append(_columns[i].Name);
+                sqlBuilder.Append(dialect.QuoteIdentifier(_columns[i].Name));
             }
         }
         else
         {
             sqlBuilder.Append("*");
         }
-        
+    }
+
+    /// <summary>
+    /// FROM句を構築します。
+    /// </summary>
+    /// <param name="sqlBuilder">SQLビルダー</param>
+    /// <param name="dialect">SQL方言</param>
+    private void BuildFromClause(StringBuilder sqlBuilder, ISqlDialect dialect)
+    {
         sqlBuilder.Append(" FROM ");
-        sqlBuilder.Append(_table.TableName);
-        sqlBuilder.Append(";");
-        
-        var parameters = new List<(string Name, object? Value)>();
-        return (sqlBuilder.ToString(), parameters);
+        sqlBuilder.Append(dialect.QuoteIdentifier(_table.TableName));
+    }
+
+    /// <summary>
+    /// WHERE句を構築します。
+    /// </summary>
+    /// <param name="sqlBuilder">SQLビルダー</param>
+    /// <param name="parameters">パラメータ</param>
+    /// <param name="dialect">SQL方言</param>
+    private void BuildWhereClause(
+        StringBuilder sqlBuilder, 
+        List<(string Name, object? Value)> parameters, 
+        ISqlDialect dialect)
+    {
+        if (_conditions.Count == 0)
+        {
+            return;
+        }
+
+        sqlBuilder.Append(" WHERE ");
+
+        int parameterIndex = 0;
+        for (int i = 0; i < _conditions.Count; i++)
+        {
+            if (i > 0)
+            {
+                sqlBuilder.Append(" AND ");
+            }
+            BuildWhereCondition(sqlBuilder, _conditions[i], parameters, dialect, ref parameterIndex);
+        }
+    }
+
+    /// <summary>
+    /// WHERE句の条件を構築します。
+    /// </summary>
+    /// <param name="sqlBuilder">SQLビルダー</param>
+    /// <param name="condition">WHERE句の条件</param>
+    /// <param name="parameters">パラメータのリスト</param>
+    /// <param name="dialect">SQL方言</param>
+    /// <param name="parameterIndex">パラメータのインデックス</param>
+    private void BuildWhereCondition(
+        StringBuilder sqlBuilder, 
+        WhereCondition condition, 
+        List<(string Name, object? Value)> parameters, 
+        ISqlDialect dialect, 
+        ref int parameterIndex)
+    {
+        if (condition is WhereCompositeCondition composite)
+        {
+            sqlBuilder.Append("(");
+            BuildWhereCondition(sqlBuilder, composite.Left, parameters, dialect, ref parameterIndex);
+            sqlBuilder.Append(" ");
+            sqlBuilder.Append(composite.LogicalOperator);
+            sqlBuilder.Append(" ");
+            BuildWhereCondition(sqlBuilder, composite.Right, parameters, dialect, ref parameterIndex);
+            sqlBuilder.Append(")");
+        }
+        else
+        {
+            var parameterName = dialect.GetParameterPlaceholder(parameterIndex);
+            
+            sqlBuilder.Append(dialect.QuoteIdentifier(condition.ColumnName));
+            sqlBuilder.Append(" ");
+            sqlBuilder.Append(condition.Operator);
+            sqlBuilder.Append(" ");
+            sqlBuilder.Append(parameterName);
+            
+            parameters.Add((parameterName, condition.Value));
+            parameterIndex++;
+        }
     }
 }
