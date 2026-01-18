@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 
 using ColumnValuePair = (AuraORM.Builder.Table.Column Column, object? Value);
 
@@ -7,7 +7,7 @@ namespace AuraORM.Builder.Query;
 /// <summary>
 /// INSERT句の値を表すクラス
 /// </summary>
-public class InsertQueryValues : IEnumerable<ColumnValuePair[]>
+public partial class InsertQueryValues : IEnumerable<ColumnValuePair[]>
 {
     private readonly List<ColumnValuePair[]> _values = [];
     private int? _columnCount = null;
@@ -17,7 +17,7 @@ public class InsertQueryValues : IEnumerable<ColumnValuePair[]>
     /// </summary>
     /// <param name="cells">値</param>
     /// <exception cref="ArgumentException">列数が一致しない場合</exception>
-    public void Add(params ColumnValuePair[] cells)
+    private void AddRow(params ColumnValuePair[] cells)
     {
         // 1行目の列数を基準として記録する
         _columnCount ??= cells.Length;

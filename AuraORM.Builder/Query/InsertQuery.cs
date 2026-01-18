@@ -13,7 +13,6 @@ namespace AuraORM.Builder.Query;
 public sealed class InsertQuery<TTable> where TTable : ITable
 {
     private readonly TTable _table;
-    private readonly ISqlDialect? _dialect;
     private readonly DbContext? _dbContext;
     private readonly TransactionContext? _transactionContext;
 
@@ -22,36 +21,13 @@ public sealed class InsertQuery<TTable> where TTable : ITable
     /// </summary>
     /// <param name="table">テーブル</param>
     /// <param name="dbContext">データベースコンテキスト</param>
-    /// <param name="dialect">SQL方言</param>
     /// <param name="transactionContext">トランザクションコンテキスト</param>
-    internal InsertQuery(TTable table, DbContext? dbContext = null, ISqlDialect? dialect = null, TransactionContext? transactionContext = null)
+    internal InsertQuery(TTable table, DbContext? dbContext = null, TransactionContext? transactionContext = null)
     {
         _table = table;
         _dbContext = dbContext;
-        _dialect = dialect;
         _transactionContext = transactionContext;
     }
-
-
-    /// <summary>
-    /// テーブルメタデータを取得
-    /// </summary>
-    public TTable GetTable() => _table;
-
-    /// <summary>
-    /// Dialectを取得
-    /// </summary>
-    public ISqlDialect? GetDialect() => _dialect;
-
-    /// <summary>
-    /// DbContextを取得
-    /// </summary>
-    public DbContext? GetDbContext() => _dbContext;
-
-    /// <summary>
-    /// TransactionContextを取得
-    /// </summary>
-    public TransactionContext? GetTransactionContext() => _transactionContext;
 
     /// <summary>
     /// エンティティを指定してINSERTクエリを生成します。
@@ -60,7 +36,7 @@ public sealed class InsertQuery<TTable> where TTable : ITable
     /// <returns>INSERTクエリビルダー</returns>
     public InsertQuery<TEntity, TTable> For<TEntity>()
     {
-        return new InsertQuery<TEntity, TTable>(_table, _dbContext, _dialect, _transactionContext);
+        return new InsertQuery<TEntity, TTable>(_table, _dbContext, _transactionContext);
     }
 }
 
@@ -78,32 +54,15 @@ public sealed class InsertQuery<TEntity, TTable> where TTable : ITable
     private InsertQueryValues _values = [];
 
     /// <summary>
-    /// 使用しているDialectを取得
-    /// </summary>
-    public ISqlDialect Dialect { get; }
-
-    /// <summary>
-    /// DbContextを取得
-    /// </summary>
-    public DbContext? GetDbContext() => _dbContext;
-
-    /// <summary>
-    /// TransactionContextを取得
-    /// </summary>
-    public TransactionContext? GetTransactionContext() => _transactionContext;
-
-    /// <summary>
     /// コンストラクタ
     /// </summary>
     /// <param name="table">テーブル</param>
     /// <param name="dbContext">データベースコンテキスト</param>
-    /// <param name="dialect">SQL方言</param>
     /// <param name="transactionContext">トランザクションコンテキスト</param>
-    public InsertQuery(TTable table, DbContext? dbContext, ISqlDialect? dialect, TransactionContext? transactionContext)
+    public InsertQuery(TTable table, DbContext? dbContext, TransactionContext? transactionContext)
     {
         _table = table;
         _dbContext = dbContext;
-        Dialect = dialect ?? DialectProvider.Default;
         _transactionContext = transactionContext;
     }
 
@@ -124,12 +83,14 @@ public sealed class InsertQuery<TEntity, TTable> where TTable : ITable
     /// <returns>SQLテキストとパラメータのタプル</returns>
     public (string SqlText, List<(string Name, object? Value)> Parameters) Build()
     {
+        var dialect = _dbContext?.Dialect ?? DialectProvider.Default;
+
         var sqlBuilder = new StringBuilder();
         var parameters = new List<(string Name, object? Value)>();
 
         // INSERT INTO句の構築
         sqlBuilder.Append("INSERT INTO ");
-        sqlBuilder.Append(Dialect.QuoteIdentifier(_table.TableName));
+        sqlBuilder.Append(dialect.QuoteIdentifier(_table.TableName));
 
         // 値が空の場合は特殊な形式を返す
         if (_values.Count() == 0)
@@ -150,7 +111,7 @@ public sealed class InsertQuery<TEntity, TTable> where TTable : ITable
             {
                 sqlBuilder.Append(", ");
             }
-            sqlBuilder.Append(Dialect.QuoteIdentifier(columnNames[i]));
+            sqlBuilder.Append(dialect.QuoteIdentifier(columnNames[i]));
         }
         sqlBuilder.Append(")");
 
@@ -173,7 +134,7 @@ public sealed class InsertQuery<TEntity, TTable> where TTable : ITable
                     sqlBuilder.Append(", ");
                 }
 
-                var parameterName = Dialect.GetParameterPlaceholder(parameterIndex);
+                var parameterName = dialect.GetParameterPlaceholder(parameterIndex);
                 sqlBuilder.Append(parameterName);
                 parameters.Add((parameterName, row[i].Value));
                 parameterIndex++;

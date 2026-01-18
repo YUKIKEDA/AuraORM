@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -9,6 +9,12 @@
 
   <ItemGroup>
     <Folder Include="Aggregates\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AuraORM.Generator\AuraORM.Generator.csproj" 
+                      OutputItemType="Analyzer" 
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>
