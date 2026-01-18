@@ -1,7 +1,5 @@
 using System.Collections;
 
-using ColumnValuePair = (AuraORM.Builder.Table.Column Column, object? Value);
-
 namespace AuraORM.Builder.Query;
 
 /// <summary>

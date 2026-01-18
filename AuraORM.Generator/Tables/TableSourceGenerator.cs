@@ -350,6 +350,9 @@ public class TableSourceGenerator : IIncrementalGenerator
         // Insert句拡張メソッド
         GenerateInsertQueryExtensions(sb, tableInfo);
 
+        // Update句拡張メソッド
+        GenerateUpdateQueryExtensions(sb, tableInfo);
+
         sb.AppendLine($"{indent}}}");
     }
 
@@ -386,13 +389,30 @@ public class TableSourceGenerator : IIncrementalGenerator
 
         var indent = tableInfo.Namespace != null ? "    " : "";
 
-        // InsertQuery.Values() 拡張メソッド（複数エンティティ）
+        // InsertQuery.Values() 拡張メソッド（型推論用）
         sb.AppendLine($"{indent}    /// <summary>");
         sb.AppendLine($"{indent}    /// {typeName}エンティティのコレクションを指定してINSERTクエリビルダを生成");
         sb.AppendLine($"{indent}    /// </summary>");
         sb.AppendLine($"{indent}    public static AuraORM.Builder.Query.InsertQuery<{typeName}, {tableTypeName}> Values(this AuraORM.Builder.Query.InsertQuery<{tableTypeName}> builder, InsertQueryValues values)");
         sb.AppendLine($"{indent}    {{");
         sb.AppendLine($"{indent}        return builder.For<{typeName}>().Values(values);");
+        sb.AppendLine($"{indent}    }}");
+    }
+
+    private static void GenerateUpdateQueryExtensions(StringBuilder sb, TableInfo tableInfo)
+    {
+        var typeName = tableInfo.TypeName;
+        var tableTypeName = $"{typeName}Table";
+
+        var indent = tableInfo.Namespace != null ? "    " : "";
+
+        // UpdateQuery.Set() 拡張メソッド（型推論用）
+        sb.AppendLine($"{indent}    /// <summary>");
+        sb.AppendLine($"{indent}    /// {typeName}エンティティのコレクションを指定してUPDATEクエリビルダを生成");
+        sb.AppendLine($"{indent}    /// </summary>");
+        sb.AppendLine($"{indent}    public static AuraORM.Builder.Query.UpdateQuery<{typeName}, {tableTypeName}> Set(this AuraORM.Builder.Query.UpdateQuery<{tableTypeName}> builder, UpdateQueryValues values)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        return builder.For<{typeName}>().Set(values);");
         sb.AppendLine($"{indent}    }}");
     }
 }

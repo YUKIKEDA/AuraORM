@@ -58,4 +58,15 @@ public class DbContext
     {
         return new InsertQuery<TTable>(table, this);
     }
+
+    /// <summary>
+    /// UPDATEクエリを生成します。
+    /// </summary>
+    /// <typeparam name="TTable">テーブル</typeparam>
+    /// <param name="table">テーブル</param>
+    /// <returns>UPDATEクエリビルダー</returns>
+    public UpdateQuery<TTable> Update<TTable>(TTable table) where TTable : ITable
+    {
+        return new UpdateQuery<TTable>(table, this);
+    }
 }
