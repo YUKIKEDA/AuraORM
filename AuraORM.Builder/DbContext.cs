@@ -42,9 +42,20 @@ public class DbContext
     /// SELECTクエリを生成します。
     /// </summary>
     /// <param name="columns">カラム</param>
-    /// <returns>SELECTクエリ</returns>
+    /// <returns>SELECTクエリビルダー</returns>
     public SelectQuery Select(params Column[] columns)
     {
         return new SelectQuery(this, columns);
+    }
+
+    /// <summary>
+    /// INSERTクエリを生成します。
+    /// </summary>
+    /// <typeparam name="TTable">テーブル</typeparam>
+    /// <param name="table">テーブル</param>
+    /// <returns>INSERTクエリビルダー</returns>
+    public InsertQuery<TTable> Insert<TTable>(TTable table) where TTable : ITable
+    {
+        return new InsertQuery<TTable>(table, this);
     }
 }

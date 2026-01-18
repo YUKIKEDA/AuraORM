@@ -347,6 +347,9 @@ public class TableSourceGenerator : IIncrementalGenerator
         // Select句拡張メソッド
         GenerateSelectQueryExtensions(sb, tableInfo);
 
+        // Insert句拡張メソッド
+        GenerateInsertQueryExtensions(sb, tableInfo);
+
         sb.AppendLine($"{indent}}}");
     }
 
@@ -362,6 +365,7 @@ public class TableSourceGenerator : IIncrementalGenerator
 
         var indent = tableInfo.Namespace != null ? "    " : "";
 
+        // SelectQuery.From() 拡張メソッド（型推論用）
         sb.AppendLine($"{indent}    /// <summary>");
         sb.AppendLine($"{indent}    /// {tableInfo.TypeName}テーブルを指定してクエリビルダを生成");
         sb.AppendLine($"{indent}    /// </summary>");
@@ -373,5 +377,22 @@ public class TableSourceGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}        return builder.From<{typeName}, {tableTypeName}>(table);");
         sb.AppendLine($"{indent}    }}");
         sb.AppendLine();
+    }
+
+    private static void GenerateInsertQueryExtensions(StringBuilder sb, TableInfo tableInfo)
+    {
+        var typeName = tableInfo.TypeName;
+        var tableTypeName = $"{typeName}Table";
+
+        var indent = tableInfo.Namespace != null ? "    " : "";
+
+        // InsertQuery.Values() 拡張メソッド（複数エンティティ）
+        sb.AppendLine($"{indent}    /// <summary>");
+        sb.AppendLine($"{indent}    /// {typeName}エンティティのコレクションを指定してINSERTクエリビルダを生成");
+        sb.AppendLine($"{indent}    /// </summary>");
+        sb.AppendLine($"{indent}    public static AuraORM.Builder.Query.InsertQuery<{typeName}, {tableTypeName}> Values(this AuraORM.Builder.Query.InsertQuery<{tableTypeName}> builder, InsertQueryValues values)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        return builder.For<{typeName}>().Values(values);");
+        sb.AppendLine($"{indent}    }}");
     }
 }
