@@ -246,6 +246,7 @@ public class TableSourceGenerator : IIncrementalGenerator
         sb.AppendLine("using System.Data;");
         sb.AppendLine("using AuraORM.Builder.Query;");
         sb.AppendLine("using AuraORM.Builder.Table;");
+        sb.AppendLine("using AuraORM.Builder.Conditions;");
         sb.AppendLine();
 
         // 名前空間
@@ -352,6 +353,8 @@ public class TableSourceGenerator : IIncrementalGenerator
 
         // Update句拡張メソッド
         GenerateUpdateQueryExtensions(sb, tableInfo);
+
+        // Delete句拡張メソッド (必要に応じて追加)
 
         sb.AppendLine($"{indent}}}");
     }

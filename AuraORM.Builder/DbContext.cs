@@ -69,4 +69,15 @@ public class DbContext
     {
         return new UpdateQuery<TTable>(table, this);
     }
+
+    /// <summary>
+    /// DELETEクエリを生成します。
+    /// </summary>
+    /// <typeparam name="TTable">テーブル</typeparam>
+    /// <param name="table">テーブル</param>
+    /// <returns>DELETEクエリビルダー</returns>
+    public DeleteQuery<TTable> Delete<TTable>(TTable table) where TTable : ITable
+    {
+        return new DeleteQuery<TTable>(table, this);
+    }
 }
