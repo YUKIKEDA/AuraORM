@@ -13,13 +13,11 @@ public class UpdateQueryTests
     public void Setで指定した値をUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John"), (UserTable.Age, 20)
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -31,13 +29,11 @@ public class UpdateQueryTests
     public void Setで1つのカラムのみを指定してUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "Alice")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -50,13 +46,11 @@ public class UpdateQueryTests
     {
         // Arrange
         var createdAt = new DateTime(2024, 1, 1, 12, 0, 0);
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "Bob"), (UserTable.Age, 30), (UserTable.CreatedAt, createdAt)
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -68,13 +62,11 @@ public class UpdateQueryTests
     public void SetでNULL値を指定してUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "Charlie"), (UserTable.Age, null)
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -86,13 +78,11 @@ public class UpdateQueryTests
     public void SetとWhere句を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
-        {
-            (UserTable.Name, "John"), (UserTable.Age, 20)
-        };
-
         // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Id == 1);
+        var query = _fixture.Db.Update(UserTable).Set(new()
+        {
+            (UserTable.Name, "John") , (UserTable.Age, 20)
+        }).Where(UserTable.Id == 1);
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -104,13 +94,11 @@ public class UpdateQueryTests
     public void Setと複数のWhere条件を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "Alice")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where((UserTable.Age > 20).And(UserTable.Name != "Bob"));
+        }).Where((UserTable.Age > 20).And(UserTable.Name != "Bob"));
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -122,13 +110,11 @@ public class UpdateQueryTests
     public void Setと複数のWhere条件をチェーンしてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Age > 20).Where(UserTable.Name != "Bob");
+        }).Where(UserTable.Age > 20).Where(UserTable.Name != "Bob");
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -140,13 +126,11 @@ public class UpdateQueryTests
     public void SetとIN条件を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Age.In(20, 30, 40));
+        }).Where(UserTable.Age.In(20, 30, 40));
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -158,13 +142,11 @@ public class UpdateQueryTests
     public void SetとNOT_IN条件を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Age.NotIn(20, 30, 40));
+        }).Where(UserTable.Age.NotIn(20, 30, 40));
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -176,13 +158,11 @@ public class UpdateQueryTests
     public void SetとIS_NULL条件を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Name.IsNull());
+        }).Where(UserTable.Name.IsNull());
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -194,13 +174,11 @@ public class UpdateQueryTests
     public void SetとIS_NOT_NULL条件を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Name.IsNotNull());
+        }).Where(UserTable.Name.IsNotNull());
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -212,13 +190,11 @@ public class UpdateQueryTests
     public void SetとBETWEEN条件を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Age.Between(20, 40));
+        }).Where(UserTable.Age.Between(20, 40));
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -230,13 +206,11 @@ public class UpdateQueryTests
     public void SetとOR条件を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where((UserTable.Name == "Alice").Or(UserTable.Age > 20));
+        }).Where((UserTable.Name == "Alice").Or(UserTable.Age > 20));
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -248,13 +222,11 @@ public class UpdateQueryTests
     public void SetとLIKE条件を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Name.Like("John%"));
+        }).Where(UserTable.Name.Like("John%"));
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -266,13 +238,11 @@ public class UpdateQueryTests
     public void Setとより小さい演算子を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Age < 20);
+        }).Where(UserTable.Age < 20);
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -284,13 +254,11 @@ public class UpdateQueryTests
     public void Setとより大きいか等しい演算子を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Age >= 20);
+        }).Where(UserTable.Age >= 20);
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -302,13 +270,11 @@ public class UpdateQueryTests
     public void Setとより小さいか等しい演算子を組み合わせてUPDATE句に追加できる()
     {
         // Arrange
-        var values = new UpdateQueryValues
+        // Act
+        var query = _fixture.Db.Update(UserTable).Set(new()
         {
             (UserTable.Name, "John")
-        };
-
-        // Act
-        var query = _fixture.Db.Update(UserTable).Set(values).Where(UserTable.Age <= 20);
+        }).Where(UserTable.Age <= 20);
         var (sqlText, parameters) = query.Build();
 
         // Assert

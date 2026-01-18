@@ -13,13 +13,11 @@ public class InsertQueryTests
     public void Valuesで指定した値をINSERT句に追加できる()
     {
         // Arrange
-        var insertValues = new InsertQueryValues
+        // Act
+        var query = _fixture.Db.Insert(UserTable).Values(new()
         {
             { (UserTable.Name, "John"), (UserTable.Age, 20) }
-        };
-
-        // Act
-        var query = _fixture.Db.Insert(UserTable).Values(insertValues);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -31,13 +29,11 @@ public class InsertQueryTests
     public void Valuesで1つのカラムのみを指定してINSERT句に追加できる()
     {
         // Arrange
-        var insertValues = new InsertQueryValues
+        // Act
+        var query = _fixture.Db.Insert(UserTable).Values(new()
         {
             { (UserTable.Name, "Alice") }
-        };
-
-        // Act
-        var query = _fixture.Db.Insert(UserTable).Values(insertValues);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -50,13 +46,11 @@ public class InsertQueryTests
     {
         // Arrange
         var createdAt = new DateTime(2024, 1, 1, 12, 0, 0);
-        var insertValues = new InsertQueryValues
+        // Act
+        var query = _fixture.Db.Insert(UserTable).Values(new()
         {
             { (UserTable.Name, "Bob"), (UserTable.Age, 30), (UserTable.CreatedAt, createdAt) }
-        };
-
-        // Act
-        var query = _fixture.Db.Insert(UserTable).Values(insertValues);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -68,13 +62,11 @@ public class InsertQueryTests
     public void ValuesでNULL値を指定してINSERT句に追加できる()
     {
         // Arrange
-        var insertValues = new InsertQueryValues
+        // Act
+        var query = _fixture.Db.Insert(UserTable).Values(new()
         {
             { (UserTable.Name, "Charlie"), (UserTable.Age, null) }
-        };
-
-        // Act
-        var query = _fixture.Db.Insert(UserTable).Values(insertValues);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -87,13 +79,11 @@ public class InsertQueryTests
     {
         // Arrange
         var createdAt = new DateTime(2024, 1, 1, 12, 0, 0);
-        var insertValues = new InsertQueryValues
+        // Act
+        var query = _fixture.Db.Insert(UserTable).Values(new()
         {
             { (UserTable.Name, "David"), (UserTable.Age, 25), (UserTable.CreatedAt, createdAt) }
-        };
-
-        // Act
-        var query = _fixture.Db.Insert(UserTable).Values(insertValues);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -105,12 +95,8 @@ public class InsertQueryTests
     public void Valuesで空のオブジェクトを指定した場合は空のINSERT句になる()
     {
         // Arrange
-        var insertValues = new InsertQueryValues
-        {
-        };
-
         // Act
-        var query = _fixture.Db.Insert(UserTable).Values(insertValues);
+        var query = _fixture.Db.Insert(UserTable).Values(new());
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -122,14 +108,12 @@ public class InsertQueryTests
     public void Valuesで複数行を指定してINSERT句に追加できる()
     {
         // Arrange
-        var insertValues = new InsertQueryValues
+        // Act
+        var query = _fixture.Db.Insert(UserTable).Values(new()
         {
             { (UserTable.Name, "John"), (UserTable.Age, 20) },
             { (UserTable.Name, "Jane"), (UserTable.Age, 25) }
-        };
-
-        // Act
-        var query = _fixture.Db.Insert(UserTable).Values(insertValues);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -141,15 +125,13 @@ public class InsertQueryTests
     public void Valuesで3行以上を指定してINSERT句に追加できる()
     {
         // Arrange
-        var insertValues = new InsertQueryValues
+        // Act
+        var query = _fixture.Db.Insert(UserTable).Values(new()
         {
             { (UserTable.Name, "Alice"), (UserTable.Age, 20) },
             { (UserTable.Name, "Bob"), (UserTable.Age, 25) },
             { (UserTable.Name, "Charlie"), (UserTable.Age, 30) }
-        };
-
-        // Act
-        var query = _fixture.Db.Insert(UserTable).Values(insertValues);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -165,14 +147,12 @@ public class InsertQueryTests
     public void Valuesで複数行を指定しNULL値を含むINSERT句に追加できる()
     {
         // Arrange
-        var insertValues = new InsertQueryValues
+        // Act
+        var query = _fixture.Db.Insert(UserTable).Values(new()
         {
             { (UserTable.Name, "David"), (UserTable.Age, null) },
             { (UserTable.Name, "Eve"), (UserTable.Age, 28) }
-        };
-
-        // Act
-        var query = _fixture.Db.Insert(UserTable).Values(insertValues);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
@@ -186,13 +166,12 @@ public class InsertQueryTests
         // Arrange
         var createdAt1 = new DateTime(2024, 1, 1, 12, 0, 0);
         var createdAt2 = new DateTime(2024, 1, 2, 12, 0, 0);
-        var insertValues = new InsertQueryValues
+        // Act
+        var query = _fixture.Db.Insert(UserTable).Values(new()
         {
             { (UserTable.Name, "Frank"), (UserTable.Age, 35), (UserTable.CreatedAt, createdAt1) },
             { (UserTable.Name, "Grace"), (UserTable.Age, 40), (UserTable.CreatedAt, createdAt2) }
-        };
-        // Act
-        var query = _fixture.Db.Insert(UserTable).Values(insertValues);
+        });
         var (sqlText, parameters) = query.Build();
 
         // Assert
