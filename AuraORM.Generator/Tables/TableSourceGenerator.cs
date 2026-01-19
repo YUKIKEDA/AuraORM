@@ -345,77 +345,14 @@ public class TableSourceGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}public static class {tableInfo.TypeName}QueryBuilderExtensions");
         sb.AppendLine($"{indent}{{");
 
-        // Select句拡張メソッド
-        GenerateSelectQueryExtensions(sb, tableInfo);
+        // Select句拡張メソッド (必要に応じて追加)
 
-        // Insert句拡張メソッド
-        GenerateInsertQueryExtensions(sb, tableInfo);
+        // Insert句拡張メソッド (必要に応じて追加)
 
-        // Update句拡張メソッド
-        GenerateUpdateQueryExtensions(sb, tableInfo);
+        // Update句拡張メソッド (必要に応じて追加)
 
         // Delete句拡張メソッド (必要に応じて追加)
 
         sb.AppendLine($"{indent}}}");
-    }
-
-    /// <summary>
-    /// SELECT句拡張メソッドを生成する
-    /// </summary>
-    /// <param name="sb">StringBuilder</param>
-    /// <param name="tableInfo">テーブル情報</param>
-    private static void GenerateSelectQueryExtensions(StringBuilder sb, TableInfo tableInfo)
-    {
-        var typeName = tableInfo.TypeName;
-        var tableTypeName = $"{typeName}Table";
-
-        var indent = tableInfo.Namespace != null ? "    " : "";
-
-        // SelectQuery.From() 拡張メソッド（型推論用）
-        sb.AppendLine($"{indent}    /// <summary>");
-        sb.AppendLine($"{indent}    /// {tableInfo.TypeName}テーブルを指定してクエリビルダを生成");
-        sb.AppendLine($"{indent}    /// </summary>");
-        sb.AppendLine($"{indent}    /// <param name=\"query\">SELECTクエリビルダー</param>");
-        sb.AppendLine($"{indent}    /// <param name=\"table\">テーブル</param>");
-        sb.AppendLine($"{indent}    /// <returns>SELECTクエリビルダー</returns>");
-        sb.AppendLine($"{indent}    public static AuraORM.Builder.Query.SelectQuery<{typeName}, {tableTypeName}> From(this AuraORM.Builder.Query.SelectQuery builder, {tableTypeName} table)");
-        sb.AppendLine($"{indent}    {{");
-        sb.AppendLine($"{indent}        return builder.From<{typeName}, {tableTypeName}>(table);");
-        sb.AppendLine($"{indent}    }}");
-        sb.AppendLine();
-    }
-
-    private static void GenerateInsertQueryExtensions(StringBuilder sb, TableInfo tableInfo)
-    {
-        var typeName = tableInfo.TypeName;
-        var tableTypeName = $"{typeName}Table";
-
-        var indent = tableInfo.Namespace != null ? "    " : "";
-
-        // InsertQuery.Values() 拡張メソッド（型推論用）
-        sb.AppendLine($"{indent}    /// <summary>");
-        sb.AppendLine($"{indent}    /// {typeName}エンティティのコレクションを指定してINSERTクエリビルダを生成");
-        sb.AppendLine($"{indent}    /// </summary>");
-        sb.AppendLine($"{indent}    public static AuraORM.Builder.Query.InsertQuery<{typeName}, {tableTypeName}> Values(this AuraORM.Builder.Query.InsertQuery<{tableTypeName}> builder, InsertQueryValues values)");
-        sb.AppendLine($"{indent}    {{");
-        sb.AppendLine($"{indent}        return builder.For<{typeName}>().Values(values);");
-        sb.AppendLine($"{indent}    }}");
-    }
-
-    private static void GenerateUpdateQueryExtensions(StringBuilder sb, TableInfo tableInfo)
-    {
-        var typeName = tableInfo.TypeName;
-        var tableTypeName = $"{typeName}Table";
-
-        var indent = tableInfo.Namespace != null ? "    " : "";
-
-        // UpdateQuery.Set() 拡張メソッド（型推論用）
-        sb.AppendLine($"{indent}    /// <summary>");
-        sb.AppendLine($"{indent}    /// {typeName}エンティティのコレクションを指定してUPDATEクエリビルダを生成");
-        sb.AppendLine($"{indent}    /// </summary>");
-        sb.AppendLine($"{indent}    public static AuraORM.Builder.Query.UpdateQuery<{typeName}, {tableTypeName}> Set(this AuraORM.Builder.Query.UpdateQuery<{tableTypeName}> builder, UpdateQueryValues values)");
-        sb.AppendLine($"{indent}    {{");
-        sb.AppendLine($"{indent}        return builder.For<{typeName}>().Set(values);");
-        sb.AppendLine($"{indent}    }}");
     }
 }

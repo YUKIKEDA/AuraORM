@@ -40,23 +40,20 @@ public sealed class SelectQuery
     /// <summary>
     /// テーブルを指定してSELECTクエリを生成します。
     /// </summary>
-    /// <typeparam name="TEntity">エンティティの型</typeparam>
     /// <typeparam name="TTable">テーブルの型</typeparam>
     /// <param name="table">テーブル</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery<TEntity, TTable> From<TEntity, TTable>(TTable table)
-        where TTable : ITable
+    public SelectQuery<TTable> From<TTable>(TTable table) where TTable : ITable
     {
-        return new SelectQuery<TEntity, TTable>(table, _context, _columns);
+        return new SelectQuery<TTable>(table, _context, _columns);
     }
 }
 
 /// <summary>
 /// SELECTクエリビルダーを表すクラス
 /// </summary>
-/// <typeparam name="TEntity">エンティティの型</typeparam>
 /// <typeparam name="TTable">テーブルの型</typeparam>
-public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
+public sealed class SelectQuery<TTable>where TTable : ITable
 {
     private readonly TTable _table;
     private readonly DbContext? _dbContext;
@@ -90,7 +87,7 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     /// </summary>
     /// <param name="condition">WHERE句の条件</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery<TEntity, TTable> Where(WhereCondition condition)
+    public SelectQuery<TTable> Where(WhereCondition condition)
     {
         _conditions.Add(condition);
         return this;
@@ -101,7 +98,7 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     /// </summary>
     /// <param name="orderBy">ORDER BY句</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery<TEntity, TTable> OrderBy(OrderByCondition orderBy)
+    public SelectQuery<TTable> OrderBy(OrderByCondition orderBy)
     {
         _orderByConditions.Add(orderBy);
         return this;
@@ -112,7 +109,7 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     /// </summary>
     /// <param name="limit">取得件数</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery<TEntity, TTable> Limit(int limit)
+    public SelectQuery<TTable> Limit(int limit)
     {
         _limit = limit;
         return this;
@@ -123,7 +120,7 @@ public sealed class SelectQuery<TEntity, TTable>where TTable : ITable
     /// </summary>
     /// <param name="offset">取得開始位置</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery<TEntity, TTable> Offset(int offset)
+    public SelectQuery<TTable> Offset(int offset)
     {
         _offset = offset;
         return this;

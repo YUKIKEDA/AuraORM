@@ -16,6 +16,8 @@ public sealed class InsertQuery<TTable> where TTable : ITable
     private readonly DbContext? _dbContext;
     private readonly TransactionContext? _transactionContext;
 
+    private InsertQueryValues _values = [];
+
     /// <summary>
     /// コンストラクタ
     /// </summary>
@@ -30,48 +32,11 @@ public sealed class InsertQuery<TTable> where TTable : ITable
     }
 
     /// <summary>
-    /// エンティティを指定してINSERTクエリを生成します。
-    /// </summary>
-    /// <typeparam name="TEntity">エンティティの型</typeparam>
-    /// <returns>INSERTクエリビルダー</returns>
-    public InsertQuery<TEntity, TTable> For<TEntity>()
-    {
-        return new InsertQuery<TEntity, TTable>(_table, _dbContext, _transactionContext);
-    }
-}
-
-/// <summary>
-/// INSERTクエリビルダー
-/// </summary>
-/// <typeparam name="TEntity">エンティティの型</typeparam>
-/// <typeparam name="TTable">テーブルの型</typeparam>
-public sealed class InsertQuery<TEntity, TTable> where TTable : ITable
-{
-    private readonly TTable _table;
-    private readonly DbContext? _dbContext;
-    private readonly TransactionContext? _transactionContext;
-
-    private InsertQueryValues _values = [];
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="table">テーブル</param>
-    /// <param name="dbContext">データベースコンテキスト</param>
-    /// <param name="transactionContext">トランザクションコンテキスト</param>
-    public InsertQuery(TTable table, DbContext? dbContext, TransactionContext? transactionContext)
-    {
-        _table = table;
-        _dbContext = dbContext;
-        _transactionContext = transactionContext;
-    }
-
-    /// <summary>
     /// 値を指定してINSERTクエリを生成します。
     /// </summary>
     /// <param name="values">値</param>
     /// <returns>INSERTクエリビルダー</returns>
-    public InsertQuery<TEntity, TTable> Values(InsertQueryValues values)
+    public InsertQuery<TTable> Values(InsertQueryValues values)
     {
         _values = values;
         return this;

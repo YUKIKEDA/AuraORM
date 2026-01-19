@@ -16,47 +16,12 @@ public sealed class UpdateQuery<TTable> where TTable : ITable
     private readonly TTable _table;
     private readonly DbContext? _dbContext;
     private readonly TransactionContext? _transactionContext;
+    private readonly List<WhereCondition> _whereConditions = [];
+
+    private UpdateQueryValues _values = [];
 
     /// <summary>
     /// コンストラクタ
-    /// </summary>
-    /// <param name="table">テーブル</param>
-    /// <param name="dbContext">データベースコンテキスト</param>
-    /// <param name="transactionContext">トランザクションコンテキスト</param>
-    public UpdateQuery(TTable table, DbContext? dbContext = null, TransactionContext? transactionContext = null)
-    {
-        _table = table;
-        _dbContext = dbContext;
-        _transactionContext = transactionContext;
-    }
-
-    /// <summary>
-    /// テーブルを指定してUPDATEクエリを生成します。
-    /// </summary>
-    /// <typeparam name="TEntity">エンティティの型</typeparam>
-    /// <returns>UPDATEクエリビルダー</returns>
-    public UpdateQuery<TEntity, TTable> For<TEntity>()
-    {
-        return new UpdateQuery<TEntity, TTable>(_table, _dbContext, _transactionContext);
-    }
-}
-
-/// <summary>
-/// UPDATEクエリビルダー
-/// </summary>
-/// <typeparam name="TEntity">エンティティの型</typeparam>
-/// <typeparam name="TTable">テーブルの型</typeparam>
-public sealed class UpdateQuery<TEntity, TTable> where TTable : ITable
-{
-    private readonly TTable _table;
-    private readonly DbContext? _dbContext;
-    private readonly TransactionContext? _transactionContext;
-    private readonly List<WhereCondition> _whereConditions = [];
-
-    private UpdateQueryValues _values = new();
-
-    /// <summary>
-    /// 値を指定してUPDATEクエリを生成します。
     /// </summary>
     /// <param name="table">テーブル</param>
     /// <param name="dbContext">データベースコンテキスト</param>
@@ -73,7 +38,7 @@ public sealed class UpdateQuery<TEntity, TTable> where TTable : ITable
     /// </summary>
     /// <param name="values">値</param>
     /// <returns>UPDATEクエリビルダー</returns>
-    public UpdateQuery<TEntity, TTable> Set(UpdateQueryValues values)
+    public UpdateQuery<TTable> Set(UpdateQueryValues values)
     {
         _values = values;
         return this;
@@ -84,7 +49,7 @@ public sealed class UpdateQuery<TEntity, TTable> where TTable : ITable
     /// </summary>
     /// <param name="condition">条件</param>
     /// <returns>UPDATEクエリビルダー</returns>
-    public UpdateQuery<TEntity, TTable> Where(WhereCondition condition)
+    public UpdateQuery<TTable> Where(WhereCondition condition)
     {
         _whereConditions.Add(condition);
         return this;
