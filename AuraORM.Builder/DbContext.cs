@@ -80,4 +80,15 @@ public class DbContext
     {
         return new DeleteQuery<TTable>(table, this);
     }
+
+    /// <summary>
+    /// RAW SQLクエリを生成します。
+    /// </summary>
+    /// <param name="rawSqlText">SQLテキスト</param>
+    /// <param name="parameters">パラメータ</param>
+    /// <returns>RAW SQLクエリビルダー</returns>
+    public RawSqlQuery RawSql(string rawSqlText, List<(string Name, object? Value)>? parameters = null)
+    {
+        return new RawSqlQuery(rawSqlText, parameters, this);
+    }
 }
