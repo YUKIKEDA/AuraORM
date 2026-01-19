@@ -58,6 +58,7 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     private readonly TTable _table;
     private readonly DbContext? _dbContext;
     private readonly Column[]? _columns;
+
     private readonly List<WhereCondition> _conditions = [];
     private readonly List<OrderByCondition> _orderByConditions = [];    
     private int? _limit;
@@ -124,6 +125,54 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     {
         _offset = offset;
         return this;
+    }
+
+    /// <summary>
+    /// INNER JOINを追加します。
+    /// </summary>
+    /// <typeparam name="TJoinTable">JOIN先のテーブルの型</typeparam>
+    /// <param name="joinTable">JOIN先のテーブル</param>
+    /// <param name="condition">JOIN条件</param>
+    /// <returns>SELECT JOINクエリビルダー</returns>
+    public SelectJoinQuery<TTable, TJoinTable> InnerJoin<TJoinTable>(TJoinTable joinTable, JoinCondition condition) where TJoinTable : ITable
+    {
+        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Inner, condition, _dbContext, _columns);
+    }
+
+    /// <summary>
+    /// LEFT JOINを追加します。
+    /// </summary>
+    /// <typeparam name="TJoinTable">JOIN先のテーブルの型</typeparam>
+    /// <param name="joinTable">JOIN先のテーブル</param>
+    /// <param name="condition">JOIN条件</param>
+    /// <returns>SELECT JOINクエリビルダー</returns>
+    public SelectJoinQuery<TTable, TJoinTable> LeftJoin<TJoinTable>(TJoinTable joinTable, JoinCondition condition) where TJoinTable : ITable
+    {
+        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Left, condition, _dbContext, _columns);
+    }
+
+    /// <summary>
+    /// RIGHT JOINを追加します。
+    /// </summary>
+    /// <typeparam name="TJoinTable">JOIN先のテーブルの型</typeparam>
+    /// <param name="joinTable">JOIN先のテーブル</param>
+    /// <param name="condition">JOIN条件</param>
+    /// <returns>SELECT JOINクエリビルダー</returns>
+    public SelectJoinQuery<TTable, TJoinTable> RightJoin<TJoinTable>(TJoinTable joinTable, JoinCondition condition) where TJoinTable : ITable
+    {
+        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Right, condition, _dbContext, _columns);
+    }
+
+    /// <summary>
+    /// FULL JOINを追加します。
+    /// </summary>
+    /// <typeparam name="TJoinTable">JOIN先のテーブルの型</typeparam>
+    /// <param name="joinTable">JOIN先のテーブル</param>
+    /// <param name="condition">JOIN条件</param>
+    /// <returns>SELECT JOINクエリビルダー</returns>
+    public SelectJoinQuery<TTable, TJoinTable> FullJoin<TJoinTable>(TJoinTable joinTable, JoinCondition condition) where TJoinTable : ITable
+    {
+        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Full, condition, _dbContext, _columns);
     }
 
     /// <summary>

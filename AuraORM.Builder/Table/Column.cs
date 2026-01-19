@@ -171,6 +171,31 @@ public class Column<T> : Column
     }
 
     /// <summary>
+    /// 等号演算子をオーバーロードします。
+    /// </summary>
+    /// <param name="left">左辺のカラム</param>
+    /// <param name="right">右辺のカラム</param>
+    /// <returns>JOIN条件</returns>
+    public static JoinCondition operator ==(Column<T> left, Column<T> right)
+    {
+        return new JoinCondition(left.Name, right.Name);
+    }
+
+    /// <summary>
+    /// 不等号演算子をオーバーロードします。
+    /// </summary>
+    /// <param name="left">左辺のカラム</param>
+    /// <param name="right">右辺のカラム</param>
+    /// <returns>JOIN条件</returns>
+    /// <exception cref="InvalidOperationException">JOIN条件では != 演算子は使用できません。== のみサポートされています。</exception>
+    [Obsolete("JOIN条件では != 演算子は使用できません。== のみサポートされています。", error: true)]
+    public static JoinCondition operator !=(Column<T> left, Column<T> right)
+    {
+        // TODO: コンパイルエラーにする方法を検討 (Obsoluteは本来の用途と異なる)
+        throw new InvalidOperationException("JOIN条件では != 演算子は使用できません。== のみサポートされています。");
+    }
+
+    /// <summary>
     /// 等しいかどうかを比較します。
     /// </summary>
     /// <param name="obj">比較対象</param>
