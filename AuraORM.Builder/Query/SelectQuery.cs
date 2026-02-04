@@ -11,53 +11,43 @@ namespace AuraORM.Builder.Query;
 /// </summary>
 public sealed class SelectQuery
 {
-    private readonly DbContext? _context;
-    private readonly Column[] _columns;
+    /// <summary>
+    /// データベースコンテキスト
+    /// </summary>
+    private readonly DbContext _context;
 
     /// <summary>
     /// コンストラクタ
     /// </summary>
     /// <param name="context">データベースコンテキスト</param>
     /// <param name="columns">カラム</param>
-    internal SelectQuery(DbContext? context = null, params Column[] columns)
+    internal SelectQuery(DbContext context)
     {
         _context = context;
-        _columns = columns;
     }
-
-    /// <summary>
-    /// データベースコンテキストを取得します。
-    /// </summary>
-    /// <returns>データベースコンテキスト。関連付けられていない場合は null。</returns>
-    public DbContext? GetContext() => _context;
-
-    /// <summary>
-    /// カラムを取得します。
-    /// </summary>
-    /// <returns>カラムの配列</returns>
-    public Column[] GetColumns() => _columns;
 
     /// <summary>
     /// テーブルを指定してSELECTクエリを生成します。
     /// </summary>
+    /// <typeparam name="TEntity">エンティティの型</typeparam>
     /// <typeparam name="TTable">テーブルの型</typeparam>
     /// <param name="table">テーブル</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery<TTable> From<TTable>(TTable table) where TTable : ITable
+    public SelectQuery<TEntity, TTable> From<TEntity, TTable>(TTable table) where TTable : ITable
     {
-        return new SelectQuery<TTable>(table, _context, _columns);
+        return new SelectQuery<TEntity, TTable>(table, _context);
     }
 }
 
 /// <summary>
 /// SELECTクエリビルダーを表すクラス
 /// </summary>
+/// <typeparam name="TEntity">エンティティの型</typeparam>
 /// <typeparam name="TTable">テーブルの型</typeparam>
-public sealed class SelectQuery<TTable>where TTable : ITable
+public sealed class SelectQuery<TEntity, TTable> where TTable : ITable
 {
     private readonly TTable _table;
-    private readonly DbContext? _dbContext;
-    private readonly Column[]? _columns;
+    public DbContext DbContext { get; }
 
     private readonly List<WhereCondition> _conditions = [];
     private readonly List<OrderByCondition> _orderByConditions = [];    
@@ -70,25 +60,18 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     /// <param name="table">テーブル</param>
     /// <param name="dbContext">データベースコンテキスト</param>
     /// <param name="columns">カラム</param>
-    public SelectQuery(TTable table, DbContext? dbContext = null, Column[]? columns = null)
+    public SelectQuery(TTable table, DbContext dbContext, Column[]? columns = null)
     {
         _table = table;
-        _dbContext = dbContext;
-        _columns = columns;
+        DbContext = dbContext;
     }
-
-    /// <summary>
-    /// このビルダーに関連付けられているデータベースコンテキストを取得します。
-    /// </summary>
-    /// <returns>データベースコンテキスト。関連付けられていない場合は null。</returns>
-    public DbContext? GetDbContext() => _dbContext;
 
     /// <summary>
     /// WHERE句を追加します。
     /// </summary>
     /// <param name="condition">WHERE句の条件</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery<TTable> Where(WhereCondition condition)
+    public SelectQuery<TEntity, TTable> Where(WhereCondition condition)
     {
         _conditions.Add(condition);
         return this;
@@ -99,7 +82,7 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     /// </summary>
     /// <param name="orderBy">ORDER BY句</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery<TTable> OrderBy(OrderByCondition orderBy)
+    public SelectQuery<TEntity, TTable> OrderBy(OrderByCondition orderBy)
     {
         _orderByConditions.Add(orderBy);
         return this;
@@ -110,7 +93,7 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     /// </summary>
     /// <param name="limit">取得件数</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery<TTable> Limit(int limit)
+    public SelectQuery<TEntity, TTable> Limit(int limit)
     {
         _limit = limit;
         return this;
@@ -121,7 +104,7 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     /// </summary>
     /// <param name="offset">取得開始位置</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery<TTable> Offset(int offset)
+    public SelectQuery<TEntity, TTable> Offset(int offset)
     {
         _offset = offset;
         return this;
@@ -136,7 +119,7 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     /// <returns>SELECT JOINクエリビルダー</returns>
     public SelectJoinQuery<TTable, TJoinTable> InnerJoin<TJoinTable>(TJoinTable joinTable, JoinCondition condition) where TJoinTable : ITable
     {
-        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Inner, condition, _dbContext, _columns);
+        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Inner, condition, DbContext);
     }
 
     /// <summary>
@@ -148,7 +131,7 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     /// <returns>SELECT JOINクエリビルダー</returns>
     public SelectJoinQuery<TTable, TJoinTable> LeftJoin<TJoinTable>(TJoinTable joinTable, JoinCondition condition) where TJoinTable : ITable
     {
-        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Left, condition, _dbContext, _columns);
+        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Left, condition, DbContext);
     }
 
     /// <summary>
@@ -160,7 +143,7 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     /// <returns>SELECT JOINクエリビルダー</returns>
     public SelectJoinQuery<TTable, TJoinTable> RightJoin<TJoinTable>(TJoinTable joinTable, JoinCondition condition) where TJoinTable : ITable
     {
-        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Right, condition, _dbContext, _columns);
+        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Right, condition, DbContext);
     }
 
     /// <summary>
@@ -172,7 +155,7 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     /// <returns>SELECT JOINクエリビルダー</returns>
     public SelectJoinQuery<TTable, TJoinTable> FullJoin<TJoinTable>(TJoinTable joinTable, JoinCondition condition) where TJoinTable : ITable
     {
-        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Full, condition, _dbContext, _columns);
+        return new SelectJoinQuery<TTable, TJoinTable>(_table, joinTable, JoinType.Full, condition, DbContext);
     }
 
     /// <summary>
@@ -182,7 +165,7 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     public (string SqlText, List<(string Name, object? Value)> Parameters) Build()
     {
         var sqlBuilder = new StringBuilder();
-        var dialect = _dbContext?.Dialect ?? DialectProvider.Default;
+        var dialect = DbContext?.Dialect ?? DialectProvider.Default;
 
         // SELECT句の構築
         BuildSelectClause(sqlBuilder, dialect);
@@ -217,22 +200,7 @@ public sealed class SelectQuery<TTable>where TTable : ITable
     private void BuildSelectClause(StringBuilder sqlBuilder, ISqlDialect dialect)
     {
         sqlBuilder.Append("SELECT ");
-        
-        if (_columns != null && _columns.Length > 0)
-        {
-            for (int i = 0; i < _columns.Length; i++)
-            {
-                if (i > 0)
-                {
-                    sqlBuilder.Append(", ");
-                }
-                sqlBuilder.Append(dialect.QuoteIdentifier(_columns[i].Name));
-            }
-        }
-        else
-        {
-            sqlBuilder.Append("*");
-        }
+        sqlBuilder.Append("*");
     }
 
     /// <summary>

@@ -12,3 +12,15 @@ public partial record User(
     int? Age,
     DateTime CreatedAt
 );
+
+
+[QueryResult]
+public partial record UserNameResult(
+    [Column("name")] string Name
+);
+
+[QueryResult]
+public partial record UserNameAndAgeResult(
+    [Column("name")] string Name,
+    [Column("age")] int? Age
+);

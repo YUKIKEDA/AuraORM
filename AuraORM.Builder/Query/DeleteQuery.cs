@@ -3,7 +3,6 @@ using System.Text;
 using AuraORM.Builder.Conditions;
 using AuraORM.Builder.Dialect;
 using AuraORM.Builder.Table;
-using AuraORM.Builder.Transaction;
 
 namespace AuraORM.Builder.Query;
 
@@ -15,7 +14,6 @@ public sealed class DeleteQuery<TTable> where TTable : ITable
 {
     private readonly TTable _table;
     private readonly DbContext? _dbContext;
-    private readonly TransactionContext? _transactionContext;
     private readonly List<WhereCondition> _whereConditions = [];
 
     /// <summary>
@@ -23,12 +21,10 @@ public sealed class DeleteQuery<TTable> where TTable : ITable
     /// </summary>
     /// <param name="table">テーブル</param>
     /// <param name="dbContext">データベースコンテキスト</param>
-    /// <param name="transactionContext">トランザクションコンテキスト</param>
-    internal DeleteQuery(TTable table, DbContext? dbContext = null, TransactionContext? transactionContext = null)
+    internal DeleteQuery(TTable table, DbContext? dbContext = null)
     {
         _table = table;
         _dbContext = dbContext;
-        _transactionContext = transactionContext;
     }
 
     /// <summary>

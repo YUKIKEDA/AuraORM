@@ -21,9 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AuraORM.Builder\AuraORM.Builder.csproj" />
-    <ProjectReference Include="..\AuraORM.Generator\AuraORM.Generator.csproj" 
-                      OutputItemType="Analyzer" 
-                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\AuraORM.Generator\AuraORM.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -31,7 +29,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Fixtures\" />
     <Folder Include="Schema\" />
     <Folder Include="Tests\Conditions\" />
   </ItemGroup>

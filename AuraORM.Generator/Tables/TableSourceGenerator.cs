@@ -23,7 +23,7 @@ public class TableSourceGenerator : IIncrementalGenerator
                 predicate: (node, _) => node is RecordDeclarationSyntax or ClassDeclarationSyntax,
                 transform: (ctx, ct) => GetTableInfo(ctx, ct))
             .Where(info => info is not null)
-            .Select((info, _) => info!);
+            .Select((info, _) => info!); // null許容を外す
 
         // コード生成
         context.RegisterSourceOutput(tableTypes, (ctx, tableInfo) =>
@@ -260,9 +260,17 @@ public class TableSourceGenerator : IIncrementalGenerator
 
         // テーブルクラスを生成
         GenerateTableClass(sb, tableInfo);
+        
         sb.AppendLine();
+        
         // クエリビルダー拡張メソッドを生成
         GenerateQueryBuilderExtensions(sb, tableInfo);
+
+        sb.AppendLine();
+
+        // マッパー拡張メソッドを生成
+        GenerateMapperExtensions(sb, tableInfo);
+
 
         // -------------------------------------------------------
 
@@ -346,6 +354,12 @@ public class TableSourceGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}{{");
 
         // Select句拡張メソッド (必要に応じて追加)
+        GenerateSelectQueryExtensions(sb, tableInfo);
+        
+        sb.AppendLine();
+
+        // Select Columns拡張メソッド (必要に応じて追加)
+        GenerateSelectColumnsQueryExtensions(sb, tableInfo);
 
         // Insert句拡張メソッド (必要に応じて追加)
 
@@ -354,5 +368,199 @@ public class TableSourceGenerator : IIncrementalGenerator
         // Delete句拡張メソッド (必要に応じて追加)
 
         sb.AppendLine($"{indent}}}");
+    }
+
+    private static void GenerateSelectQueryExtensions(StringBuilder sb, TableInfo tableInfo)
+    {
+        var indent = tableInfo.Namespace != null ? "    " : "";
+
+        var typeName = tableInfo.TypeName;
+        var tableTypeName = $"{typeName}Table";
+
+        // Fromメソッド
+        sb.AppendLine($"{indent}    /// <summary>");
+        sb.AppendLine($"{indent}    /// {typeName}テーブルを指定してクエリビルダを生成（型推論付き）");
+        sb.AppendLine($"{indent}    /// </summary>");
+        sb.AppendLine($"{indent}    public static AuraORM.Builder.Query.SelectQuery<{typeName}, {tableTypeName}> From(this AuraORM.Builder.Query.SelectQuery builder, {tableTypeName} table)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        return builder.From<{typeName}, {tableTypeName}>(table);");
+        sb.AppendLine($"{indent}    }}");
+
+        sb.AppendLine();
+
+        // ToListAsync()メソッド
+        sb.AppendLine($"{indent}    /// <summary>");
+        sb.AppendLine($"{indent}    /// SELECTクエリを非同期で実行し、結果をリストで取得");
+        sb.AppendLine($"{indent}    /// </summary>");
+        sb.AppendLine($"{indent}    public static async System.Threading.Tasks.Task<System.Collections.Generic.List<{typeName}>> ToListAsync(");
+        sb.AppendLine($"{indent}        this AuraORM.Builder.Query.SelectQuery<{typeName}, {tableTypeName}> query,");
+        sb.AppendLine($"{indent}        System.Threading.CancellationToken token = default)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        var results = new System.Collections.Generic.List<{typeName}>();");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}        var db = query.DbContext;");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}        var transaction = db.TransactionContext?.Transaction;");
+        sb.AppendLine($"{indent}        var connection = db.Connection;");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}        var (sql, parameters) = query.Build();");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}        await using var command = connection.CreateCommand();");
+        sb.AppendLine($"{indent}        command.CommandText = sql;");
+        sb.AppendLine($"{indent}        command.Transaction = transaction;");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}        foreach (var (name, value) in parameters)");
+        sb.AppendLine($"{indent}        {{");
+        sb.AppendLine($"{indent}            var param = command.CreateParameter();");
+        sb.AppendLine($"{indent}            param.ParameterName = name;");
+        sb.AppendLine($"{indent}            param.Value = value ?? System.DBNull.Value;");
+        sb.AppendLine($"{indent}            command.Parameters.Add(param);");
+        sb.AppendLine($"{indent}        }}");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);");
+        sb.AppendLine($"{indent}        while (await reader.ReadAsync(token).ConfigureAwait(false))");
+        sb.AppendLine($"{indent}        {{");
+        sb.AppendLine($"{indent}            results.Add(reader.Map{typeName}());");
+        sb.AppendLine($"{indent}        }}");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}        return results;");
+        sb.AppendLine($"{indent}    }}");
+    }
+
+    private static void GenerateSelectColumnsQueryExtensions(StringBuilder sb, TableInfo tableInfo)
+    {
+        var indent = tableInfo.Namespace != null ? "    " : "";
+
+        var typeName = tableInfo.TypeName;
+        var tableTypeName = $"{typeName}Table";
+
+        // Fromメソッド
+        sb.AppendLine($"{indent}    /// <summary>");
+        sb.AppendLine($"{indent}    /// {typeName}テーブルを指定してクエリビルダを生成（型推論付き）");
+        sb.AppendLine($"{indent}    /// </summary>");
+        sb.AppendLine($"{indent}    public static AuraORM.Builder.Query.SelectColumnsQuery<{typeName}, {tableTypeName}> From(this AuraORM.Builder.Query.SelectColumnsQuery builder, {tableTypeName} table)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        return builder.From<{typeName}, {tableTypeName}>(table);");
+        sb.AppendLine($"{indent}    }}");
+
+        sb.AppendLine();
+
+    }
+
+
+    private static void GenerateMapperExtensions(StringBuilder sb, TableInfo tableInfo)
+    {
+        var indent = tableInfo.Namespace != null ? "    " : "";
+
+        sb.AppendLine($"{indent}/// <summary>");
+        sb.AppendLine($"{indent}/// {tableInfo.TypeName}のマッパー拡張メソッド");
+        sb.AppendLine($"{indent}/// </summary>");
+        sb.AppendLine($"{indent}public static class {tableInfo.TypeName}Extensions");
+        sb.AppendLine($"{indent}{{");
+        // Map メソッド (IDataReaderから読み込み)
+        sb.AppendLine($"{indent}    /// <summary>");
+        sb.AppendLine($"{indent}    /// IDataReaderから{tableInfo.TypeName}を生成（リフレクション不使用）");
+        sb.AppendLine($"{indent}    /// </summary>");
+        sb.AppendLine($"{indent}    public static {tableInfo.TypeName} Map{tableInfo.TypeName}(this IDataReader reader)");
+        sb.AppendLine($"{indent}    {{");
+
+        if (tableInfo.IsRecord)
+        {
+            // recordの場合はコンストラクタを使用
+            var args = string.Join(",\n" + indent + "            ", tableInfo.Columns.Select(c => GenerateReaderCall(c)));
+            sb.AppendLine($"{indent}        return new {tableInfo.TypeName}(");
+            sb.AppendLine($"{indent}            {args});");
+        }
+        else
+        {
+            // クラスの場合はオブジェクト初期化子を使用
+            sb.AppendLine($"{indent}        return new {tableInfo.TypeName}");
+            sb.AppendLine($"{indent}        {{");
+            for (int i = 0; i < tableInfo.Columns.Count; i++)
+            {
+                var column = tableInfo.Columns[i];
+                var comma = i < tableInfo.Columns.Count - 1 ? "," : "";
+                sb.AppendLine($"{indent}            {column.PropertyName} = {GenerateReaderCall(column)}{comma}");
+            }
+            sb.AppendLine($"{indent}        }};");
+        }
+
+        sb.AppendLine($"{indent}    }}");
+        sb.AppendLine($"{indent}}}");
+    }
+
+    private static string GenerateReaderCall(ColumnInfo column)
+    {
+        var baseType = column.TypeName.TrimEnd('?');
+        var isNullable = column.TypeName.EndsWith("?") || column.IsNullable;
+
+        // Enum型の処理
+        if (column.IsEnum)
+        {
+            var underlyingGetter = column.UnderlyingEnumType switch
+            {
+                "int" or "System.Int32" => "GetInt32",
+                "long" or "System.Int64" => "GetInt64",
+                "short" or "System.Int16" => "GetInt16",
+                "byte" or "System.Byte" => "GetByte",
+                "sbyte" or "System.SByte" => "GetByte", // SByteは特殊対応
+                "uint" or "System.UInt32" => "GetInt32", // UInt32はInt32で読み取り
+                "ulong" or "System.UInt64" => "GetInt64", // UInt64はInt64で読み取り
+                "ushort" or "System.UInt16" => "GetInt16", // UInt16はInt16で読み取り
+                _ => "GetInt32"
+            };
+
+            if (isNullable)
+            {
+                // Nullable<Enum>の場合、明示的なキャストが必要
+                return $"reader.IsDBNull({column.Ordinal}) ? ({baseType}?)null : ({baseType})reader.{underlyingGetter}({column.Ordinal})";
+            }
+            return $"({baseType})reader.{underlyingGetter}({column.Ordinal})";
+        }
+
+        var getterMethod = baseType switch
+        {
+            "int" or "System.Int32" => "GetInt32",
+            "long" or "System.Int64" => "GetInt64",
+            "short" or "System.Int16" => "GetInt16",
+            "byte" or "System.Byte" => "GetByte",
+            "bool" or "System.Boolean" => "GetBoolean",
+            "float" or "System.Single" => "GetFloat",
+            "double" or "System.Double" => "GetDouble",
+            "decimal" or "System.Decimal" => "GetDecimal",
+            "string" or "System.String" => "GetString",
+            "System.DateTime" or "DateTime" => "GetDateTime",
+            "System.Guid" or "Guid" => "GetGuid",
+            "System.DateTimeOffset" or "DateTimeOffset" => null, // 特殊対応
+            "System.TimeSpan" or "TimeSpan" => null, // 特殊対応
+            _ => null
+        };
+
+        // DateTimeOffset/TimeSpanの特殊対応
+        if (baseType is "System.DateTimeOffset" or "DateTimeOffset")
+        {
+            return isNullable
+                ? $"reader.IsDBNull({column.Ordinal}) ? null : (DateTimeOffset)reader.GetValue({column.Ordinal})"
+                : $"(DateTimeOffset)reader.GetValue({column.Ordinal})";
+        }
+
+        if (baseType is "System.TimeSpan" or "TimeSpan")
+        {
+            return isNullable
+                ? $"reader.IsDBNull({column.Ordinal}) ? null : (TimeSpan)reader.GetValue({column.Ordinal})"
+                : $"(TimeSpan)reader.GetValue({column.Ordinal})";
+        }
+
+        if (getterMethod == null)
+        {
+            // 未知の型はGetValueで取得
+            return isNullable
+                ? $"reader.IsDBNull({column.Ordinal}) ? default : ({column.TypeName})reader.GetValue({column.Ordinal})"
+                : $"({baseType})reader.GetValue({column.Ordinal})";
+        }
+
+        return isNullable
+            ? $"reader.IsDBNull({column.Ordinal}) ? null : reader.{getterMethod}({column.Ordinal})"
+            : $"reader.{getterMethod}({column.Ordinal})";
     }
 }

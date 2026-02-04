@@ -3,6 +3,7 @@ using System.Data.Common;
 using AuraORM.Builder.Dialect;
 using AuraORM.Builder.Query;
 using AuraORM.Builder.Table;
+using AuraORM.Builder.Transaction;
 
 namespace AuraORM.Builder;
 
@@ -27,6 +28,11 @@ public class DbContext
     public ISqlDialect Dialect { get; }
 
     /// <summary>
+    /// トランザクションコンテキスト
+    /// </summary>
+    public TransactionContext? TransactionContext { get; }
+
+    /// <summary>
     /// コンストラクタ
     /// </summary>
     /// <param name="connection">データベース接続</param>
@@ -41,11 +47,20 @@ public class DbContext
     /// <summary>
     /// SELECTクエリを生成します。
     /// </summary>
-    /// <param name="columns">カラム</param>
     /// <returns>SELECTクエリビルダー</returns>
-    public SelectQuery Select(params Column[] columns)
+    public SelectQuery Select()
     {
-        return new SelectQuery(this, columns);
+        return new SelectQuery(this);
+    }
+
+    /// <summary>
+    /// SELECT COLUMNSクエリを生成します。
+    /// </summary>
+    /// <param name="columns">カラム</param>
+    /// <returns>SELECT COLUMNSクエリビルダー</returns>
+    public SelectColumnsQuery Select(params Column[] columns)
+    {
+        return new SelectColumnsQuery(this, columns);
     }
 
     /// <summary>

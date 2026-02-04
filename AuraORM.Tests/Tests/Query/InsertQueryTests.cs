@@ -96,7 +96,7 @@ public class InsertQueryTests
     {
         // Arrange
         // Act
-        var query = _fixture.Db.Insert(UserTable).Values(new());
+        var query = _fixture.Db.Insert(UserTable).Values([]);
         var (sqlText, parameters) = query.Build();
 
         // Assert

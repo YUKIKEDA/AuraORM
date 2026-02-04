@@ -10,7 +10,7 @@ public class SelectQueryTests
     private readonly TestFixture _fixture = new();
 
     [Fact]
-    public void Selectで何もしていない場合はFrom句で指定したテーブルのデータを全件取得できる()
+    public void Selectで何もしていない場合はFrom句で指定したテーブルのデータを全件取得するSQLが生成できる()
     {
         // Arrange
 
@@ -25,7 +25,7 @@ public class SelectQueryTests
     }
 
     [Fact]
-    public void Selectで指定した1つのカラムのデータをFromで指定したテーブルから取得できる()
+    public void Selectで指定した1つのカラムのデータをFromで指定したテーブルから取得するSQLが生成できる()
     {
         // Arrange
 
@@ -40,7 +40,7 @@ public class SelectQueryTests
     }
 
     [Fact]
-    public void Selectで指定した複数のカラムのデータをFromで指定したテーブルから取得できる()
+    public void Selectで指定した複数のカラムのデータをFromで指定したテーブルから取得するSQLが生成できる()
     {
         // Arrange
         
