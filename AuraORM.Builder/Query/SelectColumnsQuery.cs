@@ -7,22 +7,6 @@ using AuraORM.Builder.Table;
 namespace AuraORM.Builder.Query;
 
 /// <summary>
-/// SELECT COLUMNSクエリの共通インターフェース
-/// </summary>
-public interface ISelectColumnsQuery
-{
-    /// <summary>
-    /// データベースコンテキスト
-    /// </summary>
-    DbContext DbContext { get; }
-
-    /// <summary>
-    /// 構築されたSELECTクエリをSQLテキストとパラメータのリストに変換します。
-    /// </summary>
-    (string SqlText, List<(string Name, object? Value)> Parameters) Build();
-}
-
-/// <summary>
 ///  
 /// </summary>
 public class SelectColumnsQuery
@@ -67,7 +51,7 @@ public class SelectColumnsQuery
 /// </summary>
 /// <typeparam name="TEntity">エンティティの型</typeparam>
 /// <typeparam name="TTable">テーブルの型</typeparam>
-public sealed class SelectColumnsQuery<TEntity, TTable> : ISelectColumnsQuery where TTable : ITable
+public sealed class SelectColumnsQuery<TEntity, TTable> : IQueryBuilder where TTable : ITable
 {
     private readonly TTable _table;
     public DbContext DbContext { get; }

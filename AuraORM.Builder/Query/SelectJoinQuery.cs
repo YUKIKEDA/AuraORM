@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 
 using AuraORM.Builder.Conditions;
 using AuraORM.Builder.Dialect;
@@ -11,7 +11,7 @@ namespace AuraORM.Builder.Query;
 /// </summary>
 /// <typeparam name="TTable">テーブルの型</typeparam>
 /// <typeparam name="TJoinTable">JOIN先のテーブルの型</typeparam>
-public sealed class SelectJoinQuery<TTable, TJoinTable> 
+public sealed class SelectJoinQuery<TTable, TJoinTable> : IQueryBuilder
     where TTable : ITable
     where TJoinTable : ITable
 {
@@ -19,12 +19,13 @@ public sealed class SelectJoinQuery<TTable, TJoinTable>
     private readonly TJoinTable _joinTable;
     private readonly JoinType _joinType;
     private readonly JoinCondition _joinCondition;
-    private readonly DbContext? _dbContext;
     private readonly Column[]? _columns;
     private readonly List<WhereCondition> _whereConditions = [];
     private readonly List<OrderByCondition> _orderByConditions = [];
     private int? _limit;
     private int? _offset;
+
+    public DbContext DbContext { get; }
 
     /// <summary>
     /// コンストラクタ
@@ -40,14 +41,14 @@ public sealed class SelectJoinQuery<TTable, TJoinTable>
         TJoinTable joinTable,
         JoinType joinType,
         JoinCondition joinCondition,
-        DbContext? dbContext = null,
+        DbContext dbContext,
         Column[]? columns = null)
     {
         _table = table;
         _joinTable = joinTable;
         _joinType = joinType;
         _joinCondition = joinCondition;
-        _dbContext = dbContext;
+        DbContext = dbContext;
         _columns = columns;
     }
 
@@ -102,7 +103,7 @@ public sealed class SelectJoinQuery<TTable, TJoinTable>
     public (string SqlText, List<(string Name, object? Value)> Parameters) Build()
     {
         var sqlBuilder = new StringBuilder();
-        var dialect = _dbContext?.Dialect ?? DialectProvider.Default;
+        var dialect = DbContext.Dialect;
 
         // SELECT句の構築
         BuildSelectClause(sqlBuilder, dialect);
@@ -137,7 +138,7 @@ public sealed class SelectJoinQuery<TTable, TJoinTable>
     private void BuildSelectClause(StringBuilder sqlBuilder, ISqlDialect dialect)
     {
         sqlBuilder.Append("SELECT ");
-        
+
         if (_columns != null && _columns.Length > 0)
         {
             for (int i = 0; i < _columns.Length; i++)
@@ -151,7 +152,30 @@ public sealed class SelectJoinQuery<TTable, TJoinTable>
         }
         else
         {
-            sqlBuilder.Append("*");
+            // JOIN時はカラム名の重複を避けるため、テーブル名プレフィックス付きでエイリアスを付与
+            var tableName = _table.TableName;
+            var joinTableName = _joinTable.TableName;
+            var first = true;
+            foreach (var col in _table.ColumnNames)
+            {
+                if (!first) sqlBuilder.Append(", ");
+                sqlBuilder.Append(dialect.QuoteIdentifier(tableName));
+                sqlBuilder.Append(".");
+                sqlBuilder.Append(dialect.QuoteIdentifier(col));
+                sqlBuilder.Append(" AS ");
+                sqlBuilder.Append(dialect.QuoteIdentifier($"{tableName}_{col}"));
+                first = false;
+            }
+            foreach (var col in _joinTable.ColumnNames)
+            {
+                if (!first) sqlBuilder.Append(", ");
+                sqlBuilder.Append(dialect.QuoteIdentifier(joinTableName));
+                sqlBuilder.Append(".");
+                sqlBuilder.Append(dialect.QuoteIdentifier(col));
+                sqlBuilder.Append(" AS ");
+                sqlBuilder.Append(dialect.QuoteIdentifier($"{joinTableName}_{col}"));
+                first = false;
+            }
         }
     }
 

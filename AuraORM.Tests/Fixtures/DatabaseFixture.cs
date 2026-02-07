@@ -46,6 +46,21 @@ public class DatabaseFixture : IDisposable
 
         using var cmd1 = new SqliteCommand(createUsersTable, Connection);
         cmd1.ExecuteNonQuery();
+
+        var createOrdersTable = @"
+            CREATE TABLE orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userid INTEGER NOT NULL,
+                productname TEXT NOT NULL,
+                amount REAL NOT NULL,
+                status INTEGER NOT NULL,
+                orderdate TEXT NOT NULL,
+                shippeddate TEXT,
+                FOREIGN KEY (userid) REFERENCES users(id)
+            )";
+
+        using var cmd2 = new SqliteCommand(createOrdersTable, Connection);
+        cmd2.ExecuteNonQuery();
     }
 
     /// <summary>
@@ -74,12 +89,42 @@ public class DatabaseFixture : IDisposable
     }
 
     /// <summary>
+    /// テスト用の注文データを挿入する（SeedUsers の後に呼ぶこと）
+    /// </summary>
+    public void SeedOrders()
+    {
+        var baseDate = DateTime.Now;
+        var orders = new[]
+        {
+            (UserId: 1, ProductName: "商品A", Amount: 1000m, Status: 0, OrderDate: baseDate, ShippedDate: (DateTime?)null),
+            (UserId: 1, ProductName: "商品B", Amount: 2000m, Status: 2, OrderDate: baseDate, ShippedDate: (DateTime?)baseDate.AddDays(1)),
+            (UserId: 2, ProductName: "商品C", Amount: 1500m, Status: 1, OrderDate: baseDate, ShippedDate: (DateTime?)null),
+        };
+
+        foreach (var (userId, productName, amount, status, orderDate, shippedDate) in orders)
+        {
+            using var cmd = new SqliteCommand(
+                "INSERT INTO orders (userid, productname, amount, status, orderdate, shippeddate) VALUES (@userId, @productName, @amount, @status, @orderDate, @shippedDate)",
+                Connection);
+            cmd.Parameters.AddWithValue("@userId", userId);
+            cmd.Parameters.AddWithValue("@productName", productName);
+            cmd.Parameters.AddWithValue("@amount", amount);
+            cmd.Parameters.AddWithValue("@status", status);
+            cmd.Parameters.AddWithValue("@orderDate", orderDate.ToString("o"));
+            cmd.Parameters.AddWithValue("@shippedDate", shippedDate?.ToString("o") ?? (object)DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
     /// テストデータをリセットする
     /// </summary>
     public void ResetDatabase()
     {
-        using var cmd1 = new SqliteCommand("DELETE FROM users", Connection);
+        using var cmd1 = new SqliteCommand("DELETE FROM orders", Connection);
         cmd1.ExecuteNonQuery();
+        using var cmd2 = new SqliteCommand("DELETE FROM users", Connection);
+        cmd2.ExecuteNonQuery();
 
         // AutoIncrementをリセット
         using var cmd3 = new SqliteCommand("DELETE FROM sqlite_sequence", Connection);

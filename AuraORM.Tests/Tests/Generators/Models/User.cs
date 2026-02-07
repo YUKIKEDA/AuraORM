@@ -7,10 +7,10 @@ namespace AuraORM.Tests.Tests.Generators.Models;
 /// </summary>
 [Table("users")]
 public partial record User(
-    [Pk, AutoIncrement] int Id,
-    string Name,
-    int? Age,
-    DateTime CreatedAt
+    [Pk, AutoIncrement, Column("id")] int Id,
+    [Column("name")] string Name,
+    [Column("age")] int? Age,
+    [Column("createdat")] DateTime CreatedAt
 );
 
 

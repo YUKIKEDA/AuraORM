@@ -261,32 +261,20 @@ public class QueryResultSourceGenerator : IIncrementalGenerator
     /// <param name="indent"></param>
     private static void GenerateQueryBuilderExtensions(StringBuilder sb, QueryResult info, string indent)
     {
-        sb.AppendLine($"{indent}/// <summary>");
-        sb.AppendLine($"{indent}/// {info.TypeName}用のクエリビルダー拡張メソッド");
-        sb.AppendLine($"{indent}/// </summary>");
-        sb.AppendLine($"{indent}public static class {info.TypeName}QueryResultExtensions");
-        sb.AppendLine($"{indent}{{");
-        // SelectColumns拡張メソッド生成
-        GenerateSelectColumnsQueryExtensions(sb, info, indent);
-
-        sb.AppendLine($"{indent}}}");
-    }
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="sb"></param>
-    /// <param name="info"></param>
-    /// <param name="indent"></param>
-    private static void GenerateSelectColumnsQueryExtensions(StringBuilder sb, QueryResult info, string indent)
-    {
         var typeName = info.TypeName;
 
+        sb.AppendLine($"{indent}/// <summary>");
+        sb.AppendLine($"{indent}/// {typeName}用のクエリビルダー拡張メソッド");
+        sb.AppendLine($"{indent}/// </summary>");
+        sb.AppendLine($"{indent}public static class {typeName}QueryResultExtensions");
+        sb.AppendLine($"{indent}{{");
+
+        // IQueryBuilder拡張メソッド生成
         sb.AppendLine($"{indent}    /// <summary>");
-        sb.AppendLine($"{indent}    /// SELECT COLUMNSクエリを非同期で実行し、結果を{typeName}のリストで取得");
+        sb.AppendLine($"{indent}    /// クエリを非同期で実行し、結果を{typeName}のリストで取得");
         sb.AppendLine($"{indent}    /// </summary>");
         sb.AppendLine($"{indent}    public static async System.Threading.Tasks.Task<System.Collections.Generic.List<{typeName}>> ToListAsync<TResult>(");
-        sb.AppendLine($"{indent}        this ISelectColumnsQuery query,");
+        sb.AppendLine($"{indent}        this IQueryBuilder query,");
         sb.AppendLine($"{indent}        System.Threading.CancellationToken token = default) where TResult : {typeName}");
         sb.AppendLine($"{indent}    {{");
         sb.AppendLine($"{indent}        var results = new System.Collections.Generic.List<{typeName}>();");
@@ -318,14 +306,10 @@ public class QueryResultSourceGenerator : IIncrementalGenerator
         sb.AppendLine();
         sb.AppendLine($"{indent}        return results;");
         sb.AppendLine($"{indent}    }}");
+
+        sb.AppendLine($"{indent}}}");
     }
 
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="sb"></param>
-    /// <param name="info"></param>
-    /// <param name="indent"></param>
     private static void GenerateMapperExtensions(StringBuilder sb, QueryResult info, string indent)
     {
         sb.AppendLine($"{indent}/// <summary>");

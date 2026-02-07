@@ -59,8 +59,7 @@ public sealed class SelectQuery<TEntity, TTable> where TTable : ITable
     /// </summary>
     /// <param name="table">テーブル</param>
     /// <param name="dbContext">データベースコンテキスト</param>
-    /// <param name="columns">カラム</param>
-    public SelectQuery(TTable table, DbContext dbContext, Column[]? columns = null)
+    public SelectQuery(TTable table, DbContext dbContext)
     {
         _table = table;
         DbContext = dbContext;

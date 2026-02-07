@@ -10,6 +10,9 @@ public class JoinConditionTests
     private static readonly OrderTable OrderTable = OrderTable.Instance;
     private readonly TestFixture _fixture = new();
 
+    /// <summary>SELECT句未指定時のJOIN用SELECT句（テーブルプレフィックス付きエイリアス）</summary>
+    private const string JoinSelectAllClause = "SELECT \"users\".\"id\" AS \"users_id\", \"users\".\"name\" AS \"users_name\", \"users\".\"age\" AS \"users_age\", \"users\".\"createdat\" AS \"users_createdat\", \"orders\".\"id\" AS \"orders_id\", \"orders\".\"userid\" AS \"orders_userid\", \"orders\".\"productname\" AS \"orders_productname\", \"orders\".\"amount\" AS \"orders_amount\", \"orders\".\"status\" AS \"orders_status\", \"orders\".\"orderdate\" AS \"orders_orderdate\", \"orders\".\"shippeddate\" AS \"orders_shippeddate\" ";
+
     [Fact]
     public void INNER_JOIN句を生成できる()
     {
@@ -19,7 +22,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\";", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\";", sqlText);
         Assert.Empty(parameters);
     }
 
@@ -32,7 +35,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" LEFT JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\";", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" LEFT JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\";", sqlText);
         Assert.Empty(parameters);
     }
 
@@ -45,7 +48,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" RIGHT JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\";", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" RIGHT JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\";", sqlText);
         Assert.Empty(parameters);
     }
 
@@ -58,7 +61,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" FULL JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\";", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" FULL JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\";", sqlText);
         Assert.Empty(parameters);
     }
 
@@ -73,7 +76,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" WHERE \"age\" > @p0;", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" WHERE \"age\" > @p0;", sqlText);
         Assert.Equal([("@p0", 20)], parameters);
     }
 
@@ -88,7 +91,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" ORDER BY \"name\" ASC;", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" ORDER BY \"name\" ASC;", sqlText);
         Assert.Empty(parameters);
     }
 
@@ -103,7 +106,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" LIMIT 10;", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" LIMIT 10;", sqlText);
         Assert.Empty(parameters);
     }
 
@@ -118,7 +121,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" OFFSET 5;", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" OFFSET 5;", sqlText);
         Assert.Empty(parameters);
     }
 
@@ -136,7 +139,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" WHERE \"age\" > @p0 ORDER BY \"name\" ASC;", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" WHERE \"age\" > @p0 ORDER BY \"name\" ASC;", sqlText);
         Assert.Equal([("@p0", 20)], parameters);
     }
 
@@ -153,7 +156,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" WHERE \"age\" > @p0 LIMIT 10 OFFSET 5;", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" WHERE \"age\" > @p0 LIMIT 10 OFFSET 5;", sqlText);
         Assert.Equal([("@p0", 20)], parameters);
     }
 
@@ -168,7 +171,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"name\" = \"orders\".\"productname\";", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"name\" = \"orders\".\"productname\";", sqlText);
         Assert.Empty(parameters);
     }
 
@@ -183,7 +186,7 @@ public class JoinConditionTests
         var (sqlText, parameters) = query.Build();
 
         // Assert
-        Assert.Equal("SELECT * FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" WHERE (\"age\" > @p0 AND \"name\" <> @p1);", sqlText);
+        Assert.Equal(JoinSelectAllClause + "FROM \"users\" INNER JOIN \"orders\" ON \"users\".\"id\" = \"orders\".\"userid\" WHERE (\"age\" > @p0 AND \"name\" <> @p1);", sqlText);
         Assert.Equal([("@p0", 20), ("@p1", "Bob")], parameters);
     }
 

@@ -447,7 +447,7 @@ public class TableSourceGenerator : IIncrementalGenerator
 
     }
 
-
+    // TODO ヘルパークラスにまとめるべきか検討
     private static void GenerateMapperExtensions(StringBuilder sb, TableInfo tableInfo)
     {
         var indent = tableInfo.Namespace != null ? "    " : "";
@@ -489,6 +489,7 @@ public class TableSourceGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}}}");
     }
 
+    // TODO ヘルパークラスにまとめるべきか検討
     private static string GenerateReaderCall(ColumnInfo column)
     {
         var baseType = column.TypeName.TrimEnd('?');
