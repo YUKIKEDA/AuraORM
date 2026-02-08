@@ -74,6 +74,8 @@ public class DatabaseFixture : IDisposable
             ("花子", 30, DateTime.Now),
             ("次郎", 18, DateTime.Now),
             ("美咲", 28, DateTime.Now),
+            ("健一", 35, DateTime.Now),
+            ("さくら", 22, DateTime.Now),
         };
 
         foreach (var (name, age, createdAt) in users)
@@ -99,6 +101,10 @@ public class DatabaseFixture : IDisposable
             (UserId: 1, ProductName: "商品A", Amount: 1000m, Status: 0, OrderDate: baseDate, ShippedDate: (DateTime?)null),
             (UserId: 1, ProductName: "商品B", Amount: 2000m, Status: 2, OrderDate: baseDate, ShippedDate: (DateTime?)baseDate.AddDays(1)),
             (UserId: 2, ProductName: "商品C", Amount: 1500m, Status: 1, OrderDate: baseDate, ShippedDate: (DateTime?)null),
+            (UserId: 3, ProductName: "商品D", Amount: 800m, Status: 0, OrderDate: baseDate, ShippedDate: (DateTime?)null),
+            (UserId: 4, ProductName: "商品E", Amount: 3200m, Status: 3, OrderDate: baseDate, ShippedDate: (DateTime?)baseDate.AddDays(2)),
+            (UserId: 5, ProductName: "商品F", Amount: 500m, Status: 0, OrderDate: baseDate, ShippedDate: (DateTime?)null),
+            (UserId: 5, ProductName: "商品G", Amount: 4500m, Status: 2, OrderDate: baseDate, ShippedDate: (DateTime?)baseDate.AddDays(1)),
         };
 
         foreach (var (userId, productName, amount, status, orderDate, shippedDate) in orders)

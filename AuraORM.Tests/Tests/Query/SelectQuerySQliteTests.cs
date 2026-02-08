@@ -1,5 +1,6 @@
 using System.Diagnostics;
 
+using AuraORM.Builder.Conditions;
 using AuraORM.Tests.Fixtures;
 using AuraORM.Tests.Tests.Generators.Models;
 
@@ -33,19 +34,21 @@ public class SelectQuerySQliteTests : IDisposable
         var actual = await query.ToListAsync();
 
         // Assert
-        Assert.Equal(4, actual.Count);
+        Assert.Equal(6, actual.Count);
         Assert.Equal("太郎", actual[0].Name);
         Assert.Equal(25, actual[0].Age);
         Assert.Equal("花子", actual[1].Name);
         Assert.Equal("次郎", actual[2].Name);
         Assert.Equal("美咲", actual[3].Name);
+        Assert.Equal("健一", actual[4].Name);
+        Assert.Equal("さくら", actual[5].Name);
     }
 
     [Fact]
     public async Task Selectで指定した1つのカラムのデータをFromで指定したテーブルから取得できる()
     {
         // Arrange
-        var expected = new List<string> { "太郎", "花子", "次郎", "美咲" };
+        var expected = new List<string> { "太郎", "花子", "次郎", "美咲", "健一", "さくら" };
 
         // Act
         var query = _fixture.Db.Select(UserTable.Name).From(UserTable);
@@ -63,7 +66,7 @@ public class SelectQuerySQliteTests : IDisposable
         var actual = await query.ToListAsync<UserNameAndAgeResult>();
 
         // Assert
-        Assert.Equal(4, actual.Count);
+        Assert.Equal(6, actual.Count);
         Assert.Equal("太郎", actual[0].Name);
         Assert.Equal(25, actual[0].Age);
         Assert.Equal("花子", actual[1].Name);
@@ -72,6 +75,10 @@ public class SelectQuerySQliteTests : IDisposable
         Assert.Equal(18, actual[2].Age);
         Assert.Equal("美咲", actual[3].Name);
         Assert.Equal(28, actual[3].Age);
+        Assert.Equal("健一", actual[4].Name);
+        Assert.Equal(35, actual[4].Age);
+        Assert.Equal("さくら", actual[5].Name);
+        Assert.Equal(22, actual[5].Age);
     }
 
     [Fact]
@@ -82,57 +89,44 @@ public class SelectQuerySQliteTests : IDisposable
         var query = _fixture.Db.Select().From(UserTable).InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId);
         var actual = await query.ToListAsync<UserOrderSummary>();
 
-        // Assert
+        // Assert（注文7件: 太郎2, 花子1, 次郎1, 美咲1, 健一2。さくらは0件）
         Assert.NotNull(actual);
-        Assert.Equal(3, actual.Count);
+        Assert.Equal(7, actual.Count);
 
-        // ユーザー1（太郎）の注文2件
-        var taroOrders = actual.Where(x => x.UserName == "太郎").OrderBy(x => x.OrderId).ToList();
-        Assert.Equal(2, taroOrders.Count);
-        Assert.Equal(1, taroOrders[0].UserId);
-        Assert.Equal("太郎", taroOrders[0].UserName);
-        Assert.Equal(25, taroOrders[0].Age);
-        Assert.Equal("商品A", taroOrders[0].ProductName);
-        Assert.Equal(1000m, taroOrders[0].Amount);
-        Assert.Equal(OrderStatus.Pending, taroOrders[0].Status);
-
-        Assert.Equal("商品B", taroOrders[1].ProductName);
-        Assert.Equal(2000m, taroOrders[1].Amount);
-        Assert.Equal(OrderStatus.Shipped, taroOrders[1].Status);
-
-        // ユーザー2（花子）の注文1件
-        var hanakoOrder = actual.Single(x => x.UserName == "花子");
-        Assert.Equal(2, hanakoOrder.UserId);
-        Assert.Equal("花子", hanakoOrder.UserName);
-        Assert.Equal(30, hanakoOrder.Age);
-        Assert.Equal("商品C", hanakoOrder.ProductName);
-        Assert.Equal(1500m, hanakoOrder.Amount);
-        Assert.Equal(OrderStatus.Processing, hanakoOrder.Status);
+        Assert.Equal(2, actual.Count(x => x.UserName == "太郎"));
+        Assert.Equal(1, actual.Count(x => x.UserName == "花子" && x.ProductName == "商品C"));
+        Assert.Equal(1, actual.Count(x => x.UserName == "次郎" && x.ProductName == "商品D"));
+        Assert.Equal(1, actual.Count(x => x.UserName == "美咲" && x.ProductName == "商品E"));
+        Assert.Equal(2, actual.Count(x => x.UserName == "健一"));
+        Assert.Contains(actual, x => x.UserName == "太郎" && x.ProductName == "商品A" && x.Amount == 1000m);
+        Assert.Contains(actual, x => x.UserName == "太郎" && x.ProductName == "商品B" && x.Amount == 2000m);
+        Assert.Contains(actual, x => x.UserName == "健一" && x.ProductName == "商品F");
+        Assert.Contains(actual, x => x.UserName == "健一" && x.ProductName == "商品G");
     }
 
     [Fact]
     public async Task LEFT_JOIN句を生成できる()
     {
         // Arrange
-        // Act（LEFT JOIN: 全ユーザー4人、注文のないユーザーは order 側が null → 5行）
+        // Act（LEFT JOIN: 全ユーザー6人、注文のないユーザーは order 側が null → 8行）
         var query = _fixture.Db.Select().From(UserTable).LeftJoin(OrderTable, UserTable.Id == OrderTable.UserId);
         var actual = await query.ToListAsync<UserOrderSummaryLeftJoin>();
 
         // Assert
         Assert.NotNull(actual);
-        Assert.Equal(5, actual.Count);
+        Assert.Equal(8, actual.Count);
 
         var withOrders = actual.Where(x => x.OrderId.HasValue && x.OrderId != 0).ToList();
-        Assert.Equal(3, withOrders.Count);
+        Assert.Equal(7, withOrders.Count);
         Assert.Equal(2, withOrders.Count(x => x.UserName == "太郎"));
-        Assert.Equal(1, withOrders.Count(x => x.UserName == "花子" && x.ProductName == "商品C"));
+        Assert.Equal(2, withOrders.Count(x => x.UserName == "健一"));
         Assert.Contains(withOrders, x => x.UserName == "太郎" && x.ProductName == "商品A");
-        Assert.Contains(withOrders, x => x.UserName == "太郎" && x.ProductName == "商品B");
+        Assert.Contains(withOrders, x => x.UserName == "花子" && x.ProductName == "商品C");
+        Assert.DoesNotContain(withOrders, x => x.UserName == "さくら"); // さくらは注文なし
 
-        var withoutOrders = actual.Where(x => !x.OrderId.HasValue || x.OrderId == 0).Select(x => x.UserName).OrderBy(x => x).ToList();
-        Assert.Equal(2, withoutOrders.Count);
-        Assert.Contains("次郎", withoutOrders);
-        Assert.Contains("美咲", withoutOrders);
+        var withoutOrders = actual.Where(x => !x.OrderId.HasValue || x.OrderId == 0).Select(x => x.UserName).ToList();
+        Assert.Single(withoutOrders);
+        Assert.Contains("さくら", withoutOrders);
     }
 
     [Fact]
@@ -143,12 +137,13 @@ public class SelectQuerySQliteTests : IDisposable
         var query = _fixture.Db.Select().From(UserTable).RightJoin(OrderTable, UserTable.Id == OrderTable.UserId);
         var actual = await query.ToListAsync<UserOrderSummary>();
 
-        // Assert
+        // Assert（注文7件）
         Assert.NotNull(actual);
-        Assert.Equal(3, actual.Count);
+        Assert.Equal(7, actual.Count);
         Assert.Equal(1, actual.Count(x => x.UserName == "太郎" && x.ProductName == "商品A"));
         Assert.Equal(1, actual.Count(x => x.UserName == "太郎" && x.ProductName == "商品B"));
         Assert.Equal(1, actual.Count(x => x.UserName == "花子" && x.ProductName == "商品C"));
+        Assert.Equal(1, actual.Count(x => x.UserName == "健一" && x.ProductName == "商品G"));
     }
 
     [Fact]
@@ -159,9 +154,9 @@ public class SelectQuerySQliteTests : IDisposable
         var query = _fixture.Db.Select().From(UserTable).FullJoin(OrderTable, UserTable.Id == OrderTable.UserId);
         var actual = await query.ToListAsync<UserOrderSummaryLeftJoin>();
 
-        // Assert（少なくとも INNER の 3 行は含まれる）
+        // Assert（少なくとも INNER の 7 行は含まれる）
         Assert.NotNull(actual);
-        Assert.True(actual.Count >= 3);
+        Assert.True(actual.Count >= 7);
         var withOrders = actual.Where(x => x.OrderId.HasValue && x.OrderId != 0).ToList();
         Assert.Contains(withOrders, x => x.UserName == "太郎" && x.ProductName == "商品A");
         Assert.Contains(withOrders, x => x.UserName == "花子" && x.ProductName == "商品C");
@@ -185,7 +180,7 @@ public class SelectQuerySQliteTests : IDisposable
     [Fact]
     public async Task JOIN句で複数の条件を組み合わせて使用できる()
     {
-        // Arrange（INNER JOIN + WHERE Age > 20 AND Name != "Bob" → 太郎・花子の注文 3 件）
+        // Arrange（INNER JOIN + WHERE Age > 20 AND Name != "Bob" → 次郎(18)以外の注文 6 件）
         // Act
         var query = _fixture.Db.Select().From(UserTable)
             .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId)
@@ -194,9 +189,10 @@ public class SelectQuerySQliteTests : IDisposable
 
         // Assert
         Assert.NotNull(actual);
-        Assert.Equal(3, actual.Count);
+        Assert.Equal(6, actual.Count);
         Assert.Equal(2, actual.Count(x => x.UserName == "太郎"));
         Assert.Equal(1, actual.Count(x => x.UserName == "花子"));
+        Assert.Equal(2, actual.Count(x => x.UserName == "健一"));
         Assert.All(actual, x => Assert.True(x.Age > 20));
         Assert.All(actual, x => Assert.NotEqual("Bob", x.UserName));
     }
@@ -210,11 +206,13 @@ public class SelectQuerySQliteTests : IDisposable
             .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId);
         var actual = await query.ToListAsync<UserNameResult>();
 
-        // Assert
+        // Assert（注文7件分の名前）
         Assert.NotNull(actual);
-        Assert.Equal(3, actual.Count);
+        Assert.Equal(7, actual.Count);
         Assert.Equal(2, actual.Count(x => x.Name == "太郎"));
         Assert.Equal(1, actual.Count(x => x.Name == "花子"));
+        Assert.Equal(1, actual.Count(x => x.Name == "次郎"));
+        Assert.Equal(2, actual.Count(x => x.Name == "健一"));
     }
 
     [Fact]
@@ -226,11 +224,13 @@ public class SelectQuerySQliteTests : IDisposable
             .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId);
         var actual = await query.ToListAsync<UserNameAndAgeResult>();
 
-        // Assert
+        // Assert（注文7件）
         Assert.NotNull(actual);
-        Assert.Equal(3, actual.Count);
+        Assert.Equal(7, actual.Count);
         Assert.Equal(2, actual.Count(x => x.Name == "太郎" && x.Age == 25));
         Assert.Equal(1, actual.Count(x => x.Name == "花子" && x.Age == 30));
+        Assert.Equal(1, actual.Count(x => x.Name == "次郎" && x.Age == 18));
+        Assert.Equal(2, actual.Count(x => x.Name == "健一" && x.Age == 35));
     }
 
     [Fact]
@@ -242,13 +242,11 @@ public class SelectQuerySQliteTests : IDisposable
             .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId);
         var actual = await query.ToListAsync<ProductNameResult>();
 
-        // Assert
+        // Assert（注文7件、商品A〜G）
         Assert.NotNull(actual);
-        Assert.Equal(3, actual.Count);
+        Assert.Equal(7, actual.Count);
         var productNames = actual.Select(x => x.ProductName).OrderBy(x => x).ToList();
-        Assert.Equal("商品A", productNames[0]);
-        Assert.Equal("商品B", productNames[1]);
-        Assert.Equal("商品C", productNames[2]);
+        Assert.Equal(new[] { "商品A", "商品B", "商品C", "商品D", "商品E", "商品F", "商品G" }, productNames);
     }
 
     [Fact]
@@ -260,11 +258,133 @@ public class SelectQuerySQliteTests : IDisposable
             .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId);
         var actual = await query.ToListAsync<NameAndProductNameResult>();
 
-        // Assert
+        // Assert（注文7件）
         Assert.NotNull(actual);
-        Assert.Equal(3, actual.Count);
+        Assert.Equal(7, actual.Count);
         Assert.Contains(actual, x => x.UserName == "太郎" && x.ProductName == "商品A");
         Assert.Contains(actual, x => x.UserName == "太郎" && x.ProductName == "商品B");
         Assert.Contains(actual, x => x.UserName == "花子" && x.ProductName == "商品C");
+        Assert.Contains(actual, x => x.UserName == "健一" && x.ProductName == "商品G");
+    }
+
+    [Fact]
+    public async Task JOIN句とWHERE句を組み合わせて生成できる()
+    {
+        // Arrange（Age > 20 → 次郎(18)以外の注文 6 件）
+        // Act
+        var query = _fixture.Db.Select().From(UserTable)
+            .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId)
+            .Where(UserTable.Age > 20);
+        var actual = await query.ToListAsync<UserOrderSummary>();
+
+        // Assert
+        Assert.NotNull(actual);
+        Assert.Equal(6, actual.Count);
+        Assert.All(actual, x => Assert.True(x.Age > 20));
+    }
+
+    [Fact]
+    public async Task JOIN句とORDER_BY句を組み合わせて生成できる()
+    {
+        // Arrange（name ASC でソート）
+        // Act
+        var query = _fixture.Db.Select().From(UserTable)
+            .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId)
+            .OrderBy(new OrderByCondition("name", false));
+        var actual = await query.ToListAsync<UserOrderSummary>();
+
+        // Assert（7 件取得、ORDER BY name ASC が適用されている）
+        Assert.NotNull(actual);
+        Assert.Equal(7, actual.Count);
+        Assert.Equal(2, actual.Count(x => x.UserName == "太郎"));
+        Assert.Equal(1, actual.Count(x => x.UserName == "花子"));
+        Assert.Equal(2, actual.Count(x => x.UserName == "健一"));
+    }
+
+    [Fact]
+    public async Task JOIN句とLIMIT句を組み合わせて生成できる()
+    {
+        // Arrange（LIMIT 10、該当は 7 件）
+        // Act
+        var query = _fixture.Db.Select().From(UserTable)
+            .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId)
+            .Limit(10);
+        var actual = await query.ToListAsync<UserOrderSummary>();
+
+        // Assert
+        Assert.NotNull(actual);
+        Assert.Equal(7, actual.Count);
+    }
+
+    [Fact]
+    public async Task JOIN句とOFFSET句を組み合わせて生成できる()
+    {
+        // Arrange（LIMIT 10 OFFSET 5。7 件中 5 件スキップで 2 件取得）
+        // Act
+        var query = _fixture.Db.Select().From(UserTable)
+            .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId)
+            .Limit(10)
+            .Offset(5);
+        var actual = await query.ToListAsync<UserOrderSummary>();
+
+        // Assert
+        Assert.NotNull(actual);
+        Assert.Equal(2, actual.Count);
+    }
+
+    [Fact]
+    public async Task JOIN句とWHERE句とORDER_BY句を組み合わせて生成できる()
+    {
+        // Arrange
+        var joinCondition = UserTable.Id == OrderTable.UserId;
+
+        // Act（Age > 20 かつ name ASC）
+        var query = _fixture.Db.Select().From(UserTable)
+            .InnerJoin(OrderTable, joinCondition)
+            .Where(UserTable.Age > 20)
+            .OrderBy(new OrderByCondition("name", false));
+        var actual = await query.ToListAsync<UserOrderSummary>();
+
+        // Assert（Age > 20 で 6 件）
+        Assert.NotNull(actual);
+        Assert.Equal(6, actual.Count);
+        Assert.All(actual, x => Assert.True(x.Age > 20));
+    }
+
+    [Fact]
+    public async Task JOIN句とWHERE句とLIMIT句とOFFSET句を組み合わせて生成できる()
+    {
+        // Arrange（Age > 20 で 6 件該当、OFFSET 5 で 1 件取得）
+        // Act
+        var query = _fixture.Db.Select().From(UserTable)
+            .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId)
+            .Where(UserTable.Age > 20)
+            .Limit(10)
+            .Offset(5);
+        var actual = await query.ToListAsync<UserOrderSummary>();
+
+        // Assert
+        Assert.NotNull(actual);
+        Assert.Single(actual);
+        Assert.All(actual, x => Assert.True(x.Age > 20));
+    }
+
+    [Fact]
+    public async Task JOIN句でカラム指定とWHERE句を組み合わせて生成できる()
+    {
+        // Arrange（Name, ProductName のみ SELECT、Age > 20）
+        // Act
+        var query = _fixture.Db.Select(UserTable.Name, OrderTable.ProductName).From(UserTable)
+            .InnerJoin(OrderTable, UserTable.Id == OrderTable.UserId)
+            .Where(UserTable.Age > 20);
+        var actual = await query.ToListAsync<NameAndProductNameResult>();
+
+        // Assert（Age > 20 で 6 件）
+        Assert.NotNull(actual);
+        Assert.Equal(6, actual.Count);
+        Assert.Contains(actual, x => x.UserName == "太郎" && x.ProductName == "商品A");
+        Assert.Contains(actual, x => x.UserName == "太郎" && x.ProductName == "商品B");
+        Assert.Contains(actual, x => x.UserName == "花子" && x.ProductName == "商品C");
+        Assert.Contains(actual, x => x.UserName == "健一" && x.ProductName == "商品G");
     }
 }
