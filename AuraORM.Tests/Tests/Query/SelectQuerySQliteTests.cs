@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 using AuraORM.Builder.Conditions;
 using AuraORM.Tests.Fixtures;
 using AuraORM.Tests.Tests.Generators.Models;

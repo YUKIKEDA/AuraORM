@@ -107,4 +107,32 @@ public sealed class InsertQuery<TTable> where TTable : ITable
 
         return (sqlBuilder.ToString(), parameters);
     }
+
+    /// <summary>
+    /// クエリを実行します。
+    /// </summary>
+    /// <returns>影響を受けた行数</returns>
+    /// <exception cref="InvalidOperationException">データベースコンテキストが未設定の場合</exception>
+    public int Execute()
+    {
+        var db = _dbContext 
+            ?? throw new InvalidOperationException("DbContext is required. Use db.Insert(...).Set(...) to create the query.");
+        var connection = db.Connection;
+        
+        var (sql, parameters) = Build();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.Transaction = _dbContext.TransactionContext?.Transaction;
+            
+        foreach (var (name, value) in parameters)
+        {
+            var param = command.CreateParameter();
+            param.ParameterName = name;
+            param.Value = value ?? DBNull.Value;
+            command.Parameters.Add(param);
+        }
+            
+        return command.ExecuteNonQuery();
+    }
 }

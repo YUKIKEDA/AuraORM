@@ -10,7 +10,7 @@ public class InsertQueryTests
     private readonly TestFixture _fixture = new();
 
     [Fact]
-    public void Valuesで指定した値をINSERT句に追加できる()
+    public void Valuesで指定した値をINSERT句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -26,7 +26,7 @@ public class InsertQueryTests
     }
 
     [Fact]
-    public void Valuesで1つのカラムのみを指定してINSERT句に追加できる()
+    public void Valuesで1つのカラムのみを指定してINSERT句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -42,7 +42,7 @@ public class InsertQueryTests
     }
 
     [Fact]
-    public void Valuesで3つ以上のカラムを指定してINSERT句に追加できる()
+    public void Valuesで3つ以上のカラムを指定してINSERT句に追加するSQLが生成できる()
     {
         // Arrange
         var createdAt = new DateTime(2024, 1, 1, 12, 0, 0);
@@ -59,7 +59,7 @@ public class InsertQueryTests
     }
 
     [Fact]
-    public void ValuesでNULL値を指定してINSERT句に追加できる()
+    public void ValuesでNULL値を指定してINSERT句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -75,7 +75,7 @@ public class InsertQueryTests
     }
 
     [Fact]
-    public void ValuesですべてのINSERT可能なカラムを指定してINSERT句に追加できる()
+    public void ValuesですべてのINSERT可能なカラムを指定してINSERT句に追加するSQLが生成できる()
     {
         // Arrange
         var createdAt = new DateTime(2024, 1, 1, 12, 0, 0);
@@ -92,7 +92,7 @@ public class InsertQueryTests
     }
 
     [Fact]
-    public void Valuesで空のオブジェクトを指定した場合は空のINSERT句になる()
+    public void Valuesで空のオブジェクトを指定した場合は空のINSERT句になるSQLが生成できる()
     {
         // Arrange
         // Act
@@ -105,7 +105,7 @@ public class InsertQueryTests
     }
 
     [Fact]
-    public void Valuesで複数行を指定してINSERT句に追加できる()
+    public void Valuesで複数行を指定してINSERT句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -122,7 +122,7 @@ public class InsertQueryTests
     }
 
     [Fact]
-    public void Valuesで3行以上を指定してINSERT句に追加できる()
+    public void Valuesで3行以上を指定してINSERT句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -144,7 +144,7 @@ public class InsertQueryTests
     }
 
     [Fact]
-    public void Valuesで複数行を指定しNULL値を含むINSERT句に追加できる()
+    public void Valuesで複数行を指定しNULL値を含むINSERT句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -161,7 +161,7 @@ public class InsertQueryTests
     }
 
     [Fact]
-    public void Valuesで複数行を指定し3つ以上のカラムを含むINSERT句に追加できる()
+    public void Valuesで複数行を指定し3つ以上のカラムを含むINSERT句に追加するSQLが生成できる()
     {
         // Arrange
         var createdAt1 = new DateTime(2024, 1, 1, 12, 0, 0);
