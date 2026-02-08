@@ -9,7 +9,7 @@ public class DeleteQueryTests
     private readonly TestFixture _fixture = new();
 
     [Fact]
-    public void Deleteで何もしていない場合は指定したテーブルの全データを削除する()
+    public void Deleteで何もしていない場合は指定したテーブルの全データを削除するSQLが生成できる()
     {
         // Arrange
 
@@ -24,7 +24,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句で1つの条件を指定してDELETE句に追加できる()
+    public void Where句で1つの条件を指定してDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -38,7 +38,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句で複数の条件を組み合わせてDELETE句に追加できる()
+    public void Where句で複数の条件を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -52,7 +52,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句で複数の条件をチェーンしてDELETE句に追加できる()
+    public void Where句で複数の条件をチェーンしてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -66,7 +66,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句でIN条件を組み合わせてDELETE句に追加できる()
+    public void Where句でIN条件を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -80,7 +80,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句でNOT_IN条件を組み合わせてDELETE句に追加できる()
+    public void Where句でNOT_IN条件を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -94,7 +94,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句でIS_NULL条件を組み合わせてDELETE句に追加できる()
+    public void Where句でIS_NULL条件を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -108,7 +108,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句でIS_NOT_NULL条件を組み合わせてDELETE句に追加できる()
+    public void Where句でIS_NOT_NULL条件を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -122,7 +122,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句でBETWEEN条件を組み合わせてDELETE句に追加できる()
+    public void Where句でBETWEEN条件を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -136,7 +136,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句でOR条件を組み合わせてDELETE句に追加できる()
+    public void Where句でOR条件を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -150,7 +150,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句でLIKE条件を組み合わせてDELETE句に追加できる()
+    public void Where句でLIKE条件を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -164,7 +164,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句でより小さい演算子を組み合わせてDELETE句に追加できる()
+    public void Where句でより小さい演算子を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -178,7 +178,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句でより大きいか等しい演算子を組み合わせてDELETE句に追加できる()
+    public void Where句でより大きいか等しい演算子を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
@@ -192,7 +192,7 @@ public class DeleteQueryTests
     }
 
     [Fact]
-    public void Where句でより小さいか等しい演算子を組み合わせてDELETE句に追加できる()
+    public void Where句でより小さいか等しい演算子を組み合わせてDELETE句に追加するSQLが生成できる()
     {
         // Arrange
 
