@@ -10,7 +10,7 @@ public class UpdateQueryTests
     private readonly TestFixture _fixture = new();
 
     [Fact]
-    public void Setで指定した値をUPDATE句に追加できる()
+    public void Setで指定した値をUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -26,7 +26,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void Setで1つのカラムのみを指定してUPDATE句に追加できる()
+    public void Setで1つのカラムのみを指定してUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -42,7 +42,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void Setで3つ以上のカラムを指定してUPDATE句に追加できる()
+    public void Setで3つ以上のカラムを指定してUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         var createdAt = new DateTime(2024, 1, 1, 12, 0, 0);
@@ -59,7 +59,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void SetでNULL値を指定してUPDATE句に追加できる()
+    public void SetでNULL値を指定してUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -75,7 +75,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void SetとWhere句を組み合わせてUPDATE句に追加できる()
+    public void SetとWhere句を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -91,7 +91,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void Setと複数のWhere条件を組み合わせてUPDATE句に追加できる()
+    public void Setと複数のWhere条件を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -107,7 +107,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void Setと複数のWhere条件をチェーンしてUPDATE句に追加できる()
+    public void Setと複数のWhere条件をチェーンしてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -123,7 +123,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void SetとIN条件を組み合わせてUPDATE句に追加できる()
+    public void SetとIN条件を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -139,7 +139,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void SetとNOT_IN条件を組み合わせてUPDATE句に追加できる()
+    public void SetとNOT_IN条件を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -155,7 +155,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void SetとIS_NULL条件を組み合わせてUPDATE句に追加できる()
+    public void SetとIS_NULL条件を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -171,7 +171,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void SetとIS_NOT_NULL条件を組み合わせてUPDATE句に追加できる()
+    public void SetとIS_NOT_NULL条件を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -187,7 +187,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void SetとBETWEEN条件を組み合わせてUPDATE句に追加できる()
+    public void SetとBETWEEN条件を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -203,7 +203,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void SetとOR条件を組み合わせてUPDATE句に追加できる()
+    public void SetとOR条件を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -219,7 +219,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void SetとLIKE条件を組み合わせてUPDATE句に追加できる()
+    public void SetとLIKE条件を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -235,7 +235,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void Setとより小さい演算子を組み合わせてUPDATE句に追加できる()
+    public void Setとより小さい演算子を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -251,7 +251,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void Setとより大きいか等しい演算子を組み合わせてUPDATE句に追加できる()
+    public void Setとより大きいか等しい演算子を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
@@ -267,7 +267,7 @@ public class UpdateQueryTests
     }
 
     [Fact]
-    public void Setとより小さいか等しい演算子を組み合わせてUPDATE句に追加できる()
+    public void Setとより小さいか等しい演算子を組み合わせてUPDATE句に追加するSQLが生成できる()
     {
         // Arrange
         // Act
