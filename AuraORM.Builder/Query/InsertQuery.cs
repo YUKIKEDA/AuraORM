@@ -109,11 +109,12 @@ public sealed class InsertQuery<TTable> where TTable : ITable
     }
 
     /// <summary>
-    /// クエリを実行します。
+    /// クエリを非同期で実行します。
     /// </summary>
+    /// <param name="token">キャンセルトークン</param>
     /// <returns>影響を受けた行数</returns>
     /// <exception cref="InvalidOperationException">データベースコンテキストが未設定の場合</exception>
-    public int Execute()
+    public async Task<int> ExecuteAsync(CancellationToken token = default)
     {
         var db = _dbContext 
             ?? throw new InvalidOperationException("DbContext is required. Use db.Insert(...).Set(...) to create the query.");
@@ -133,6 +134,6 @@ public sealed class InsertQuery<TTable> where TTable : ITable
             command.Parameters.Add(param);
         }
             
-        return command.ExecuteNonQuery();
+        return await command.ExecuteNonQueryAsync(token);
     }
 }
