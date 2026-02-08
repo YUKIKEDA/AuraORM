@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Common;
 
 using AuraORM.Builder.Dialect;
@@ -37,11 +38,27 @@ public class DbContext
     /// </summary>
     /// <param name="connection">データベース接続</param>
     /// <param name="schema">スキーマ</param>
+    /// <param name="sqlDialect">SQL方言</param>
     public DbContext(DbConnection connection, Schema schema, ISqlDialect? sqlDialect = null)
     {
         Connection = connection ?? throw new ArgumentNullException(nameof(connection));
         Schema = schema ?? throw new ArgumentNullException(nameof(schema));
         Dialect = sqlDialect ?? DialectProvider.Default;
+    }
+
+    /// <summary>
+    /// トランザクションコンテキスト付きの内部コンストラクタ
+    /// </summary>
+    /// <param name="connection">データベース接続</param>
+    /// <param name="schema">スキーマ</param>
+    /// <param name="dialect">SQL方言</param>
+    /// <param name="transactionContext">トランザクションコンテキスト</param>
+    internal DbContext(DbConnection connection, Schema schema, ISqlDialect dialect, TransactionContext transactionContext)
+    {
+        Connection = connection ?? throw new ArgumentNullException(nameof(connection));
+        Schema = schema ?? throw new ArgumentNullException(nameof(schema));
+        Dialect = dialect ?? throw new ArgumentNullException(nameof(dialect));
+        TransactionContext = transactionContext;
     }
 
     /// <summary>
@@ -105,5 +122,77 @@ public class DbContext
     public RawSqlQuery RawSql(string rawSqlText, List<(string Name, object? Value)>? parameters = null)
     {
         return new RawSqlQuery(rawSqlText, parameters, this);
+    }
+
+    /// <summary>
+    /// トランザクションを開始し、非同期処理を実行します。
+    /// 正常終了時はコミット、例外発生時はロールバックされます。
+    /// </summary>
+    /// <param name="func">トランザクション内で実行する処理</param>
+    /// <param name="isolationLevel">分離レベル</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    public async Task TransactionAsync(
+        Func<TransactionContext, Task> func,
+        IsolationLevel isolationLevel = IsolationLevel.ReadCommitted,
+        CancellationToken cancellationToken = default)
+    {
+        if (Connection.State != ConnectionState.Open)
+        {
+            await Connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        using var transaction = Connection.BeginTransaction(isolationLevel);
+
+        try
+        {
+            var txContext = new TransactionContext(transaction, this);
+            
+            await func(txContext).ConfigureAwait(false);
+
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// トランザクションを開始し、戻り値を返す非同期処理を実行します。
+    /// 正常終了時はコミット、例外発生時はロールバックされます。
+    /// </summary>
+    /// <typeparam name="T">戻り値の型</typeparam>
+    /// <param name="func">トランザクション内で実行する処理</param>
+    /// <param name="isolationLevel">分離レベル</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>処理結果</returns>
+    public async Task<T> TransactionAsync<T>(
+        Func<TransactionContext, Task<T>> func,
+        IsolationLevel isolationLevel = IsolationLevel.ReadCommitted,
+        CancellationToken cancellationToken = default)
+    {
+        if (Connection.State != ConnectionState.Open)
+        {
+            await Connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        using var transaction = Connection.BeginTransaction(isolationLevel);
+
+        try
+        {
+            var txContext = new TransactionContext(transaction, this);
+            
+            var result = await func(txContext).ConfigureAwait(false);
+
+            transaction.Commit();
+            
+            return result;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
     }
 }
