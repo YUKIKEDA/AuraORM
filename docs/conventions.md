@@ -19,6 +19,7 @@ stylecop.json                StyleCop の設定
 build.ps1                    ローカルのゲート（CI も同じスクリプトを実行する。マージの条件は CI）
 src/                         パッケージに入るプロジェクト
 tests/                       テスト（tests/*.Tests）
+tools/                       開発用のスクリプト。`databases.json`（結合テストのデータベースのイメージとバージョン、CI も読む）と `db.ps1`（WSL コンテナでそれを立てる）
 docs/                        設計・判断・ロードマップ・規約（本書）
 .cursor/rules/               エージェント向けの規約
 .agents/skills/              スキル（.claude/skills/ に写しを置く）
@@ -30,7 +31,7 @@ docs/                        設計・判断・ロードマップ・規約（本
 | `src/AuraORM` | ランタイムのライブラリ（`net8.0`、`IsAotCompatible`、パッケージ依存なし）。式と関数（`Expressions/`）、方言の型と機能のインターフェース（`Dialects/`）、文の木と方言ごとの SQL の出力（`Rendering/`）、`SqlStatement`（`Statements/`）、生成コードが使う型（`Tables/`、`Projections/`）、行の読み取り（`Reading/`）、属性とテーブルの情報（`Schema/`） |
 | `src/AuraORM.Generators` | ソースジェネレーター（`netstandard2.0`、Roslyn 4.8）。`[Table]` と `[QueryResult]` の型を読み（`SchemaReader`）、モデル（`Model/`）から C# 12 のコードを出す（`TableEmitter`、`ResultEmitter`）。診断の ID は `Diagnostics` と `AnalyzerReleases.*.md`。`AuraORM` のパッケージの `analyzers/dotnet/cs` に入る |
 | `tests/AuraORM.Generators.Tests` | ジェネレーターのテスト（`net8.0` と `net10.0`）。断片を C# 12 の利用者のコードとしてジェネレーター付きでコンパイルし、成功するか、診断の ID を確かめる（`Support/GeneratorHarness`） |
-| `tests/AuraORM.Integration.Tests` | 結合テスト（`net8.0` と `net10.0`）。同じテストを方言ごとに回すため、テストのクラスは方言を型引数に取る抽象クラスで、方言ごとに派生クラスを置く（`RawQueryTests<TDialect>` と `SqliteRawQueryTests`）。データベースは `Support/ITestTarget<TDialect>` が用意する。SQLite はプロセス内のメモリ上のデータベース |
+| `tests/AuraORM.Integration.Tests` | 結合テスト（`net8.0` と `net10.0`）。同じテストを方言ごとに回すため、テストのクラスは方言を型引数に取る抽象クラスで、方言ごとに派生クラスを置く（`RawQueryTests<TDialect>` と `SqliteRawQueryTests`、サーバーの分は `Execution/ServerTests.cs`）。データベースは `Support/ITestTarget<TDialect>` が用意する。SQLite はプロセス内のメモリ上のデータベース。サーバーは環境変数 `AURA_TEST_{NAME}` の接続文字列を使い、未設定なら飛ばす。`AURA_TEST_REQUIRE` に名前のあるデータベースは、未設定なら失敗する。サーバーごとのテストは xUnit のコレクションで一つずつ回す |
 | `tests/AuraORM.Tests` | ランタイムのテスト（`net8.0` と `net10.0`）。SQL のゴールデンテスト（`Support/SqlAssert`、期待値は方言ごとに手で書く）、利用者のコードとしてのコンパイルテスト（`Support/CompileAssert`、Roslyn 4.8、C# 12）、ジェネレーターが作ったテスト用のテーブル（`Support/Schema.cs`）を使うテスト。行の読み取りは `DataTableReader` で確かめる |
 
 ## ビルドとゲート
@@ -44,7 +45,8 @@ docs/                        設計・判断・ロードマップ・規約（本
 ## データベースとコンテナ
 
 - Docker は使わない
-- ローカルの結合テスト用データベースは WSL コンテナ（`wslc.exe`、WSL 2.9.3 以降）で動かす。CI では GitHub Actions のサービスコンテナで動かす
+- ローカルの結合テスト用データベースは WSL コンテナ（`wslc.exe`、WSL 2.9.3 以降）で動かす。`./tools/db.ps1 up` で立て、`./tools/db.ps1 test` でテストを回し、`./tools/db.ps1 down` で止める
+- CI では GitHub Actions のサービスコンテナで、データベースごとに最小と最新のバージョンを回す。イメージとバージョンは `tools/databases.json` が正本で、CI とスクリプトの両方がそれを読む
 - 詳細は `.cursor/rules/containers.mdc`
 
 ## C# の書き方

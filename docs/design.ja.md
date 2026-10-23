@@ -830,7 +830,7 @@ await db.InTransactionAsync(async tx => { … });   // 例外がなければコ�
 
 ### 12.6 プロバイダーとの組み合わせ
 
-テストと CI で確かめる組み合わせは次のとおり。AuraORM はこれらのパッケージに依存しない。
+テストと CI で確かめる組み合わせは次のとおり（版は `Directory.Packages.props`、データベースの版は `tools/databases.json`）。AuraORM はこれらのパッケージに依存しない。
 
 | 方言 | プロバイダー | 補足 |
 | --- | --- | --- |

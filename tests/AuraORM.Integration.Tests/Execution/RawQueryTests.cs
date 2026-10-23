@@ -131,7 +131,7 @@ public abstract class RawQueryTests<TDialect>
     /// - Alice in <c>people</c>.
     ///
     /// Steps:
-    /// - Count the rows; query the age of a person who does not exist with both scalar methods.
+    /// - Count the rows (with <c>Count()</c>, a 64-bit count on every dialect); query the age of a person who does not exist with both scalar methods.
     ///
     /// Expected:
     /// - The count is 1; <c>QueryScalarAsync</c> throws <see cref="InvalidOperationException"/>; the other returns null.
@@ -143,7 +143,7 @@ public abstract class RawQueryTests<TDialect>
         await InsertAsync(db, Alice);
         const long missing = 99;
 
-        Assert.Equal(1L, await db.QueryScalarAsync<long>($"SELECT COUNT(*) FROM {Person.Table}", Ct));
+        Assert.Equal(1L, await db.QueryScalarAsync<long>($"SELECT {Count()} FROM {Person.Table}", Ct));
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             db.QueryScalarAsync<int?>($"SELECT age FROM {Person.Table} WHERE id = {missing}", Ct)
         );
@@ -170,8 +170,8 @@ public abstract class RawQueryTests<TDialect>
         await InsertAsync(db, Alice);
         await InsertAsync(db, Bob);
 
-        List<(string, int)> rows = await db.QueryAsync<string, int>(
-            $"SELECT {Identifier("name")}, 0 FROM {Person.Table} {Unsafe("ORDER BY id DESC")}",
+        List<(string, long)> rows = await db.QueryAsync<string, long>(
+            $"SELECT {Identifier("name")}, id FROM {Person.Table} {Unsafe("ORDER BY id DESC")}",
             Ct
         );
 

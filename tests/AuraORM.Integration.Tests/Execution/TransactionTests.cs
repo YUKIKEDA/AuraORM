@@ -121,7 +121,7 @@ public abstract class TransactionTests<TDialect>
         );
 
     private static async Task<long[]> IdsAsync(Database<TDialect> db) =>
-        (await db.QueryAsync<long, int>($"SELECT id, 0 FROM {Person.Table} ORDER BY id", Ct)).Select(r => r.Item1).ToArray();
+        (await db.QueryAsync<long, int?>($"SELECT id, age FROM {Person.Table} ORDER BY id", Ct)).Select(r => r.Item1).ToArray();
 }
 
 /// <summary>

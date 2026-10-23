@@ -48,3 +48,133 @@ jobs:
 
       - name: Gate
         run: ./build.ps1
+
+  # The versions of each database come from tools/databases.json, which tools/db.ps1 reads too (.cursor/rules/containers.mdc).
+  plan:
+    name: integration plan
+    runs-on: ubuntu-latest
+    outputs:
+      postgresql: ${{ steps.read.outputs.postgresql }}
+      mysql: ${{ steps.read.outputs.mysql }}
+      mariadb: ${{ steps.read.outputs.mariadb }}
+      sqlserver: ${{ steps.read.outputs.sqlserver }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: read
+        shell: bash
+        run: |
+          for name in postgresql mysql mariadb sqlserver; do
+            echo "$name=$(jq -c --arg name "$name" '.databases[] | select(.name == $name) | .versions' tools/databases.json)" >> "$GITHUB_OUTPUT"
+          done
+
+  # Each database job runs the integration tests against a service container, at the minimum and the latest version
+  # (docs/design.ja.md §17). AURA_TEST_REQUIRE makes a skipped test of that database fail the job.
+  integration-postgresql:
+    name: integration (postgresql ${{ matrix.version }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.plan.outputs.postgresql) }}
+    services:
+      db:
+        image: postgres:${{ matrix.version }}
+        env:
+          POSTGRES_PASSWORD: Aura_Test_1
+          POSTGRES_DB: aura
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+      - run: .github/scripts/integration-env.sh postgresql
+      - run: dotnet test --project tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj -c Release
+
+  integration-mysql:
+    name: integration (mysql ${{ matrix.version }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.plan.outputs.mysql) }}
+    services:
+      db:
+        image: mysql:${{ matrix.version }}
+        env:
+          MYSQL_ROOT_PASSWORD: Aura_Test_1
+          MYSQL_DATABASE: aura
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pAura_Test_1" --health-interval 5s --health-timeout 5s --health-retries 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+      - run: .github/scripts/integration-env.sh mysql
+      - run: dotnet test --project tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj -c Release
+
+  integration-mariadb:
+    name: integration (mariadb ${{ matrix.version }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.plan.outputs.mariadb) }}
+    services:
+      db:
+        image: mariadb:${{ matrix.version }}
+        env:
+          MARIADB_ROOT_PASSWORD: Aura_Test_1
+          MARIADB_DATABASE: aura
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+      - run: .github/scripts/integration-env.sh mariadb
+      - run: dotnet test --project tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj -c Release
+
+  integration-sqlserver:
+    name: integration (sqlserver ${{ matrix.version }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.plan.outputs.sqlserver) }}
+    services:
+      db:
+        image: mcr.microsoft.com/mssql/server:${{ matrix.version }}
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Aura_Test_1
+        ports: ["1433:1433"]
+        # 2019 ships sqlcmd in mssql-tools, later versions in mssql-tools18.
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Aura_Test_1 -Q 'SELECT 1' || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Aura_Test_1 -Q 'SELECT 1'"
+          --health-interval 5s --health-timeout 10s --health-retries 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+      - run: .github/scripts/integration-env.sh sqlserver
+      - run: dotnet test --project tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj -c Release

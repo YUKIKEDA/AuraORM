@@ -63,5 +63,5 @@ Skills live in `.agents/skills/` (copied to `.claude/skills/`). `skills-lock.jso
 
 - .NET 10 SDK (`global.json`) and the .NET 8 runtime (the tests target `net8.0` and `net10.0`). If `dotnet --list-sdks` shows none, install it; do not stop to ask.
 - Windows is the owner's host; CI runs Windows, Linux, and macOS.
-- Databases for integration tests: WSL containers locally (`C:\Program Files\WSL\wslc.exe`, by full path), service containers in CI. Never Docker (`.cursor/rules/containers.mdc`).
+- Databases for integration tests: WSL containers locally through `./tools/db.ps1` (`up`, `test`, `down`; it calls `C:\Program Files\WSL\wslc.exe` by full path), service containers in CI, both from `tools/databases.json`. Never Docker (`.cursor/rules/containers.mdc`).
 - The agent shell is PowerShell (`.cursor/rules/powershell-shell.mdc`).

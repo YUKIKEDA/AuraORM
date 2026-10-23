@@ -22,7 +22,7 @@ A pull request that adds or changes generated SQL lists the builder calls and th
 
 - .NET 10 SDK (`global.json`) and the .NET 8 runtime.
 - `dotnet tool restore` once after cloning (CSharpier).
-- Integration tests against PostgreSQL, MySQL, and SQL Server need those databases. CI provides them as service containers. Locally, start them with WSL containers (`wslc`, WSL 2.9.3 or later); the script for it comes with the integration-test row of the roadmap. Docker is not used in this repository.
+- Integration tests against PostgreSQL, MySQL, MariaDB, and SQL Server need those databases. CI provides them as service containers, at the minimum and the latest version of each (`tools/databases.json`). Locally, start them with WSL containers (`wslc`, WSL 2.9.3 or later): `./tools/db.ps1 up`, `./tools/db.ps1 test`, `./tools/db.ps1 down`. Without them, those tests are skipped locally. Docker is not used in this repository.
 
 ## Language
 
