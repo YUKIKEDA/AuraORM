@@ -12,6 +12,15 @@ internal sealed class SqliteRenderer : DialectRenderer
 
     protected override string LengthFunction => "LENGTH";
 
+    // §3.3: a decimal is stored as TEXT, so comparing it by size, ordering by it, and MIN / MAX would order strings
+    // ('9.5' > '10.25'), and SUM / AVG would compute in floating point. Equality is exact and allowed.
+    public override void CheckDecimalOrdering(string operation) =>
+        throw new InvalidOperationException(
+            "SQLite stores decimal values as text, so "
+                + operation
+                + " of decimal values is not exact there: comparisons, ORDER BY, MIN, and MAX order them as strings, and SUM and AVG add them as floating-point numbers. On SQLite, compare decimals for equality only, or store the column as double or long."
+        );
+
     protected override char IdentifierOpen => '"';
 
     protected override char IdentifierClose => '"';
