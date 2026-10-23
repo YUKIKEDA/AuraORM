@@ -80,7 +80,8 @@ public sealed class MySqlTarget : ServerTarget<MySqlDialect>
 
     protected override IReadOnlyList<string> ResetTables => MySqlFamily.ResetTables;
 
-    protected override Task<DbDataSource> CreateDataSourceAsync(string connectionString) => MySqlFamily.CreateDataSourceAsync(connectionString, DatabaseName);
+    protected override Task<DbDataSource> CreateDataSourceAsync(string connectionString) =>
+        MySqlFamily.CreateDataSourceAsync(connectionString, DatabaseName);
 }
 
 /// <summary>
@@ -92,7 +93,8 @@ public sealed class MariaDbTarget : ServerTarget<MariaDbDialect>
 
     protected override IReadOnlyList<string> ResetTables => MySqlFamily.ResetTables;
 
-    protected override Task<DbDataSource> CreateDataSourceAsync(string connectionString) => MySqlFamily.CreateDataSourceAsync(connectionString, DatabaseName);
+    protected override Task<DbDataSource> CreateDataSourceAsync(string connectionString) =>
+        MySqlFamily.CreateDataSourceAsync(connectionString, DatabaseName);
 }
 
 /// <summary>

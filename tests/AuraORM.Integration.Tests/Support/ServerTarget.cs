@@ -28,7 +28,8 @@ public abstract class ServerTarget<TDialect> : ITestTarget<TDialect>
     /// <summary>
     /// Gets the name of the database that this test process uses: <c>aura_net8</c> under .NET 8, <c>aura_net10</c> under .NET 10.
     /// </summary>
-    protected static string DatabaseName { get; } = "aura_net" + Environment.Version.Major.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    protected static string DatabaseName { get; } =
+        "aura_net" + Environment.Version.Major.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     public async Task<Database<TDialect>> CreateDatabaseAsync()
     {

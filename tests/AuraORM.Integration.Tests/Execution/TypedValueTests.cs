@@ -28,6 +28,27 @@ public abstract class TypedValueTests<TDialect>
         PersonStatus.Active
     );
 
+    // Past the sizes up to which SqlClient infers nvarchar(4000) and varbinary(8000) for an untyped value.
+    private static readonly TypedRow Large = new(
+        3,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        new string('x', 5000),
+        [.. Enumerable.Repeat((byte)7, 9000)],
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+    );
+
     private static readonly TypedRow Nulls = new(2, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     private protected abstract ITestTarget<TDialect> Target { get; }
@@ -42,12 +63,14 @@ public abstract class TypedValueTests<TDialect>
     /// - An empty <c>typed_values</c> table, with the SQL type of design §3.3 for each column.
     ///
     /// Steps:
-    /// - Insert one row of values and one row of nulls with a raw command whose holes are the values.
-    /// - Read both rows into <see cref="TypedRow"/>, ordered by id.
+    /// - Insert one row of values, one row of nulls, and one row with a 5000-character string and a 9000-byte array, with a
+    ///   raw command whose holes are the values.
+    /// - Read the rows into <see cref="TypedRow"/>, ordered by id.
     ///
     /// Expected:
     /// - The rows equal what was inserted (the byte array compared by its bytes). A null <see cref="byte"/> array is sent
-    ///   with <c>DbType.Binary</c>, so SQL Server accepts it for <c>varbinary</c>.
+    ///   with <c>DbType.Binary</c>, so SQL Server accepts it for <c>varbinary</c>, and a <see cref="DateTime"/> keeps its 100 ns
+    ///   ticks on SQL Server (<c>DbType.DateTime2</c>).
     /// </remarks>
     [Fact]
     public async Task InsertAndRead_EveryTypeAndNull_RoundTrips()
@@ -56,12 +79,13 @@ public abstract class TypedValueTests<TDialect>
 
         Assert.Equal(1, await InsertAsync(db, Values));
         Assert.Equal(1, await InsertAsync(db, Nulls));
+        Assert.Equal(1, await InsertAsync(db, Large));
         List<TypedRow> rows = await db.QueryAsync<TypedRow>(
             $"SELECT id, flag_value, tiny_value, small_value, number_value, big_value, single_value, double_value, money_value, text_value, blob_value, key_value, at_value, at_offset_value, day_value, time_value, state_value FROM {TypedRow.Table} ORDER BY id",
             Ct
         );
 
-        Assert.Equal(2, rows.Count);
+        Assert.Equal(3, rows.Count);
         TypedRow read = rows[0];
         Assert.Equal(Values.FlagValue, read.FlagValue);
         Assert.Equal(Values.TinyValue, read.TinyValue);
@@ -80,6 +104,8 @@ public abstract class TypedValueTests<TDialect>
         Assert.Equal(Values.TimeValue?.Ticks, read.TimeValue?.Ticks);
         Assert.Equal(Values.StateValue, read.StateValue);
         Assert.Equal(Nulls, rows[1]);
+        Assert.Equal(Large.TextValue, rows[2].TextValue);
+        Assert.Equal(Large.BlobValue, rows[2].BlobValue);
     }
 
     private static Task<int> InsertAsync(Database<TDialect> db, TypedRow row) =>
