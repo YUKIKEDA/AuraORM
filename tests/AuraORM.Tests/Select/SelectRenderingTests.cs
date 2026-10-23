@@ -354,10 +354,11 @@ public sealed class SelectRenderingTests
     /// - The <c>Id</c> column of <see cref="Account"/>, kept in a variable from the lambda of a query on accounts.
     ///
     /// Steps:
-    /// - Use it in the projection of a query on <see cref="Membership"/>, then in its <c>WHERE</c>.
+    /// - Use it in the projection of a query on <see cref="Membership"/>, then in its <c>WHERE</c>, then in another query on
+    ///   <see cref="Account"/> (the same table, another occurrence).
     ///
     /// Expected:
-    /// - <see cref="InvalidOperationException"/> from <c>ToSql()</c> in both, naming the column.
+    /// - <see cref="InvalidOperationException"/> from <c>ToSql()</c> in all three, naming the column.
     /// </remarks>
     [Fact]
     public void ToSql_ColumnOfAnotherQuery_Throws()
@@ -377,6 +378,9 @@ public sealed class SelectRenderingTests
             Db<SqliteDialect>().From(Membership.Table).Where(m => Eq(leaked!, 1L)).Select(m => m.Role).ToSql()
         );
 
+        var sameTable = Assert.Throws<InvalidOperationException>(() => Db<SqliteDialect>().From(Account.Table).Select(a => leaked!).ToSql());
+
+        Assert.Contains("accounts.id", sameTable.Message, StringComparison.Ordinal);
         Assert.Contains("accounts.id", inSelect.Message, StringComparison.Ordinal);
         Assert.Contains("accounts.id", inWhere.Message, StringComparison.Ordinal);
     }

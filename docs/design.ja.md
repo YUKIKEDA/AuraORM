@@ -979,7 +979,7 @@ CREATE TABLE "users" (
 | 検査 | 例外 |
 | --- | --- |
 | 同じテーブルを別名なしで二度使った（§5.2） | `InvalidOperationException` |
-| 文の外のクエリの列を使った（ラムダの外に列を持ち出した） | `InvalidOperationException` |
+| 文の外のクエリの列を使った（ラムダの外に列を持ち出した。同じテーブルでも、別の文の `From` の列は文の外である） | `InvalidOperationException` |
 | 複数行の INSERT で、行ごとに設定した列が違う（§6.2） | `ArgumentException` |
 | UPDATE の代入の一覧が空、同じ列に二度代入した（§7） | `ArgumentException` |
 | パラメータの数が方言の上限を超えた（§12.4） | `ArgumentException` |

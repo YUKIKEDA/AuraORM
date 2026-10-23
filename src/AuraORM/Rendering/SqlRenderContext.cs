@@ -65,7 +65,8 @@ internal sealed class SqlRenderContext : IDisposable
         {
             foreach (TableAlias candidate in scope)
             {
-                if (candidate.Reference == table.Reference)
+                // The same occurrence, not the same name: a column of another statement on the same table is out of scope too.
+                if (ReferenceEquals(candidate, table))
                 {
                     return;
                 }
