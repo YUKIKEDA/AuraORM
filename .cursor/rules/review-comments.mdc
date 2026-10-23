@@ -36,3 +36,14 @@ Agent: writes the findings in the conversation, and asks whether to post them
 Owner: 12をレビューして下さい
 Agent: posts the findings as a comment on the pull request, and gives the link and a summary in the conversation
 ```
+
+A SHA written in a reply is copied from git's output (`git log --oneline -1`), never typed from memory. A reply that names a head that does not exist sends the reviewer to the wrong code.
+
+A finding on a stacked PR is fixed on that PR's branch. The fix reaches the PRs above by merging each branch into the next, and every branch passes the gate before its push (`.cursor/rules/git.mdc`). A fix made only on the top PR leaves the finding open on the PR it was written on.
+
+```text
+# BAD
+Reply: 対応した（head `5d2a8d7`）    # a SHA from memory; no such commit
+# GOOD
+Reply: 対応した（head `aca5517`）    # copied from git log
+```

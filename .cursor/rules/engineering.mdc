@@ -21,6 +21,17 @@ Details: `docs/conventions.md`. C# style: `.cursor/rules/csharp.mdc`. Tests: `.c
 - The runtime library is `IsAotCompatible` (`.cursor/rules/aot.mdc`) and needs XML docs on the public API.
 - Package versions live in `Directory.Packages.props` (Central Package Management). A new package goes through `.cursor/rules/dependencies.mdc` first.
 - The runtime library builds with `BannedSymbols.txt`. Do not remove an entry to get a build through.
+- `Directory.Build.props` is read before the project body, so a property there cannot depend on what a project sets in its body: a condition on `$(TargetFrameworks)` is always empty there. Each project names its own target frameworks.
+
+```xml
+<!-- BAD: always true in Directory.Build.props; it makes a net8.0;net10.0 test project build net8.0 only -->
+<TargetFramework Condition="'$(TargetFramework)' == '' And '$(TargetFrameworks)' == ''">net8.0</TargetFramework>
+
+<!-- GOOD: in src/AuraORM/AuraORM.csproj -->
+<TargetFramework>net8.0</TargetFramework>
+```
+
+  After a change to build properties, read which frameworks the tests ran on in the log (`Running tests from …/net10.0/…`), not only that they passed.
 
 ## Format and analyzers
 

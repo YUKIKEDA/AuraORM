@@ -20,6 +20,17 @@ Before recommending how to build a mechanism (a type-state builder, a parameter 
 
 Before recommending a design, search `docs/design-decisions.md` for a rejection of the same shape, and say how the recommendation differs from it.
 
+Before recommending that the types reject something, check that the types carry what the check needs. An expression's type does not know the dialect, so "make it a compile error on SQLite" cannot be built for a condition inside `Where`. A recommendation that turns out not to be buildable goes back to the owner with what was found; it is not replaced by another option without asking.
+
+```text
+# BAD
+Agent: recommends "SQLite decimal ordering is a compile error"; later finds Condition<TLevel> has no dialect, and ships a
+       run-time check instead
+# GOOD
+Agent: checks that Where's lambda result carries the dialect before recommending; it does not, so the options put to the
+       owner are a run-time check, a storage change, or a documented limit
+```
+
 A statement about how another library or a database behaves is checked in its source or its official documentation before it goes to the owner, and what was not checked is said to be unchecked. The same holds for a comparison written into the design. "Kysely does X" or "SQL Server accepts Y" is a citation, not a memory.
 
 When the owner corrects a criterion, go back over the decisions made before the correction and judge them by the new criterion: the design, the decision records, and the conversation logs, where reasons given only in passing are kept. Each one that fails gets a roadmap row or a Grill before the row that depends on it.

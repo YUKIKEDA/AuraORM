@@ -63,3 +63,11 @@ public void Where_NullableColumnEqualsValue_RendersEqualsParameter()
 - A result that differs between databases (ordering without `ORDER BY`, collation, numeric precision, time zones) is not asserted across them unless the query fixes it.
 - Mutation check for a guard: change the guarded term and see the test fail, then restore it by copying the file aside and back (not `git checkout`). A mutant must build: with warnings as errors, `if (false)` does not compile (CS0162), and `dotnet test --no-build` would then run the old binaries.
 - Read the state you assert before a shared helper's cleanup runs.
+- A golden test is written from the design, so it does not find an error in the design. Where a dialect writes a meaning with its own expansion (three-valued logic, `IS DISTINCT FROM` on SQL Server, a cast that makes result types agree), an integration test checks the meaning on every database: a truth table over nulls, equal and unequal values, and the `Not` of each.
+- A column type of `docs/design.ja.md` §3.3 has a value-and-null round trip in `TypedValueTests` on every database. A provider infers a parameter type from the value and can change the value silently (SqlClient takes an untyped `DateTime` for the legacy `datetime` and rounds it); only a round trip shows it.
+
+```text
+# BAD — the SQL Server expansion of IsDistinctFrom has a golden test copied from the design; the design's expansion is
+#        UNKNOWN when one side is null, and no test notices
+# GOOD — RawQueryTests runs IsDistinctFrom / IsNotDistinctFrom with a null on either side, and under Not, on every database
+```

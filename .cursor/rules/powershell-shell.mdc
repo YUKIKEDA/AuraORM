@@ -39,3 +39,12 @@ body
 ## Writing files
 
 Write files with the editor tools, not with shell redirection. A Python script sent through the Bash tool loses the backslashes of `\f`, `\r`, `\t`, and `\v` in its string literals, so a replacement in a Windows path or a C# string literal silently misses or writes a control character. Edit text that holds backslashes with the editor tool. A script that another script writes is written with the editor tool too: nested quoting fails in ways that only show after a long run.
+
+Python on Windows writes `\r\n` in text mode. A script that edits a file opens it with `newline=''` for both reading and writing, so the file keeps the LF that `.gitattributes` asks for. Python sent through a Bash heredoc that holds `'''` strings or apostrophes can end the heredoc early (`unexpected EOF while looking for matching`); write such a script to a scratch file with the editor tool and run the file.
+
+```python
+# BAD — on Windows this writes CRLF into a file that .gitattributes keeps LF
+open(path, "w", encoding="utf-8").write(text)
+# GOOD
+open(path, "w", encoding="utf-8", newline="").write(text)
+```
