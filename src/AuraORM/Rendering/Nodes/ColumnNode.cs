@@ -1,0 +1,22 @@
+namespace AuraORM;
+
+/// <summary>
+/// A column of a table in the query: <c>"table"."column"</c>, or <c>"column"</c> where columns are written unqualified.
+/// </summary>
+internal sealed class ColumnNode(TableAlias table, string name) : SqlNode
+{
+    public TableAlias Table { get; } = table;
+
+    public string Name { get; } = name;
+
+    public override void Render(SqlRenderContext context)
+    {
+        if (!context.UnqualifiedColumns)
+        {
+            context.WriteIdentifier(Table.Reference);
+            context.Write('.');
+        }
+
+        context.WriteIdentifier(Name);
+    }
+}

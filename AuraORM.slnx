@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/AuraORM/AuraORM.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AuraORM.Tests/AuraORM.Tests.csproj" />
+  </Folder>
 </Solution>

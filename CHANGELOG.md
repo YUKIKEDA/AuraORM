@@ -9,3 +9,12 @@ version may break the public API.
 
 AuraORM is being rebuilt from its requirements (`docs/design.ja.md`). No
 version has been published to NuGet.
+
+### Added
+
+- Expressions and functions (`using static AuraORM.Sql;`): comparisons, `NULL` handling, logic, arithmetic, strings,
+  `CAST`, `CASE`, and aggregates, with the evaluation level (`PerRow` / `PerGroup`) in the type so that aggregates and
+  row values cannot be mixed.
+- The five dialect types (`SqliteDialect`, `PostgreSqlDialect`, `MySqlDialect`, `MariaDbDialect`, `SqlServerDialect`)
+  and their capability interfaces.
+- `SqlStatement`: the SQL text and parameters of a statement.
