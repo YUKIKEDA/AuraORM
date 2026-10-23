@@ -117,6 +117,7 @@ flowchart LR
 
 - 公開する型は名前空間 `AuraORM` に置く。利用者は `using AuraORM;` と `using static AuraORM.Sql;` で全機能を使える。
 - 公開面は次に限る: `Database<TDialect>` と `Transaction<TDialect>`、方言の型と機能のインターフェース、ビルダーの段階の型、式の型（`IExpr<T, TLevel>`、`Column<T>`、`Condition<TLevel>`、`IProjection<T, TLevel>`）、関数（`Sql`）、属性、`SqlStatement`、例外。
+- 生成コードが呼ぶ型（`TableAlias` と、その `Column<T>` などのメソッド）も公開する。利用者のコードからは作れない（コンストラクターが `internal`）ので、列を得る道はラムダの引数だけのままである（§3.4）。
 - 文の木、SQL の出力、パラメータの設定は `internal` にする。
 
 ### 2.4 方言
@@ -354,13 +355,13 @@ SQL Server 2019 には `IS [NOT] DISTINCT FROM` がないので展開する。�
 | `Not(c)` | `NOT (c)` |
 | `Exists(subquery)` | `EXISTS (SELECT …)` |
 
-**算術**（数値型。`System.Numerics.INumber<T>` を満たす `T` と、その nullable）
+**算術**（数値型。`System.Numerics.INumber<T>` を満たす `T` と、その nullable。名前は .NET の命名の指針に合わせて略さない）
 
 | 関数 | SQL |
 | --- | --- |
-| `Add` / `Sub` / `Mul` | `(a + b)` / `(a - b)` / `(a * b)` |
-| `Div(a, b)` | `(a / b)`。整数の型では、MySQL / MariaDB だけ `(a DIV b)`（MySQL の `/` は整数どうしでも小数を返すため） |
-| `Mod(a, b)` | `(a % b)` |
+| `Add` / `Subtract` / `Multiply` | `(a + b)` / `(a - b)` / `(a * b)` |
+| `Divide(a, b)` | `(a / b)`。整数の型では、MySQL / MariaDB だけ `(a DIV b)`（MySQL の `/` は整数どうしでも小数を返すため） |
+| `Modulo(a, b)` | `(a % b)` |
 | `Negate(a)` | `(-a)` |
 
 整数の除算の結果の型は整数である。オーバーフローとゼロ除算の扱いはデータベースに従う。
@@ -371,11 +372,11 @@ SQL Server 2019 には `IS [NOT] DISTINCT FROM` がないので展開する。�
 | --- | --- | --- | --- | --- |
 | `Concat(a, b, …)` | `(a \|\| b \|\| …)` | `(a \|\| b \|\| …)` | `CONCAT(a, b, …)` | `(a + b + …)` |
 | `Lower(a)` / `Upper(a)` | `LOWER(a)` / `UPPER(a)` | 同左 | 同左 | 同左 |
-| `Length(a)` | `LENGTH(a)` | `CHAR_LENGTH(a)` | `CHAR_LENGTH(a)` | `LEN(a)` |
+| `Length(a)` | `LENGTH(a)` | `CHAR_LENGTH(a)` | `CHAR_LENGTH(a)` | `CAST(LEN(a) AS int)` |
 | `Trim(a)` | `TRIM(a)` | 同左 | 同左 | `TRIM(a)` |
 | `Substring(a, start, length)` | `SUBSTRING(a, start, length)` | 同左 | 同左 | 同左 |
 
-どの方言でも、`Concat` は引数のどれかが NULL なら NULL を返す。SQL Server の `LEN` は末尾の空白を数えない。ほかの方言の結果と違うことがある点を XML ドキュメントにも書く。
+`Length` の結果は `int?` である。SQL Server の `LEN` は `nvarchar(max)` など長さのない型（長さのない `string` の列の型、§3.3）で `bigint` を返すので、`int` に `CAST` して方言の結果の型をそろえる。引数が NULL を許さない `string` でも結果を `int?` にするのは、C# の型引数で、参照型の NULL 可否（`string` / `string?`）から値型の NULL 可否（`int` / `int?`）を選べないためである（`string` と `string?` は同じ型で、二つの多重定義にできない）。どの方言でも、`Concat` は引数のどれかが NULL なら NULL を返す。SQL Server の `LEN` は末尾の空白を数えない。ほかの方言の結果と違うことがある点を XML ドキュメントにも書く。
 
 **型と条件分岐**
 
@@ -397,9 +398,9 @@ SQL Server 2019 には `IS [NOT] DISTINCT FROM` がないので展開する。�
 | `Sum(a)`（`decimal`、浮動小数点） | `SUM(a)` | 同左 | 同左 | 同左 | 引数の型の nullable |
 | `Avg(a)`（整数、浮動小数点） | `AVG(a)` | `AVG(CAST(a AS double precision))` | `CAST(AVG(a) AS DOUBLE)` | `AVG(CAST(a AS float))` | `double?` |
 | `Avg(a)`（`decimal`） | `AVG(a)` | 同左 | 同左 | 同左 | `decimal?` |
-| `Min(a)` / `Max(a)` | `MIN(a)` / `MAX(a)` | 同左 | 同左 | 同左 | 引数の型の nullable |
+| `Min(a)` / `Max(a)`（数値、日付と時刻、`string`、列挙型） | `MIN(a)` / `MAX(a)` | 同左 | 同左 | 同左 | 引数の型の nullable |
 
-整数の `Sum` と `Avg` に `CAST` を入れるのは、方言ごとに結果の SQL の型が違い（PostgreSQL の `SUM(bigint)` は `numeric`、MySQL の `SUM` は `DECIMAL`、SQL Server の `SUM(int)` は `int`）、そのままでは同じ CLR の型で読めず、SQL Server では `int` の範囲で桁あふれするからである。この `CAST` は関数の出力の一部として固定であり、値によって変わらない。SQLite の `decimal`（`TEXT`）の集計は浮動小数点で計算される。
+`Min` / `Max` は `bool` と `Guid` を受け取らない（CS0315）。PostgreSQL の `min` / `max` が受け取る型の一覧に `boolean` と `uuid` がなく、SQL Server の `MIN` / `MAX` は `bit` を受け取らないためである（SQL Server は `uniqueidentifier` を受け取る）。列挙型は基になる整数の順で比べる。整数の `Sum` と `Avg` に `CAST` を入れるのは、方言ごとに結果の SQL の型が違い（PostgreSQL の `SUM(bigint)` は `numeric`、MySQL の `SUM` は `DECIMAL`、SQL Server の `SUM(int)` は `int`）、そのままでは同じ CLR の型で読めず、SQL Server では `int` の範囲で桁あふれするからである。この `CAST` は関数の出力の一部として固定であり、値によって変わらない。SQLite の `decimal`（`TEXT`）の集計は浮動小数点で計算される。
 
 ### 4.3 `Cast` の型
 
@@ -1011,10 +1012,10 @@ v0.1 に入れるものと、その順序は [roadmap.md](./roadmap.md) にあ�
 本書の各データベースについての主張は、2026-10-23 に次の資料で確かめた。
 
 - SQLite: [RETURNING](https://www.sqlite.org/lang_returning.html)、[SELECT（LIMIT / OFFSET、複合 SELECT）](https://www.sqlite.org/lang_select.html)、[3.39.0 のリリースノート（RIGHT / FULL JOIN、IS DISTINCT FROM）](https://www.sqlite.org/releaselog/3_39_0.html)、[式（LIKE と ESCAPE）](https://www.sqlite.org/lang_expr.html)、[日付と時刻の関数（CURRENT_TIMESTAMP は UTC）](https://www.sqlite.org/lang_datefunc.html)、[UPSERT](https://www.sqlite.org/lang_upsert.html)、[上限](https://www.sqlite.org/limits.html)、[データ型](https://www.sqlite.org/datatype3.html)、[CREATE TABLE](https://www.sqlite.org/lang_createtable.html)、[AUTOINCREMENT](https://www.sqlite.org/autoinc.html)、[CREATE INDEX](https://www.sqlite.org/lang_createindex.html)、[WITH](https://www.sqlite.org/lang_with.html)
-- PostgreSQL: [SELECT](https://www.postgresql.org/docs/current/sql-select.html)、[INSERT](https://www.postgresql.org/docs/current/sql-insert.html)、[比較関数](https://www.postgresql.org/docs/current/functions-comparison.html)、[日付と時刻の関数（CURRENT_TIMESTAMP）](https://www.postgresql.org/docs/current/functions-datetime.html)、[パターン一致（LIKE と ESCAPE）](https://www.postgresql.org/docs/current/functions-matching.html)、[字句の構造](https://www.postgresql.org/docs/current/sql-syntax-lexical.html)、[CREATE TABLE](https://www.postgresql.org/docs/current/sql-createtable.html)、[プロトコルのメッセージ形式](https://www.postgresql.org/docs/current/protocol-message-formats.html)、[バージョンのサポート方針](https://www.postgresql.org/support/versioning/)
+- PostgreSQL: [SELECT](https://www.postgresql.org/docs/current/sql-select.html)、[INSERT](https://www.postgresql.org/docs/current/sql-insert.html)、[比較関数](https://www.postgresql.org/docs/current/functions-comparison.html)、[集計関数（min / max の型）](https://www.postgresql.org/docs/current/functions-aggregate.html)、[日付と時刻の関数（CURRENT_TIMESTAMP）](https://www.postgresql.org/docs/current/functions-datetime.html)、[パターン一致（LIKE と ESCAPE）](https://www.postgresql.org/docs/current/functions-matching.html)、[字句の構造](https://www.postgresql.org/docs/current/sql-syntax-lexical.html)、[CREATE TABLE](https://www.postgresql.org/docs/current/sql-createtable.html)、[プロトコルのメッセージ形式](https://www.postgresql.org/docs/current/protocol-message-formats.html)、[バージョンのサポート方針](https://www.postgresql.org/support/versioning/)
 - MySQL: [SELECT](https://dev.mysql.com/doc/refman/8.0/en/select.html)、[JOIN](https://dev.mysql.com/doc/refman/8.0/en/join.html)、[集合演算](https://dev.mysql.com/doc/refman/8.0/en/set-operations.html)、[INSERT … ON DUPLICATE KEY UPDATE](https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html)、[比較演算子](https://dev.mysql.com/doc/refman/8.0/en/comparison-operators.html)、[識別子](https://dev.mysql.com/doc/refman/8.0/en/identifiers.html)、[文字列関数](https://dev.mysql.com/doc/refman/8.0/en/string-functions.html)、[日付と時刻の関数（NOW）](https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html)、[DATETIME の型](https://dev.mysql.com/doc/refman/8.0/en/datetime.html)、[文字列の比較（LIKE と ESCAPE）](https://dev.mysql.com/doc/refman/8.0/en/string-comparison-functions.html)、[CREATE INDEX](https://dev.mysql.com/doc/refman/8.0/en/create-index.html)、[プレースホルダーの上限（バグ 101630）](https://bugs.mysql.com/bug.php?id=101630)。8.0 のサポート終了は [Percona の記事](https://www.percona.com/blog/mysql-8-0-end-of-life-date/) による（二次資料）
 - MariaDB: [UPDATE（RETURNING は 13.0 から）](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/changing-deleting-data/update)、[10.5.0（INSERT … RETURNING）](https://mariadb.com/docs/release-notes/community-server/old-releases/10.5/10.5.0)、[ON DUPLICATE KEY UPDATE](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/inserting-loading-data/insert-on-duplicate-key-update)、[CREATE INDEX](https://mariadb.com/docs/server/reference/sql-statements/data-definition/create/create-index)、[保守の方針](https://mariadb.org/about/#maintenance-policy)
-- SQL Server: [OUTPUT 句](https://learn.microsoft.com/en-us/sql/t-sql/queries/output-clause-transact-sql)、[UPDATE](https://learn.microsoft.com/en-us/sql/t-sql/queries/update-transact-sql)、[ORDER BY（OFFSET / FETCH）](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-order-by-clause-transact-sql)、[IS DISTINCT FROM](https://learn.microsoft.com/en-us/sql/t-sql/queries/is-distinct-from-transact-sql)、[識別子](https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers)、[CONCAT](https://learn.microsoft.com/en-us/sql/t-sql/functions/concat-transact-sql)、[CONCAT_NULL_YIELDS_NULL](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-concat-null-yields-null-transact-sql)、[比較演算子（真偽値）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/comparison-operators-transact-sql)、[検索条件](https://learn.microsoft.com/en-us/sql/t-sql/queries/search-condition-transact-sql)、[最大容量（パラメータ 2100）](https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server)、[CREATE TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-table-transact-sql)、[DROP TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/drop-table-transact-sql)、[CREATE INDEX](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-index-transact-sql)、[集合演算子](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/set-operators-except-and-intersect-transact-sql)、[テーブル値コンストラクター（1000 行）](https://learn.microsoft.com/en-us/sql/t-sql/queries/table-value-constructor-transact-sql)、[CURRENT_TIMESTAMP](https://learn.microsoft.com/en-us/sql/t-sql/functions/current-timestamp-transact-sql)、[LIKE（ESCAPE）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/like-transact-sql)、[WITH](https://learn.microsoft.com/en-us/sql/t-sql/queries/with-common-table-expression-transact-sql)
+- SQL Server: [OUTPUT 句](https://learn.microsoft.com/en-us/sql/t-sql/queries/output-clause-transact-sql)、[UPDATE](https://learn.microsoft.com/en-us/sql/t-sql/queries/update-transact-sql)、[ORDER BY（OFFSET / FETCH）](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-order-by-clause-transact-sql)、[IS DISTINCT FROM](https://learn.microsoft.com/en-us/sql/t-sql/queries/is-distinct-from-transact-sql)、[識別子](https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers)、[CONCAT](https://learn.microsoft.com/en-us/sql/t-sql/functions/concat-transact-sql)、[CONCAT_NULL_YIELDS_NULL](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-concat-null-yields-null-transact-sql)、[比較演算子（真偽値）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/comparison-operators-transact-sql)、[検索条件](https://learn.microsoft.com/en-us/sql/t-sql/queries/search-condition-transact-sql)、[最大容量（パラメータ 2100）](https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server)、[CREATE TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-table-transact-sql)、[DROP TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/drop-table-transact-sql)、[CREATE INDEX](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-index-transact-sql)、[集合演算子](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/set-operators-except-and-intersect-transact-sql)、[MIN](https://learn.microsoft.com/en-us/sql/t-sql/functions/min-transact-sql)、[LEN（max の型で bigint）](https://learn.microsoft.com/en-us/sql/t-sql/functions/len-transact-sql)、[テーブル値コンストラクター（1000 行）](https://learn.microsoft.com/en-us/sql/t-sql/queries/table-value-constructor-transact-sql)、[CURRENT_TIMESTAMP](https://learn.microsoft.com/en-us/sql/t-sql/functions/current-timestamp-transact-sql)、[LIKE（ESCAPE）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/like-transact-sql)、[WITH](https://learn.microsoft.com/en-us/sql/t-sql/queries/with-common-table-expression-transact-sql)
 - ほかのライブラリ: [Dapper の `SqlMapper.cs`（`QueryImpl` の `finally` で `cmd?.Cancel()`、commit eb47546）](https://github.com/DapperLib/Dapper/blob/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/Dapper/SqlMapper.cs)
 - プロバイダー: [SqlDataReader.Close（Cancel を先に呼ぶ）](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqldatareader.close)、[SqlParameter.Value（DBNull）](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqlparameter.value)、[Microsoft.Data.Sqlite のパラメータ](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/parameters)、[同・型](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/types)、[Npgsql の基本的な使い方（位置パラメータ）](https://www.npgsql.org/doc/basic-usage.html)、[Npgsql 8.0（NativeAOT）](https://www.npgsql.org/doc/release-notes/8.0.html)、[Npgsql の日付と時刻](https://www.npgsql.org/doc/types/datetime.html)、[MySqlConnector の版の履歴](https://mysqlconnector.net/overview/version-history/)、[SqlClient の CHANGELOG](https://raw.githubusercontent.com/dotnet/SqlClient/main/CHANGELOG.md)
 

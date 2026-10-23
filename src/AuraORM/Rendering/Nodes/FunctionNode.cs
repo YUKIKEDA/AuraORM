@@ -34,8 +34,8 @@ internal sealed class FunctionNode(SqlFunction function, SqlNode[] arguments) : 
                 context.Dialect.RenderConcat(context, Arguments);
                 return;
             case SqlFunction.Length:
-                context.Write(context.Dialect.LengthFunction);
-                break;
+                context.Dialect.RenderLength(context, Arguments[0]);
+                return;
             case SqlFunction.CurrentTimestamp:
                 context.Write("CURRENT_TIMESTAMP");
                 return;
