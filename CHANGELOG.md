@@ -36,6 +36,8 @@ version has been published to NuGet.
 - The `OrderBy` of a `SelectDistinct` takes only the selected items, named by position (`ORDER BY 1 ASC`), because
   PostgreSQL and SQL Server reject other keys; a distinct whole row has no `OrderBy`.
 - `SqlBuilder<TDialect>` builds statements without a connection, for `ToSql()` only; running them does not compile.
+- Analyzers in the package: a comparison with a typed null constant (AURA0201) or with a value that may be null
+  (AURA0202), which matches no row in SQL, and a raw SQL hole whose value is not a column type (AURA0301).
 - On SQLite, ordering, comparing by size, and `Min` / `Max` / `Sum` / `Avg` of decimals throw when the statement is
   built, because SQLite stores decimals as text. A SQL Server `Limit(0)` and a column taken out of another query's
   lambda throw too.
