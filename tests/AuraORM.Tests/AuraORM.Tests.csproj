@@ -7,6 +7,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\AuraORM\AuraORM.csproj" />
+    <!-- The generator runs on the test tables, as it does in a consumer's project. -->
+    <ProjectReference Include="..\..\src\AuraORM.Generators\AuraORM.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3" />

@@ -17,4 +17,11 @@ public interface IProjection<out T, TLevel>
     /// </summary>
     /// <param name="items">The list that receives the items.</param>
     internal void CollectSelectItems(List<SqlNode> items);
+
+    /// <summary>
+    /// Reads the items of this projection from the current row, starting at the reader's next column.
+    /// </summary>
+    /// <param name="reader">The reader of the current row.</param>
+    /// <returns>The value.</returns>
+    internal T Read(ref RowReader reader);
 }

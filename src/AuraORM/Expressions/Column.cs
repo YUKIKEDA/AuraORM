@@ -4,7 +4,7 @@ namespace AuraORM;
 /// A column of a table in the statement. It can be assigned in <c>UPDATE</c>.
 /// </summary>
 /// <typeparam name="T">The CLR type of the column, including whether it can be null.</typeparam>
-public sealed class Column<T> : IExpr<T, PerRow>, ISqlNodeSource
+public sealed class Column<T> : IExpr<T, PerRow>, ITableColumn, ISqlNodeSource
 {
     private readonly ColumnNode _node;
 
@@ -21,6 +21,8 @@ public sealed class Column<T> : IExpr<T, PerRow>, ISqlNodeSource
     SqlNode IExpr<T, PerRow>.Node => _node;
 
     SqlNode ISqlNodeSource.SourceNode => _node;
+
+    ColumnNode ITableColumn.ColumnNode => _node;
 
     internal ColumnNode Node => _node;
 }

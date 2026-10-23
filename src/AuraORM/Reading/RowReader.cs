@@ -1,0 +1,61 @@
+using System.Data.Common;
+using System.Globalization;
+
+namespace AuraORM;
+
+/// <summary>
+/// Reads the current row of a result, one column after another. Projections read their items through it; the code that
+/// the source generator emits calls <see cref="Read{T, TLevel}(IProjection{T, TLevel})"/>.
+/// </summary>
+public ref struct RowReader
+{
+    private readonly DbDataReader _reader;
+    private int _ordinal;
+
+    internal RowReader(DbDataReader reader)
+    {
+        _reader = reader;
+        _ordinal = 0;
+    }
+
+    /// <summary>
+    /// Reads a projection from the next columns of the row.
+    /// </summary>
+    /// <typeparam name="T">The type the projection is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection.</param>
+    /// <returns>The value.</returns>
+    public T Read<T, TLevel>(IProjection<T, TLevel> projection)
+        where TLevel : EvaluationLevel => projection.Read(ref this);
+
+    /// <summary>
+    /// Reads a column that the row type declares as not nullable. A <c>NULL</c> there means that the database schema does
+    /// not match the C# declaration.
+    /// </summary>
+    /// <typeparam name="T">The reference type of the column.</typeparam>
+    /// <param name="column">The column.</param>
+    /// <returns>The value.</returns>
+    /// <exception cref="InvalidOperationException">The column is <c>NULL</c>.</exception>
+    public T ReadNotNull<T>(IExpr<T, PerRow> column)
+        where T : class
+    {
+        int ordinal = _ordinal;
+        T? value = column.Read(ref this);
+        return value
+            ?? throw new InvalidOperationException(
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "The column at position {0} ({1}) is NULL, but the row type declares it as not nullable.",
+                    ordinal,
+                    _reader.GetName(ordinal)
+                )
+            );
+    }
+
+    /// <summary>
+    /// Reads the next column as a value of a supported CLR type (<c>docs/design.ja.md</c> §3.3).
+    /// </summary>
+    /// <typeparam name="T">The CLR type, including whether it can be null.</typeparam>
+    /// <returns>The value.</returns>
+    internal T ReadValue<T>() => ValueReader<T>.Read(_reader, _ordinal++);
+}

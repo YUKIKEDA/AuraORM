@@ -27,8 +27,10 @@ docs/                        設計・判断・ロードマップ・規約（本
 
 | プロジェクト | 責務 |
 | --- | --- |
-| `src/AuraORM` | ランタイムのライブラリ（`net8.0`、`IsAotCompatible`、パッケージ依存なし）。式と関数（`Expressions/`）、方言の型と機能のインターフェース（`Dialects/`）、文の木と方言ごとの SQL の出力（`Rendering/`）、`SqlStatement`（`Statements/`）、テーブルの出現（`Tables/`） |
-| `tests/AuraORM.Tests` | ランタイムのテスト（`net8.0` と `net10.0`）。SQL のゴールデンテスト（`Support/SqlAssert`、期待値は方言ごとに手で書く）と、利用者のコードとしてのコンパイルテスト（`Support/CompileAssert`、Roslyn 4.8、C# 12） |
+| `src/AuraORM` | ランタイムのライブラリ（`net8.0`、`IsAotCompatible`、パッケージ依存なし）。式と関数（`Expressions/`）、方言の型と機能のインターフェース（`Dialects/`）、文の木と方言ごとの SQL の出力（`Rendering/`）、`SqlStatement`（`Statements/`）、生成コードが使う型（`Tables/`、`Projections/`）、行の読み取り（`Reading/`）、属性とテーブルの情報（`Schema/`） |
+| `src/AuraORM.Generators` | ソースジェネレーター（`netstandard2.0`、Roslyn 4.8）。`[Table]` と `[QueryResult]` の型を読み（`SchemaReader`）、モデル（`Model/`）から C# 12 のコードを出す（`TableEmitter`、`ResultEmitter`）。診断の ID は `Diagnostics` と `AnalyzerReleases.*.md`。`AuraORM` のパッケージの `analyzers/dotnet/cs` に入る |
+| `tests/AuraORM.Generators.Tests` | ジェネレーターのテスト（`net8.0` と `net10.0`）。断片を C# 12 の利用者のコードとしてジェネレーター付きでコンパイルし、成功するか、診断の ID を確かめる（`Support/GeneratorHarness`） |
+| `tests/AuraORM.Tests` | ランタイムのテスト（`net8.0` と `net10.0`）。SQL のゴールデンテスト（`Support/SqlAssert`、期待値は方言ごとに手で書く）、利用者のコードとしてのコンパイルテスト（`Support/CompileAssert`、Roslyn 4.8、C# 12）、ジェネレーターが作ったテスト用のテーブル（`Support/Schema.cs`）を使うテスト。行の読み取りは `DataTableReader` で確かめる |
 
 ## ビルドとゲート
 
@@ -50,7 +52,7 @@ docs/                        設計・判断・ロードマップ・規約（本
 - リポジトリ内のコードは現代的な C# を使ってよい（型が明らかなときの `var`、コレクション式、プライマリコンストラクタなど）。ソースジェネレーターが利用者のプロジェクトに出力するコードは C# 12 でコンパイルできるようにする
 - private フィールドは static も含めて `_camelCase`、定数は PascalCase、`this.` は付けない、インターフェースは `I` で始める
 - 名前空間はアセンブリ名に合わせ、フォルダには合わせない
-- 型は一つのファイルに一つが既定。例外は、方言の機能のマーカーインターフェース（`Dialects/Capabilities.cs`）と、`Sql` の関数を分野ごとに分けた `partial` のファイル（`Sql.Comparison.cs` など）
+- 型は一つのファイルに一つが既定。例外は、方言の機能のマーカーインターフェース（`Dialects/Capabilities.cs`）と、`Sql` の関数を分野ごとに分けた `partial` のファイル（`Sql.Comparison.cs` など）、ジェネレーターのモデルのレコード（`src/AuraORM.Generators/Model/Models.cs`）
 - 不正な状態は型で表せないようにする。`bool` と、その `bool` 次第で意味を失う nullable の組み合わせは使わない
 - 引数・状態の検査は `ThrowHelper` 経由で例外を投げる。データベースの例外はそのまま呼び出し元に届ける
 - 公開 API には英語の XML ドキュメントを書く。internal は必須にしない

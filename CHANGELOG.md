@@ -18,3 +18,6 @@ version has been published to NuGet.
 - The five dialect types (`SqliteDialect`, `PostgreSqlDialect`, `MySqlDialect`, `MariaDbDialect`, `SqlServerDialect`)
   and their capability interfaces.
 - `SqlStatement`: the SQL text and parameters of a statement.
+- The source generator, shipped inside the package: `[Table]` records and classes get `Table`, `Columns`,
+  `NullableColumns`, and `Insert`; `[QueryResult]` types get `RowProjection` and `GroupProjection`. Schema errors are
+  reported as AURA0101 to AURA0111.

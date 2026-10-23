@@ -23,4 +23,7 @@ public interface IExpr<out T, TLevel> : IProjection<T, TLevel>
 
     /// <inheritdoc />
     void IProjection<T, TLevel>.CollectSelectItems(List<SqlNode> items) => items.Add(Node);
+
+    /// <inheritdoc />
+    T IProjection<T, TLevel>.Read(ref RowReader reader) => reader.ReadValue<T>();
 }

@@ -52,5 +52,5 @@ public sealed class TableAlias
     /// <typeparam name="T">The nullable CLR type of the column.</typeparam>
     /// <param name="name">The column name.</param>
     /// <returns>The expression.</returns>
-    public IExpr<T, PerRow> NullableColumn<T>(string name) => new SqlExpr<T, PerRow>(new ColumnNode(this, name));
+    public NullableColumn<T> NullableColumn<T>(string name) => new(this, name);
 }
