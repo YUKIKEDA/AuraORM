@@ -1,0 +1,26 @@
+---
+description: How time and allocations are measured, and what a measurement claim needs
+alwaysApply: true
+---
+
+# Benchmarks and measurements
+
+Correctness comes first. A performance claim comes with a measurement in the same PR.
+
+## Tools
+
+- Micro-benchmarks: BenchmarkDotNet with `[MemoryDiagnoser]` in `benchmarks/` (from the row that adds it). Comparisons: raw ADO.NET (the floor), Dapper, EF Core (compiled and non-compiled queries), on the same database, data, and machine. Not a gate; CI does not run them on shared runners.
+- Allocation tests that are gates (`docs/design.ja.md` names them) measure `GC.GetAllocatedBytesForCurrentThread()` after a warm-up. An allowed count stays or goes down; raising it needs an Issue.
+
+## Rules
+
+- Performance acceptance is judged on a Release build; NativeAOT figures are reported beside JIT figures when the claim is about AOT.
+- Profile before a speed row, and write on the Issue where the time goes.
+- Compare both sides with the same configuration, data, and machine state, interleaved (A, B, B, A), three rounds or more. A difference inside the spread is not a result.
+- A benchmark against a database separates the library's cost from the database's: measure SQL rendering and row materialization on their own (an in-memory reader), and the whole round trip on SQLite in memory.
+- A call shorter than the clock's resolution is repeated inside one sample until the sample is long enough.
+- A figure that moved is explained from the data, not from a guess (`.cursor/rules/open-ends.mdc`).
+- A target names what it measures before it gets a number.
+- A gain inside the spread is reverted, not shipped with other changes. A change tried for speed and not kept is reported with its measurement, so that it is not tried again.
+- A design that names a technique for its speed is measured before the design PR says so. A prototype in a scratch project is enough.
+- Before a comparison, check each compared library's latest stable release on NuGet and use it; the results name the versions.

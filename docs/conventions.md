@@ -1,0 +1,67 @@
+# 開発規約
+
+コードレビューで同じ指摘を繰り返さないための規約をまとめる。エージェントが守る強制力のある規約は `.cursor/rules/` にあり、本書はその人間向けの要約と、ディレクトリ構成の正本である。設計の中身は [design.ja.md](./design.ja.md) にある。
+
+## ディレクトリ構成
+
+プロジェクトやフォルダは、それを必要とする Issue の PR で作る。先回りして空のものを作らない。プロジェクトを追加した PR で、下の表に1行足す。
+
+```text
+AuraORM.slnx                 ソリューション（.sln は使わない）
+global.json                  .NET SDK の固定（10.0 系）とテストランナー（Microsoft.Testing.Platform）
+Directory.Build.props        全プロジェクト共通の設定（警告はエラー、解析、AOT 互換、パッケージ情報）
+Directory.Packages.props     パッケージのバージョン（Central Package Management）
+BannedSymbols.txt            ランタイムのライブラリで禁止する API（リフレクション、式ツリー、コンソール、時刻、カルチャ）
+stylecop.json                StyleCop の設定
+.editorconfig                命名・スタイル・解析ルールの重大度
+.csharpierrc.json            フォーマッタ（CSharpier）の設定
+.config/dotnet-tools.json    ローカルツール（CSharpier）
+build.ps1                    ローカルのゲート（CI も同じスクリプトを実行する。マージの条件は CI）
+src/                         パッケージに入るプロジェクト
+tests/                       テスト（tests/*.Tests）
+docs/                        設計・判断・ロードマップ・規約（本書）
+.cursor/rules/               エージェント向けの規約
+.agents/skills/              スキル（.claude/skills/ に写しを置く）
+.github/                     Issue / PR テンプレート、CI、Dependabot
+```
+
+| プロジェクト | 責務 |
+| --- | --- |
+| `src/AuraORM` | ランタイムのライブラリ（`net8.0`、`IsAotCompatible`、パッケージ依存なし）。中身は設計書の行ごとに作る |
+
+## ビルドとゲート
+
+- PR を出す前に `./build.ps1` を通す。ツールの復元、CSharpier の検査、復元、Release と Debug のビルド、全テストプロジェクトの実行を行う
+- CI は同じスクリプトを Windows・Linux・macOS で回す。データベースの結合テストと NativeAOT の検査も CI で回す。マージの条件は CI がすべて緑であること。ローカルでの実行は開発の補助であり、ゲートの代わりにならない
+- 警告は最初からすべてエラー（`TreatWarningsAsErrors`）。ビルドを通すために `NoWarn` や `#pragma warning disable` を足さない。ルールがこのリポジトリに合わない場合は、理由をコメントに書いて `.editorconfig` を変え、PR でそう明記する
+- `src/AuraORM` は `IsAotCompatible`。trim / AOT の警告もエラーになる。`BannedSymbols.txt` の API はビルドエラーになる
+- パッケージを足す前に `.cursor/rules/dependencies.mdc` を確かめる。ランタイムのライブラリには依存を足さない
+
+## データベースとコンテナ
+
+- Docker は使わない
+- ローカルの結合テスト用データベースは WSL コンテナ（`wslc.exe`、WSL 2.9.3 以降）で動かす。CI では GitHub Actions のサービスコンテナで動かす
+- 詳細は `.cursor/rules/containers.mdc`
+
+## C# の書き方
+
+- フォーマットは CSharpier だけに任せる
+- リポジトリ内のコードは現代的な C# を使ってよい（型が明らかなときの `var`、コレクション式、プライマリコンストラクタなど）。ソースジェネレーターが利用者のプロジェクトに出力するコードは C# 12 でコンパイルできるようにする
+- private フィールドは static も含めて `_camelCase`、定数は PascalCase、`this.` は付けない、インターフェースは `I` で始める
+- 名前空間はアセンブリ名に合わせ、フォルダには合わせない
+- 不正な状態は型で表せないようにする。`bool` と、その `bool` 次第で意味を失う nullable の組み合わせは使わない
+- 引数・状態の検査は `ThrowHelper` 経由で例外を投げる。データベースの例外はそのまま呼び出し元に届ける
+- 公開 API には英語の XML ドキュメントを書く。internal は必須にしない
+- SQL の生成・パラメータの設定・行の読み取りの経路の規則は `.cursor/rules/perf.mdc` にある
+
+## テスト
+
+- xUnit v3 と標準の `Assert` を使う。テストは `net8.0` と `net10.0` の両方で走る
+- メソッド名は `{対象}_{状況}_{期待}`。各テストに `summary` と `remarks`（Preconditions / Steps / Expected）を英語で書く
+- テストの層（SQL のゴールデン、コンパイルの可否、ジェネレーター、データベースごとの結合テスト、NativeAOT のサンプル）は `.cursor/rules/testing.mdc` と設計書にある
+
+## 言語
+
+- コード・コメント・XML ドキュメント・テスト・コミットの件名・PR タイトル・ルール・スキル・`README.md` は英語
+- 設計書と `docs/` の文書、`README.ja.md`、Issue と PR の本文、コミットの本文は日本語でよい
+- 詳細は `.cursor/rules/language.mdc`

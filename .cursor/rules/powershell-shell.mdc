@@ -1,0 +1,41 @@
+---
+description: PowerShell-safe shell usage for git, gh, and dotnet on Windows
+alwaysApply: true
+---
+
+# PowerShell shell (Windows)
+
+The agent shell on this setup is PowerShell. Do not use bash-only constructs in it.
+
+## Forbidden in PowerShell
+
+- Heredoc: `$(cat <<'EOF' ... EOF)`
+- Unquoted git upstream: `@{u}` (PowerShell parses `@{...}` as a hashtable). Write `'@{u}'`.
+- `export FOO=bar`, bash arrays, `&&` chains that assume bash semantics for `$?`.
+
+## Use instead
+
+- Multi-line text for a commit: a here-string.
+
+```powershell
+git commit -m @"
+type(scope): subject
+
+body
+"@
+```
+
+  `git commit -F -` with a here-string does not work: PowerShell passes the text as an argument and git reads it as a pathspec. Use `-m` as above, or commit from Bash with a heredoc.
+- Long text for `gh`: write a temporary UTF-8 file and pass `--body-file`, then delete it (`.cursor/rules/scratch.mdc`).
+- Do not put `Remove-Item` in the same command as `$env:PATH += ';C:\Program Files ...'`: the agent's PowerShell tool reads `C:\Program` as the item to remove and refuses the whole command. Remove files in a separate call, or from Bash.
+- A helper script: write it to a file in the scratchpad first, then run it. Do not build it from a here-string piped to `Set-Content` in the same command that removes files: the agent's PowerShell tool can read a line break of the here-string as a path for `Remove-Item` and refuse the whole command.
+- Native commands set `$LASTEXITCODE`. Check it before the next step: `dotnet test ...; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }`.
+- Variable names are not case-sensitive. A local `$low` is the parameter `$Low`, and setting one overwrites the other. Give locals names that differ from every parameter in more than case (`$fewer`, not `$low`).
+- Splatting one string (`& $app @args` where `$args` is `'--filter'`) passes its characters one by one. Build arguments as an array: `[string[]]$arguments = @(...)`.
+- Run `./build.ps1` in PowerShell 7 (`pwsh`, the agent's PowerShell tool), not Windows PowerShell 5.1 (`powershell.exe`): 5.1 lacks `$IsWindows` and other 7.x features.
+- Quote paths with spaces. Prefer repository-relative paths, except for .NET methods: `[IO.File]::ReadAllText` and the like read a relative path from the process's working directory, not from `Set-Location`. Pass them an absolute path.
+- In Bash, `rm -rf "$DIR"/*` is refused by the agent's safety check, because an empty `$DIR` would make it `/*`. Write `"${DIR:?}"/*` or a literal path.
+
+## Writing files
+
+Write files with the editor tools, not with shell redirection. A Python script sent through the Bash tool loses the backslashes of `\f`, `\r`, `\t`, and `\v` in its string literals, so a replacement in a Windows path or a C# string literal silently misses or writes a control character. Edit text that holds backslashes with the editor tool. A script that another script writes is written with the editor tool too: nested quoting fails in ways that only show after a long run.

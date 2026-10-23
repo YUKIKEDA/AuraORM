@@ -1,0 +1,45 @@
+---
+description: C# style, naming, types, errors, and XML docs
+globs: "**/*.cs"
+alwaysApply: false
+---
+
+# C#
+
+Formatting is CSharpier's (`.cursor/rules/engineering.mdc`). This rule covers what a formatter cannot.
+
+## Style
+
+- Modern C# is allowed in this repository: `var` when the type is apparent on the right, collection expressions, target-typed `new`, primary constructors, file-scoped namespaces, `required` members, `ref struct`.
+- Code that the source generator emits compiles with C# 12 (`net8.0`'s default language version) and with nullable annotations on or off in the consumer's project. It uses `global::`-qualified names and no `using` directives that could collide with the consumer's types.
+- Private fields are `_camelCase`, static ones included. Constants are PascalCase. No `this.` unless needed to disambiguate. Interfaces start with `I`.
+- Namespaces follow assembly names (`AuraORM`, `AuraORM.Generators`), not folders. A public type is never named like a namespace (CA1724).
+- One type per file by default. A file name matches its main type. Families of generated-by-arity types may share a file per arity.
+- No `using` alias to shorten a BCL type name. Qualify the name where it collides.
+- Library `await` uses `ConfigureAwait(false)`. `CancellationToken` is the last parameter.
+- No alignment component in an interpolated string (`{value, 4}`): CSharpier and StyleCop disagree on its spacing. Pad with `PadLeft` instead.
+
+## Types
+
+Make an invalid state unrepresentable; do not document it away or catch it at run time. For this library that is the product, not only style (`.cursor/rules/sql.mdc`).
+
+- One choice, one slot: an enum, a sealed class hierarchy, or a generic parameter, not a `bool` plus a nullable that the `bool` makes meaningless.
+- A clause that may appear once is a state of the builder type, not a field checked at run time.
+- A method that cannot fail returns its value, not a `bool` / `out` pair or a nullable.
+- A public method does not throw because the caller used the wrong phase of the same type; split the type instead.
+- The public surface is small: the entry points, the builder stages, the expression types, the attributes, the dialect markers, and the exceptions. Rendering, binding, and the expression tree internals are `internal`.
+
+## Errors
+
+- Argument and state checks throw through `ThrowHelper`, with one-sentence English messages that name the condition.
+- An error from the database (`DbException`) reaches the caller unchanged. The library does not wrap or translate it.
+- Public exception types are few and documented in the XML docs of the members that throw them.
+- A `catch` that runs cleanup which can throw keeps the exception it caught: when the cleanup throws too, throw an `AggregateException` with the caught exception first. (A failed rollback after a failed statement must not hide the statement's error.)
+- A comment that states how a database or provider behaves names what was checked: the call, the version, and the result.
+
+## XML docs
+
+- Public members under `src/` have `summary`, and `param` / `returns` / `exception` when a caller might be unsure. Sentences end with a period. Properties start with "Gets" / "Gets or sets"; constructors with "Initializes a new instance of the <see cref="T"/> class".
+- XML docs state the caller's contract, including the SQL a builder method adds (`docs/design.ja.md` is the full specification; refer to the section instead of restating dialect tables).
+- Use `<inheritdoc />` when an implementation has the interface's contract.
+- Wording and terminology: `.agents/skills/english-writing/SKILL.md`.

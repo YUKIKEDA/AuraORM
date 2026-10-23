@@ -1,0 +1,43 @@
+---
+description: A question is not a decision; options need a recommendation and an order from the owner
+alwaysApply: true
+---
+
+# Consent
+
+A question is not a decision. Do not close a design choice, an Issue, or a PR in the same turn as a question.
+
+These are questions, not orders. Do not create, edit, close, or retitle Issues or PRs, and do not rewrite `docs/roadmap.md` or `docs/design.ja.md` to settle them:
+
+- "Is it required?" "Should it be X?"
+- Any yes/no about scope, a milestone, or whether a roadmap row exists.
+
+For such a question, list the options, give a recommendation, and state each option's advantage and disadvantage. Then stop and wait.
+
+The reason for a recommendation is the library's goals and its functional and non-functional requirements (`docs/design.ja.md`): keep SQL's flexibility and reject only invalid queries through types; generated SQL is predictable (one builder call is one clause, no hidden queries, `ToSql()` shows it); type safety strict enough that an AI agent cannot write an invalid query unnoticed; NativeAOT compatible on every supported dialect. Implementation effort, volume, or ease is not a reason (`.cursor/rules/scope.mdc`), and neither is how soon it can be built.
+
+Before recommending how to build a mechanism (a type-state builder, a parameter binder, a dialect abstraction, a source-generator model, a result mapper), find how other ORMs and query builders do it (Drizzle ORM, EF Core, Dapper, linq2db, jOOQ, Kysely, SqlKata), cite the sources, and judge each way against the requirements. "It is simpler" does not settle it; the comparison does.
+
+Before recommending a design, search `docs/design-decisions.md` for a rejection of the same shape, and say how the recommendation differs from it.
+
+A statement about how another library or a database behaves is checked in its source or its official documentation before it goes to the owner, and what was not checked is said to be unchecked. The same holds for a comparison written into the design. "Kysely does X" or "SQL Server accepts Y" is a citation, not a memory.
+
+When the owner corrects a criterion, go back over the decisions made before the correction and judge them by the new criterion: the design, the decision records, and the conversation logs, where reasons given only in passing are kept. Each one that fails gets a roadmap row or a Grill before the row that depends on it.
+
+A consequence written in a report is not a decision either. Do not write what a report says will happen into a rule or the design as the owner's decision; ask for the owner's word.
+
+"Go ahead" and "next" mean the current roadmap row only. They are not consent to add rows, file extra Issues, or widen an open design.
+
+An outward-facing action (creating a GitHub repository, publishing a package to NuGet, posting outside this repository) needs an order that names it. The steps of the workflow in this repository are not such actions: creating the Issue for a row, pushing its branch, opening its PR, and recording results on the Issue are done without asking (`.cursor/rules/git.mdc`).
+
+A decision rests on the figures it was given. When a later change moves those figures (a cost, an allocation count, a package size, the SQL a call renders), report the new ones beside the old before the PR that carries the change is merged, and let the owner decide again.
+
+```text
+# BAD
+Owner: Should Update() without Where() be a compile error?
+Agent: makes it a compile error everywhere and opens the PR
+
+# GOOD
+Owner: Should Update() without Where() be a compile error?
+Agent: compile error / explicit .All() opt-in / runtime check, each with its cost; recommends one; waits
+```

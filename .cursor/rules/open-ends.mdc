@@ -1,0 +1,27 @@
+---
+description: A PR does not go out with work it names as not done, or a result it cannot explain
+alwaysApply: true
+---
+
+# No open ends in a PR
+
+A PR is opened when its work is finished, not when it runs. Two sentences do not belong in a PR body or in a report to the owner:
+
+- "Not measured." A PR that claims speed or memory (fewer allocations while building SQL, a faster result mapper) measures it before it is opened, against a named baseline, and reports the numbers before and after (`.cursor/rules/bench.mdc`). What is left is stated with a number and the reason it stays.
+- "The cause is not confirmed." A result the agent cannot explain (an integration test that fails one run in ten, a dialect that returns a different row count or type from the others, a SQL golden mismatch) is traced to its cause from the data before the PR is opened. A guess is not written as an explanation, with or without "probably".
+
+What is out of the row's scope is a roadmap row that names when (`.cursor/rules/defer.mdc`), not a caveat. A finding about code the row did not change becomes its own Issue at once (`.cursor/rules/pace.mdc`).
+
+A reason written as likely ("probably", 「と考えられる」) is checked first when a cheap check exists: reading the generated SQL with `ToSql()`, reading the database's documentation or its log, one more run.
+
+A comment in the code is held to the same line: it says what was observed, and marks a cause that was not confirmed as not confirmed, with the Issue number.
+
+```text
+# BAD
+PostgreSQL だけ統合テストがたまに落ちますが、おそらくコンテナの起動待ちの問題です。性能は測っていません。
+
+# GOOD
+PostgreSQL の統合テストは 20 回中 3 回失敗した。サーバーログを見ると、失敗はすべて前のテストの
+トランザクションが未コミットのまま同じ行を UPDATE していた回だった。テストごとに接続を分けて 50 回連続で通過。
+SELECT 1 本の SQL 生成は 1.9 → 0.6 µs、確保は 1,240 → 312 B（BenchmarkDotNet、main 比）。
+```

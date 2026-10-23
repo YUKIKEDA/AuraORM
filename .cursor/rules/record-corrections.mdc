@@ -1,0 +1,31 @@
+---
+description: A correction given in conversation is written into the file it belongs to, in the same change
+alwaysApply: true
+---
+
+# Recording corrections
+
+A correction that the owner gives in conversation lands in the same change as the work, in the file where it belongs:
+
+- A working rule: one `.cursor/rules/*.mdc`, one concern per file, with a BAD and a GOOD example.
+- A code or naming convention: `docs/conventions.md`.
+- The meaning of the library: `docs/design.ja.md` (through a `design` Issue when it changes the spec).
+- A rejected alternative: `docs/design-decisions.md`.
+- A decision and its measured reason: `docs/design.ja.md`, with the measurement beside it.
+- A step-by-step procedure: the matching skill under `.agents/skills/`.
+
+A lesson first noticed at the retrospective after a merge is written the same way, without waiting for an ask.
+
+The agent's own memory is not one of these places. A note there is read by one tool on one machine, and by no reviewer. A correction that should hold next time is a file in this repository.
+
+```text
+# BAD
+Owner: パラメータは必ずバインドする約束では？
+Agent: changes the literal to a parameter, and saves "always bind values" to its memory directory
+
+# GOOD
+Owner: パラメータは必ずバインドする約束では？
+Agent: changes the literal to a parameter, and adds the case to docs/conventions.md in the same PR
+```
+
+A rule only says to follow the design. It does not copy the design's type lists, section text, or figures.

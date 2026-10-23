@@ -1,0 +1,15 @@
+---
+description: Figures, math, and code in the design documents
+globs: "docs/**/*.md"
+alwaysApply: false
+---
+
+# Figures, math, and code in the design
+
+- Figures: a fenced `mermaid` block. No ASCII-art diagrams. A directory tree or a code signature in a code block is not a diagram.
+- Math: inline `$...$`, display `$$...$$`. Do not use `\(` or `\[`. Do not put `$` inside a code block.
+- A new formula does not reuse a symbol defined nearby with another meaning.
+- An ordered list (the clause order of a statement, the steps of the source generator) is written in one place. A section that adds to it names the steps it follows and points back.
+- Code in the design is C# pseudo-code that follows the naming in `docs/conventions.md`, so it can be copied into an implementation without renaming.
+- SQL in the design is a fenced `sql` block that names its dialect, and shows what the builder actually renders (quoting, parameter placeholders), not a hand-tidied form.
+- Japanese prose is plain form (常体). Do not run the `natural-japanese` rewriting on code, SQL, or formulas.

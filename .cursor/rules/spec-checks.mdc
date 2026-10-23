@@ -1,0 +1,30 @@
+---
+description: Checks and tests implement the design's full statement, not a necessary condition of it
+alwaysApply: true
+---
+
+# Checking the design's statements
+
+A check or a test that stands for a statement in `docs/design.ja.md` implements the whole statement, not a necessary condition of it.
+
+- Every documented contract has a code path and a test. A sentence with no code behind it is a defect.
+- Before the PR, list each contract sentence the PR adds to `docs/design.ja.md` next to the test that checks it.
+- A statement that something must not compile has a compile-fail test that asserts the diagnostic ID, not only that compilation failed. A test that the valid form compiles stands beside it.
+- A statement that lists dialects has a test per dialect, and a statement about the generated SQL asserts the exact SQL string and parameters per dialect, not a substring.
+- An API that runs the caller's code (a value converter, a mapping callback, a transaction body) is tested with that code doing what it may do to the same subsystem: run another query on the same connection, open a nested transaction, throw.
+- A walk over a query tree stops at the boundary the design names (a subquery's scope, the outermost statement), not at the first node that looks like one.
+- A rejection in `docs/design-decisions.md` whose reason is behavior has a test that fails when the rejected option is put in its place.
+- When the design fixes an order (the clause order in the rendered SQL, the order of parameters, the priority of generator diagnostics), test it with one input that fails two adjacent steps and assert the first.
+- When the design fixes a state machine (the builder's type-state from `Select` through `From`, `Where`, `OrderBy`; a transaction's states), test every transition it lists and one transition it does not allow.
+- A test of an invariant includes the input that would break it: a column from a table not in the `FROM`, a value of the wrong type, an identifier that needs quoting.
+- A fixed limit (a buffer, a dialect's maximum parameter count) has a test above it.
+- A comparison removed from a key (a cache key for rendered SQL) as the same as another is shown to have no input where the two differ, or it stays.
+- When a statement lists the values a mechanism covers, each value has a test where the other values' paths do not run.
+- When a design statement changes, search `docs/`, the READMEs, `.cursor/rules/`, and XML docs for every restatement and update them in the same PR.
+- Before a PR says "every X does Y" (every dialect renders `RETURNING` or rejects it at compile time, every column type has a mapping), search the whole solution for X. The PR's test plan names the search and the exceptions.
+
+```text
+BAD:  "Update() without Where() does not compile"
+      → test checks that Update().Where(...) compiles
+GOOD: compile-fail test on Update(users).Set(...) asserts the diagnostic ID; a second test shows .Where(...) compiles
+```

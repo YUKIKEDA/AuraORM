@@ -1,0 +1,65 @@
+---
+description: Test framework, layers, structure, and documentation of tests
+globs: "tests/**/*.cs"
+alwaysApply: false
+---
+
+# Tests
+
+The test layers are in `docs/design.ja.md`. This rule is how a test is written.
+
+## Framework
+
+- xUnit v3 with its built-in `Assert`. No assertion library.
+- Tests run on Microsoft.Testing.Platform (`global.json` `test.runner`). There is no `Microsoft.NET.Test.Sdk` or `xunit.runner.visualstudio`. Run one project with `dotnet test --project <path>`, and some of its tests with `dotnet test --project <path> -- --filter-method <pattern>`. Read the exit code and the count of tests run; a run with zero tests is not a pass.
+- Test projects target `net8.0` and `net10.0`, so the tests run on the oldest supported runtime and the newest.
+
+## Layers
+
+- SQL golden tests: a builder chain and the exact SQL text and parameters it renders, for each dialect. No database. The expected SQL is written in the test (or a golden file next to it), by hand, from the design; never produced by running the code under test and pasting its output.
+- Compile tests: a snippet compiled with the generator against the library, asserting either success or the exact diagnostic ids (`CSxxxx` from the compiler, `AURAnnnn` from the generator and analyzers). Every "does not compile" guarantee has one.
+- Generator tests: generated source and diagnostics for a given input.
+- Integration tests: the same queries executed on each supported database (SQLite in process; PostgreSQL, MySQL, SQL Server in containers, `.cursor/rules/containers.mdc`). They assert results, not SQL text.
+- NativeAOT sample: published and run in CI (`.cursor/rules/aot.mdc`).
+
+## Structure
+
+- `tests/<Project>.Tests` mirrors `src/<Project>`. `Foo.cs` → `FooTests.cs`, in the same folder.
+- Method names: `{Target}_{Scenario}_{Expected}` in PascalCase, English.
+- Each test owns its state. Tests run in parallel; an integration test creates its own tables (unique names) or runs in a transaction it rolls back.
+- An integration test against a database that is not configured skips with the database's name in the reason. In CI every database is configured.
+
+## Documentation
+
+Every `[Fact]` and `[Theory]` has XML docs in this shape, in English:
+
+```csharp
+/// <summary>
+/// One line: the behavior this test guards.
+/// </summary>
+/// <remarks>
+/// Preconditions:
+/// - ...
+///
+/// Steps:
+/// - ...
+///
+/// Expected:
+/// - ...
+/// </remarks>
+[Fact]
+public void Where_NullableColumnEqualsValue_RendersEqualsParameter()
+{
+}
+```
+
+- A `[Theory]` is documented once; list what the cases cover under Preconditions or Steps.
+- No custom XML tags. Link a design section when the why is not obvious.
+
+## What a test checks
+
+- A test stands for the whole design statement (`.cursor/rules/spec-checks.mdc`).
+- Compare with an independent reference: SQL written by hand from the design, a result computed by hand, the database's own answer. Do not compare a function with a re-implementation of itself.
+- A result that differs between databases (ordering without `ORDER BY`, collation, numeric precision, time zones) is not asserted across them unless the query fixes it.
+- Mutation check for a guard: change the guarded term and see the test fail, then restore it by copying the file aside and back (not `git checkout`). A mutant must build: with warnings as errors, `if (false)` does not compile (CS0162), and `dotnet test --no-build` would then run the old binaries.
+- Read the state you assert before a shared helper's cleanup runs.

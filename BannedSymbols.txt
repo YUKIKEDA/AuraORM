@@ -1,0 +1,9 @@
+M:System.Activator.CreateInstance(System.Type);Reflection breaks NativeAOT (.cursor/rules/aot.mdc)
+M:System.Type.GetType(System.String);Reflection breaks NativeAOT (.cursor/rules/aot.mdc)
+M:System.Type.MakeGenericType(System.Type[]);Reflection breaks NativeAOT (.cursor/rules/aot.mdc)
+N:System.Reflection.Emit;Dynamic code breaks NativeAOT (.cursor/rules/aot.mdc)
+N:System.Linq.Expressions;Expression trees are not used: queries are built from typed expressions, not compiled lambdas (docs/design.ja.md)
+T:System.Console;The library has no console output. Report through return values and exceptions
+P:System.DateTime.Now;SQL text and values never depend on the clock or the local time zone
+P:System.DateTime.Today;SQL text and values never depend on the clock or the local time zone
+P:System.Globalization.CultureInfo.CurrentCulture;SQL text is culture-invariant. Use CultureInfo.InvariantCulture
