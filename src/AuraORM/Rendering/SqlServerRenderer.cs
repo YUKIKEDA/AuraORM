@@ -29,6 +29,28 @@ internal sealed class SqlServerRenderer : DialectRenderer
             _ => "date",
         };
 
+    // §5.9: OFFSET … FETCH, which needs ORDER BY; the builder offers a limit on SQL Server only after OrderBy.
+    public override void RenderLimitOffset(SqlRenderContext context, ParameterNode? limit, ParameterNode? offset)
+    {
+        context.Write(" OFFSET ");
+        if (offset is null)
+        {
+            context.Write('0');
+        }
+        else
+        {
+            offset.Render(context);
+        }
+
+        context.Write(" ROWS");
+        if (limit is not null)
+        {
+            context.Write(" FETCH NEXT ");
+            limit.Render(context);
+            context.Write(" ROWS ONLY");
+        }
+    }
+
     // §4.2: + concatenates strings; CONCAT would turn NULL into an empty string.
     public override void RenderConcat(SqlRenderContext context, SqlNode[] arguments) => RenderInfix(context, arguments, " + ");
 

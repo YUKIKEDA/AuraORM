@@ -33,6 +33,15 @@ checks.SameItems("tuples", Book.Samples.Select(b => (b.Title, b.Pages)).ToList()
 long fiction = await db.QueryScalarAsync<long>($"SELECT {Count()} FROM {Book.Table} WHERE genre = {Genre.Fiction}");
 checks.Equal("scalar", 2L, fiction);
 
+List<Book> selected = await db.From(Book.Table).Where(b => Eq(b.Genre, Genre.Fiction)).Select(b => b).OrderBy(b => [Asc(b.Id)]).ToListAsync();
+checks.SameItems("select rows", Book.Samples.Where(b => b.Genre == Genre.Fiction).ToList(), selected);
+
+List<(string, int?)> page = await db.From(Book.Table).Select(b => (b.Title, b.Pages)).OrderBy(b => [Desc(b.Id)]).Limit(1).Offset(1).ToListAsync();
+checks.SameItems("select page", [("Anonymous Tales", (int?)null)], page);
+
+(long count, int? longest) = await db.From(Book.Table).Select(b => (Count(), Max(b.Pages))).SingleAsync();
+checks.Equal("select aggregates", (3L, (int?)412), (count, longest));
+
 try
 {
     await db.InTransactionAsync(async tx =>

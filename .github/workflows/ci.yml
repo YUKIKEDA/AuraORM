@@ -49,6 +49,17 @@ jobs:
       - name: Gate
         run: ./build.ps1
 
+      # The SELECT stages are written by a tool and committed (docs/conventions.md). Write them again and fail when they
+      # differ from the commit, so a hand edit or a stale output cannot be merged.
+      - name: Generated stages are current
+        if: runner.os == 'Linux'
+        run: |
+          dotnet run --project tools/AuraORM.StageGenerator -c Release
+          dotnet csharpier format src/AuraORM/Select/Generated
+          git status --porcelain -- src/AuraORM/Select/Generated
+          git diff --exit-code -- src/AuraORM/Select/Generated
+          if (git status --porcelain -- src/AuraORM/Select/Generated) { Write-Error 'Run the stage generator and commit its output.'; exit 1 }
+
   # NativeAOT check (docs/design.ja.md §16.3, .cursor/rules/aot.mdc): publish the sample with NativeAOT, fail on any
   # trim or AOT warning (warnings are errors), run the executable, and report its size.
   nativeaot:

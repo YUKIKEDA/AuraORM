@@ -567,11 +567,11 @@ db.From(Order.Table)
 | SQLite | `LIMIT @p0` | `LIMIT @p0 OFFSET @p1` | 書けない |
 | PostgreSQL | `LIMIT $1` | `LIMIT $1 OFFSET $2` | `OFFSET $1` |
 | MySQL / MariaDB | `LIMIT @p0` | `LIMIT @p0 OFFSET @p1` | 書けない |
-| SQL Server | `OFFSET 0 ROWS FETCH NEXT @p0 ROWS ONLY`（`OrderBy` の後だけ） | `OFFSET @p1 ROWS FETCH NEXT @p0 ROWS ONLY`（同） | `OFFSET @p0 ROWS`（`OrderBy` の後だけ） |
+| SQL Server | `OFFSET 0 ROWS FETCH NEXT @p0 ROWS ONLY`（`OrderBy` の後だけ） | `OFFSET @p0 ROWS FETCH NEXT @p1 ROWS ONLY`（同。`@p0` が `m`、`@p1` が `n`） | `OFFSET @p0 ROWS`（`OrderBy` の後だけ） |
 
 - SQL Server の `OFFSET … FETCH` は `ORDER BY` が必要なので、`OrderBy` のない `Limit` は SQL Server では書けない（`IUnorderedLimitDialect` を持たない）。ライブラリが `ORDER BY` を補うことはしない。
 - SQLite と MySQL の `OFFSET` は `LIMIT` が必要なので、`Limit` のない `Offset` は書けない（`IOffsetWithoutLimitDialect` を持たない）。
-- SQL Server の `Limit(n).Offset(m)` で、パラメータの番号が句の並び（`OFFSET` が先）ではなく呼び出しの順になるのは、パラメータの番号が式を組み立てた順に振られるからである（§5.12）。
+- SQL Server の `Limit(n).Offset(m)` では `OFFSET` が先に現れるので、`m` が `@p0`、`n` が `@p1` になる。パラメータの番号は SQL の文字列に現れる順である（§5.12）。
 
 ### 5.10 集合演算
 
@@ -598,7 +598,7 @@ var q = db.From(User.Table).Select(u => u.Name)
 
 - キーワードは大文字。要素の区切りは `, `。句の間は半角空白一つ。改行と末尾の `;` は出さない。
 - 識別子は常にクォートする。SQLite と PostgreSQL は `"x"`（中の `"` は `""`）、MySQL と MariaDB は `` `x` ``（中の `` ` `` は ``` `` ```）、SQL Server は `[x]`（中の `]` は `]]`）。
-- パラメータの名前は、PostgreSQL が `$1`、`$2`、…（名前のないパラメータ）、ほかの方言は `@p0`、`@p1`、… である。番号は、文の木を組み立てた順に振る。同じ値でも現れるたびに別のパラメータになる。
+- パラメータの名前は、PostgreSQL が `$1`、`$2`、…（名前のないパラメータ）、ほかの方言は `@p0`、`@p1`、… である。番号は、SQL の文字列に現れる順に振る（`SqlStatement.Parameters` の順でもある）。同じ値でも現れるたびに別のパラメータになる。
 - 複合の式（`And`、`Or`、算術、`Concat`）は常にかっこで囲む。比較とそれ以外の関数呼び出しは囲まない。
 - 本書の例では、読みやすさのために SQL を改行して示すことがある。実際の出力は一行である。
 
@@ -919,6 +919,7 @@ CREATE TABLE "users" (
 | パラメータの数が方言の上限を超えた（§12.4） | `ArgumentException` |
 | 生のクエリで、結果の型のメンバーに対応する列がない（§11.3） | `InvalidOperationException` |
 | `Limit` / `Offset` に負の値を渡した | `ArgumentOutOfRangeException` |
+| `OrderBy` に空の配列を返した（§5.8） | `ArgumentException` |
 
 ## 15. 診断 ID
 

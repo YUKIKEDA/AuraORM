@@ -133,3 +133,7 @@ dotnet_diagnostic.CA1707.severity = none
 # Generated code.
 [*.g.cs]
 generated_code = true
+
+# Tools: code generators pass their templates as multi-line raw strings, which SA1118 rejects.
+[tools/**/*.cs]
+dotnet_diagnostic.SA1118.severity = none

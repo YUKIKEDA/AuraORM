@@ -31,6 +31,26 @@ public sealed class TableAlias
     internal string Reference => Alias ?? Table;
 
     /// <summary>
+    /// Writes the table as a source of <c>FROM</c> or <c>JOIN</c>: <c>"schema"."table"</c>, then <c>AS "alias"</c> when it has one.
+    /// </summary>
+    /// <param name="context">The rendering context.</param>
+    internal void RenderSource(SqlRenderContext context)
+    {
+        if (Schema is not null)
+        {
+            context.WriteIdentifier(Schema);
+            context.Write('.');
+        }
+
+        context.WriteIdentifier(Table);
+        if (Alias is not null)
+        {
+            context.Write(" AS ");
+            context.WriteIdentifier(Alias);
+        }
+    }
+
+    /// <summary>
     /// Creates a column that can be assigned in <c>UPDATE</c>.
     /// </summary>
     /// <typeparam name="T">The CLR type of the column, including whether it can be null.</typeparam>

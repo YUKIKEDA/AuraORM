@@ -6,7 +6,7 @@ namespace AuraORM.Tests;
 
 /// <summary>
 /// Compiles a snippet as a consumer would: C# 12 (the default of net8.0), nullable reference types on, warnings reported,
-/// against the AuraORM assembly, in a namespace outside AuraORM.
+/// against the AuraORM assembly and the test schema (<see cref="Account"/>), in a namespace outside AuraORM.
 /// </summary>
 internal static class CompileAssert
 {
@@ -23,16 +23,16 @@ internal static class CompileAssert
     }
 
     /// <summary>
-    /// Asserts that the snippet fails with exactly the given error ids, and no other error or warning.
+    /// Asserts that the snippet fails with exactly the given error ids, and no other error. Warnings that follow from the
+    /// errors (such as nullability warnings on the expression that failed) are ignored.
     /// </summary>
     /// <param name="body">Statements of a method body.</param>
-    /// <param name="ids">The expected diagnostic ids, in any order.</param>
+    /// <param name="ids">The expected error ids, in any order.</param>
     public static void Fails(string body, params string[] ids)
     {
-        ImmutableArray<Diagnostic> diagnostics = Compile(body);
-        Assert.False(diagnostics.IsEmpty, "The snippet compiled.");
-        Assert.Equal(ids.Order().ToArray(), diagnostics.Select(d => d.Id).Distinct().Order().ToArray());
-        Assert.All(diagnostics, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
+        string[] errors = Compile(body).Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id).Distinct().Order().ToArray();
+        Assert.False(errors.Length == 0, "The snippet compiled.");
+        Assert.Equal(ids.Order().ToArray(), errors);
     }
 
     private static ImmutableArray<Diagnostic> Compile(string body)
@@ -41,13 +41,15 @@ internal static class CompileAssert
             using System;
             using System.Collections.Generic;
             using AuraORM;
+            using AuraORM.Tests;
             using static AuraORM.Sql;
 
             namespace Consumer;
 
             public static class Snippet
             {
-                public static void Run(IExpr<long, PerRow> id, IExpr<string, PerRow> name, IExpr<string?, PerRow> nickname, IExpr<int?, PerRow> age)
+                public static void Run(IExpr<long, PerRow> id, IExpr<string, PerRow> name, IExpr<string?, PerRow> nickname, IExpr<int?, PerRow> age,
+                    Database<SqliteDialect> sqlite, Database<PostgreSqlDialect> pg, Database<MySqlDialect> mysql, Database<SqlServerDialect> mssql)
                 {
             {{body}}
                 }
@@ -72,6 +74,11 @@ internal static class CompileAssert
                 Path.GetFileName(p).StartsWith("System.", StringComparison.Ordinal) || Path.GetFileName(p) is "netstandard.dll" or "mscorlib.dll"
             )
             .Select(p => MetadataReference.CreateFromFile(p));
-        return [.. platform, MetadataReference.CreateFromFile(typeof(Sql).Assembly.Location)];
+        return
+        [
+            .. platform,
+            MetadataReference.CreateFromFile(typeof(Sql).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Account).Assembly.Location),
+        ];
     }
 }

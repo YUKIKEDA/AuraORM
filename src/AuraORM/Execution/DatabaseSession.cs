@@ -21,6 +21,27 @@ public abstract partial class DatabaseSession<TDialect> : IStatementRunner
     public DatabaseOptions Options { get; }
 
     /// <summary>
+    /// Starts a SELECT statement: <c>FROM table</c> (<c>docs/design.ja.md</c> §5). The lambdas of the statement get the
+    /// table's column set.
+    /// </summary>
+    /// <typeparam name="TRow">The row type.</typeparam>
+    /// <typeparam name="TColumns">The column set.</typeparam>
+    /// <typeparam name="TNullable">The column set on the nullable side of an outer join.</typeparam>
+    /// <typeparam name="TInsert">The <c>INSERT</c> model.</typeparam>
+    /// <param name="table">The table reference, such as <c>User.Table</c>.</param>
+    /// <returns>The statement.</returns>
+    public SelectFrom<TDialect, TColumns, TNullable> From<TRow, TColumns, TNullable, TInsert>(Table<TRow, TColumns, TNullable, TInsert> table)
+        where TRow : class
+        where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
+        where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
+        where TInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        var alias = new TableAlias(table.Info.Schema, table.Info.Name, alias: null);
+        return new SelectFrom<TDialect, TColumns, TNullable>(this, SelectState.From(alias), TColumns.Create(alias));
+    }
+
+    /// <summary>
     /// Runs a raw query and reads each row into a <c>[Table]</c> or <c>[QueryResult]</c> type by column name
     /// (<c>docs/design.ja.md</c> §11.3).
     /// </summary>

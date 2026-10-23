@@ -116,6 +116,28 @@ internal abstract class DialectRenderer
     }
 
     /// <summary>
+    /// Writes the row limit and the offset of a SELECT (§5.9). The default is <c>LIMIT n OFFSET m</c>; the builder lets only
+    /// the dialects that accept it write an offset without a limit.
+    /// </summary>
+    /// <param name="context">The rendering context.</param>
+    /// <param name="limit">The row limit, or <see langword="null"/>.</param>
+    /// <param name="offset">The offset, or <see langword="null"/>.</param>
+    public virtual void RenderLimitOffset(SqlRenderContext context, ParameterNode? limit, ParameterNode? offset)
+    {
+        if (limit is not null)
+        {
+            context.Write(" LIMIT ");
+            limit.Render(context);
+        }
+
+        if (offset is not null)
+        {
+            context.Write(" OFFSET ");
+            offset.Render(context);
+        }
+    }
+
+    /// <summary>
     /// Writes an aggregate (§4.2).
     /// </summary>
     /// <param name="context">The rendering context.</param>

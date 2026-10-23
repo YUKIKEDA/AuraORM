@@ -26,3 +26,8 @@ version has been published to NuGet.
 - Raw SQL through interpolated strings, where values become parameters: fragments (`Raw`, `Raw<T>`, `RawAggregate<T>`,
   `RawHaving`, `Unsafe`, `Identifier`), queries read by column name (`QueryAsync<T>`) or as tuples, scalars, and commands
   (`ExecuteAsync`).
+- The SELECT builder on one table: `From(table)`, `Where`, `Select` / `SelectDistinct` (a column, the whole row, a
+  tuple of up to 8 items, or a result projection), `OrderBy` with `Asc` / `Desc`, `Limit`, and `Offset`, read with
+  `ToListAsync`, `AsAsyncEnumerable`, `First`, `Single`, and their `OrDefault` forms. Clauses come in SQL order, and a
+  limit or an offset that a dialect does not accept in that place (such as a SQL Server limit without `ORDER BY`) does
+  not compile.

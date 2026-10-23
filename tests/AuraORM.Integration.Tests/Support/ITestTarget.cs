@@ -9,8 +9,9 @@ public interface ITestTarget<TDialect> : IAsyncDisposable
     where TDialect : IDialect
 {
     /// <summary>
-    /// Gets a database whose <c>people</c> table exists and is empty. Each call gives a database of its own, so tests can run
-    /// in parallel.
+    /// Gets a database whose <c>people</c> table exists and is empty. On SQLite each call gives a new database; on a server each
+    /// call drops and creates the table again, which empties the databases of earlier calls, so the tests of one server run
+    /// one at a time (an xUnit collection).
     /// </summary>
     /// <returns>The database.</returns>
     Task<Database<TDialect>> CreateDatabaseAsync();
