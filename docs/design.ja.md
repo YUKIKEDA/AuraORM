@@ -369,8 +369,9 @@ db.From(User.Table).Where(u => And(filters)).Select(u => u);
 // 両方あれば WHERE ("users"."Name" LIKE @p0 AND "users"."Age" >= @p1)、一つならその条件だけ、なければ WHERE を出さない
 ```
 
+- 一覧が空のとき、`And` も `Or` も「条件なし」になり、`Where` は全行を返す。空の `Or` は論理としては偽だが、検索の絞り込みで「選んだ条件がない」ことを表すので、Drizzle ORM の `or()` と同じく「条件なし」にする。一方、空の値の一覧を受け取る `In(a, [])` は `1 = 0`（行なし）である。`In` は「この値のどれか」を表すので、値が一つもなければどの行も当たらない。
 - `OptionalCondition<TLevel>` は、SELECT の `Where`（と行 Q3 の `Having`）だけが受け取る。「条件なし」の `Where` は `WHERE` を出さない。条件の数が値で決まることは、`In` の要素の数と同じく文の形の一部である（§0.1）。
-- UPDATE と DELETE の `Where` は `Condition<PerRow>` だけを受け取り、`OptionalCondition` は CS1503 になる（§7、§8）。条件が一つもないときに全行を更新・削除する文にならないためである。全行は `AllRows()` で明示する。
+- UPDATE と DELETE の `Where` は `Condition<PerRow>` だけを受け取り、`OptionalCondition` は CS1503 になる（§7、§8）。条件が一つもないときに全行を更新・削除する文にならないためである。たとえば `Delete(…).Where(u => Or(選んだ ID の条件の一覧))` で何も選ばれていなければ、全行の削除になってしまう。全行は `AllRows()` で明示する。
 - Drizzle ORM の `and()` も `undefined` を飛ばし、一つもなければ `undefined` を返して、`where(undefined)` は `WHERE` を出さない。Drizzle では UPDATE / DELETE でも同じなので全行が対象になる。AuraORM はそこを型で止める（§19）。
 
 **算術**（数値型。`System.Numerics.INumber<T>` を満たす `T` と、その nullable。名前は .NET の命名の指針に合わせて略さない）
