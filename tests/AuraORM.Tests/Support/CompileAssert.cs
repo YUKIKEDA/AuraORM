@@ -35,6 +35,18 @@ internal static class CompileAssert
         Assert.Equal(ids.Order().ToArray(), errors);
     }
 
+    /// <summary>
+    /// Asserts that the snippet compiles with no error and reports the given warning.
+    /// </summary>
+    /// <param name="body">Statements of a method body.</param>
+    /// <param name="id">The expected warning id.</param>
+    public static void Warns(string body, string id)
+    {
+        ImmutableArray<Diagnostic> diagnostics = Compile(body);
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        Assert.Contains(diagnostics, d => d.Id == id && d.Severity == DiagnosticSeverity.Warning);
+    }
+
     private static ImmutableArray<Diagnostic> Compile(string body)
     {
         string source = $$"""

@@ -532,7 +532,9 @@ var rows = await db.From(User.Table)
     .ToListAsync();   // List<(string, decimal?)>
 ```
 
-- `on` のラムダには、結合するテーブルの通常の列が渡る（`ON` の中では、結合する行は存在するため）。
+- `on` のラムダには、結合するテーブルの通常の列が渡る（`ON` の中では、結合する行は存在するため）。それまでのテーブルの列の集合は、その時点のもの（`LeftJoin` の後なら NULL 化したもの）が渡る。
+- 結合は `From` の直後の段階にだけあり（`Where` の後は CS1061）、テーブルは 8 つまで（9 つ目の結合は CS1061）。`FullJoin` は `IFullJoinDialect` を持たない MySQL / MariaDB では CS0311 になる。
+- 別名のない同じテーブル（または同じ別名）の二度目は、結合を呼んだときに `InvalidOperationException` になる（§14.3）。列の修飾が区別できないためである。
 - `NullableColumns` を行全体として選ぶと（`Select((u, o) => (u, o))`）、結果は `Order?` になる。すべての主キー列が NULL なら `null` を返す。主キーのないテーブルでは、すべての列が NULL のとき `null` を返す。
 
 ### 5.4 WHERE
@@ -949,7 +951,7 @@ CREATE TABLE "users" (
 | 句の順序の誤り、同じ句を二度書く | 段階の型（§5.1） | CS1061 |
 | 集計と行の値の混在、GROUP BY のキーでない列 | 評価の段階（§4.5） | CS0029 / CS1662 / CS0411 |
 | `WHERE` に集計、`HAVING` に行の値 | 評価の段階 | CS1662 / CS0029 |
-| 外部結合の NULL になりうる側を NULL を許さない型で読む | `NullableColumns`（§5.3） | CS0029 |
+| 外部結合の NULL になりうる側を NULL を許さない型で読む | `NullableColumns`（§5.3） | 値型は CS0029。参照型（`string`、`byte[]`、行全体）は null 許容の警告 CS8619 / CS8600（参照型とその NULL を許す形は実行時に同じ型なので、型では止められない。警告をエラーにする利用者ではエラー） |
 | `INSERT` で必須の列がない | `required`（§6.1） | CS9035 |
 | `[AutoIncrement]` の列に値を入れる、更新する | モデルにない／`ReadOnlyColumn<T>` | CS0117 / CS1503 |
 | `WHERE` のない `UPDATE` / `DELETE` | `Where` か `AllRows` の後にだけ `ExecuteAsync` がある | CS1061 |

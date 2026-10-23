@@ -41,6 +41,14 @@ public sealed class SqliteTarget : ITestTarget<SqliteDialect>
         )
         """;
 
+    public const string CreatePets = """
+        CREATE TABLE pets (
+          id INTEGER PRIMARY KEY,
+          owner_id INTEGER,
+          name TEXT NOT NULL
+        )
+        """;
+
     private readonly List<SqliteConnection> _connections = [];
 
     public async Task<Database<SqliteDialect>> CreateDatabaseAsync()
@@ -48,7 +56,7 @@ public sealed class SqliteTarget : ITestTarget<SqliteDialect>
         var connection = new SqliteConnection("Data Source=:memory:");
         _connections.Add(connection);
         await connection.OpenAsync();
-        foreach (string ddl in (string[])[CreatePeople, CreateTypedValues])
+        foreach (string ddl in (string[])[CreatePeople, CreateTypedValues, CreatePets])
         {
             await using SqliteCommand create = connection.CreateCommand();
             create.CommandText = ddl;

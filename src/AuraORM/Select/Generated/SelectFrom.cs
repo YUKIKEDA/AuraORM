@@ -3,7 +3,8 @@
 namespace AuraORM;
 
 /// <summary>
-/// A SELECT statement right after <c>FROM</c>, with one table (<c>docs/design.ja.md</c> §5.1). <c>WHERE</c> may follow once.
+/// A SELECT statement right after <c>FROM</c>, with one table (<c>docs/design.ja.md</c> §5.1). Joins may follow, then
+/// <c>WHERE</c> once.
 /// </summary>
 /// <typeparam name="TDialect">The SQL dialect.</typeparam>
 /// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
@@ -12,6 +13,7 @@ namespace AuraORM;
 public sealed class SelectFrom<TDialect, TMode, T1, TNullable1> : SelectSource<TDialect, TMode, T1>
     where TDialect : IDialect
     where TMode : ExecutionMode
+    where TNullable1 : ITableColumns<TNullable1>
 {
     internal SelectFrom(IStatementRunner? session, SelectState state, T1 v1)
         : base(session, state, v1) { }
@@ -37,5 +39,1853 @@ public sealed class SelectFrom<TDialect, TMode, T1, TNullable1> : SelectSource<T
     {
         ArgumentNullException.ThrowIfNull(condition);
         return new(Session, State with { Where = condition(V1).Node }, V1);
+    }
+
+    /// <summary>
+    /// Joins a table: <c>INNER JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, TJoinColumns, TJoinNullable> InnerJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Inner, on(V1, TJoinColumns.Create(alias)).Node), V1, TJoinColumns.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>LEFT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's nullable column set: it has no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, TJoinNullable, TJoinNullable> LeftJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Left, on(V1, TJoinColumns.Create(alias)).Node), V1, TJoinNullable.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>RIGHT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column sets of the tables before it: they have no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, TNullable1, TNullable1, TJoinColumns, TJoinNullable> RightJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Right, on(V1, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>CROSS JOIN t</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, TJoinColumns, TJoinNullable> CrossJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Cross, null), V1, TJoinColumns.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>FULL JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column set of every table.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    internal SelectFrom<TDialect, TMode, TNullable1, TNullable1, TJoinNullable, TJoinNullable> FullJoinCore<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Full, on(V1, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TJoinNullable.Create(alias)
+        );
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after <c>FROM</c>, with 2 tables (<c>docs/design.ja.md</c> §5.1). Joins may follow, then
+/// <c>WHERE</c> once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable1">The column set of table 1 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T2">The column set of table 2, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable2">The column set of table 2 on the nullable side of an outer join.</typeparam>
+public sealed class SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2> : SelectSource<TDialect, TMode, T1, T2>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TNullable1 : ITableColumns<TNullable1>
+    where TNullable2 : ITableColumns<TNullable2>
+{
+    internal SelectFrom(IStatementRunner? session, SelectState state, T1 v1, T2 v2)
+        : base(session, state, v1, v2) { }
+
+    /// <summary>
+    /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref="Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])"/>.
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2> Where(Func<T1, T2, Condition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2).Node }, V1, V2);
+    }
+
+    /// <summary>
+    /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form
+    /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2> Where(Func<T1, T2, OptionalCondition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2).Node }, V1, V2);
+    }
+
+    /// <summary>
+    /// Joins a table: <c>INNER JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, TJoinColumns, TJoinNullable> InnerJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, T2, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Inner, on(V1, V2, TJoinColumns.Create(alias)).Node), V1, V2, TJoinColumns.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>LEFT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's nullable column set: it has no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, TJoinNullable, TJoinNullable> LeftJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, T2, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Left, on(V1, V2, TJoinColumns.Create(alias)).Node), V1, V2, TJoinNullable.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>RIGHT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column sets of the tables before it: they have no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, TNullable1, TNullable1, TNullable2, TNullable2, TJoinColumns, TJoinNullable> RightJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, T2, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Right, on(V1, V2, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>CROSS JOIN t</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, TJoinColumns, TJoinNullable> CrossJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Cross, null), V1, V2, TJoinColumns.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>FULL JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column set of every table.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    internal SelectFrom<TDialect, TMode, TNullable1, TNullable1, TNullable2, TNullable2, TJoinNullable, TJoinNullable> FullJoinCore<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, T2, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Full, on(V1, V2, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TJoinNullable.Create(alias)
+        );
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after <c>FROM</c>, with 3 tables (<c>docs/design.ja.md</c> §5.1). Joins may follow, then
+/// <c>WHERE</c> once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable1">The column set of table 1 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T2">The column set of table 2, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable2">The column set of table 2 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T3">The column set of table 3, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable3">The column set of table 3 on the nullable side of an outer join.</typeparam>
+public sealed class SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3> : SelectSource<TDialect, TMode, T1, T2, T3>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TNullable1 : ITableColumns<TNullable1>
+    where TNullable2 : ITableColumns<TNullable2>
+    where TNullable3 : ITableColumns<TNullable3>
+{
+    internal SelectFrom(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3)
+        : base(session, state, v1, v2, v3) { }
+
+    /// <summary>
+    /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref="Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])"/>.
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3> Where(Func<T1, T2, T3, Condition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3).Node }, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form
+    /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3> Where(Func<T1, T2, T3, OptionalCondition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3).Node }, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Joins a table: <c>INNER JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, TJoinColumns, TJoinNullable> InnerJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, T2, T3, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Inner, on(V1, V2, V3, TJoinColumns.Create(alias)).Node),
+            V1,
+            V2,
+            V3,
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>LEFT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's nullable column set: it has no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, TJoinNullable, TJoinNullable> LeftJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, T2, T3, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Left, on(V1, V2, V3, TJoinColumns.Create(alias)).Node),
+            V1,
+            V2,
+            V3,
+            TJoinNullable.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>RIGHT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column sets of the tables before it: they have no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, TNullable1, TNullable1, TNullable2, TNullable2, TNullable3, TNullable3, TJoinColumns, TJoinNullable> RightJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, T2, T3, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Right, on(V1, V2, V3, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TNullable3.Create(State.Sources[2].Table),
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>CROSS JOIN t</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, TJoinColumns, TJoinNullable> CrossJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Cross, null), V1, V2, V3, TJoinColumns.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>FULL JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column set of every table.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    internal SelectFrom<
+        TDialect,
+        TMode,
+        TNullable1,
+        TNullable1,
+        TNullable2,
+        TNullable2,
+        TNullable3,
+        TNullable3,
+        TJoinNullable,
+        TJoinNullable
+    > FullJoinCore<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Full, on(V1, V2, V3, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TNullable3.Create(State.Sources[2].Table),
+            TJoinNullable.Create(alias)
+        );
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after <c>FROM</c>, with 4 tables (<c>docs/design.ja.md</c> §5.1). Joins may follow, then
+/// <c>WHERE</c> once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable1">The column set of table 1 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T2">The column set of table 2, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable2">The column set of table 2 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T3">The column set of table 3, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable3">The column set of table 3 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T4">The column set of table 4, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable4">The column set of table 4 on the nullable side of an outer join.</typeparam>
+public sealed class SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4>
+    : SelectSource<TDialect, TMode, T1, T2, T3, T4>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TNullable1 : ITableColumns<TNullable1>
+    where TNullable2 : ITableColumns<TNullable2>
+    where TNullable3 : ITableColumns<TNullable3>
+    where TNullable4 : ITableColumns<TNullable4>
+{
+    internal SelectFrom(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4)
+        : base(session, state, v1, v2, v3, v4) { }
+
+    /// <summary>
+    /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref="Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])"/>.
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3, T4> Where(Func<T1, T2, T3, T4, Condition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3, V4).Node }, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form
+    /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3, T4> Where(Func<T1, T2, T3, T4, OptionalCondition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3, V4).Node }, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Joins a table: <c>INNER JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4, TJoinColumns, TJoinNullable> InnerJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, T2, T3, T4, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Inner, on(V1, V2, V3, V4, TJoinColumns.Create(alias)).Node),
+            V1,
+            V2,
+            V3,
+            V4,
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>LEFT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's nullable column set: it has no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4, TJoinNullable, TJoinNullable> LeftJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table, Func<T1, T2, T3, T4, TJoinColumns, Condition<PerRow>> on)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Left, on(V1, V2, V3, V4, TJoinColumns.Create(alias)).Node),
+            V1,
+            V2,
+            V3,
+            V4,
+            TJoinNullable.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>RIGHT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column sets of the tables before it: they have no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        TNullable1,
+        TNullable1,
+        TNullable2,
+        TNullable2,
+        TNullable3,
+        TNullable3,
+        TNullable4,
+        TNullable4,
+        TJoinColumns,
+        TJoinNullable
+    > RightJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Right, on(V1, V2, V3, V4, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TNullable3.Create(State.Sources[2].Table),
+            TNullable4.Create(State.Sources[3].Table),
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>CROSS JOIN t</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4, TJoinColumns, TJoinNullable> CrossJoin<
+        TJoinRow,
+        TJoinColumns,
+        TJoinNullable,
+        TJoinInsert
+    >(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Cross, null), V1, V2, V3, V4, TJoinColumns.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>FULL JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column set of every table.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    internal SelectFrom<
+        TDialect,
+        TMode,
+        TNullable1,
+        TNullable1,
+        TNullable2,
+        TNullable2,
+        TNullable3,
+        TNullable3,
+        TNullable4,
+        TNullable4,
+        TJoinNullable,
+        TJoinNullable
+    > FullJoinCore<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Full, on(V1, V2, V3, V4, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TNullable3.Create(State.Sources[2].Table),
+            TNullable4.Create(State.Sources[3].Table),
+            TJoinNullable.Create(alias)
+        );
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after <c>FROM</c>, with 5 tables (<c>docs/design.ja.md</c> §5.1). Joins may follow, then
+/// <c>WHERE</c> once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable1">The column set of table 1 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T2">The column set of table 2, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable2">The column set of table 2 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T3">The column set of table 3, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable3">The column set of table 3 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T4">The column set of table 4, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable4">The column set of table 4 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T5">The column set of table 5, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable5">The column set of table 5 on the nullable side of an outer join.</typeparam>
+public sealed class SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4, T5, TNullable5>
+    : SelectSource<TDialect, TMode, T1, T2, T3, T4, T5>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TNullable1 : ITableColumns<TNullable1>
+    where TNullable2 : ITableColumns<TNullable2>
+    where TNullable3 : ITableColumns<TNullable3>
+    where TNullable4 : ITableColumns<TNullable4>
+    where TNullable5 : ITableColumns<TNullable5>
+{
+    internal SelectFrom(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5)
+        : base(session, state, v1, v2, v3, v4, v5) { }
+
+    /// <summary>
+    /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref="Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])"/>.
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5> Where(Func<T1, T2, T3, T4, T5, Condition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3, V4, V5).Node }, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form
+    /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5> Where(Func<T1, T2, T3, T4, T5, OptionalCondition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3, V4, V5).Node }, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Joins a table: <c>INNER JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        T1,
+        TNullable1,
+        T2,
+        TNullable2,
+        T3,
+        TNullable3,
+        T4,
+        TNullable4,
+        T5,
+        TNullable5,
+        TJoinColumns,
+        TJoinNullable
+    > InnerJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Inner, on(V1, V2, V3, V4, V5, TJoinColumns.Create(alias)).Node),
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>LEFT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's nullable column set: it has no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        T1,
+        TNullable1,
+        T2,
+        TNullable2,
+        T3,
+        TNullable3,
+        T4,
+        TNullable4,
+        T5,
+        TNullable5,
+        TJoinNullable,
+        TJoinNullable
+    > LeftJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Left, on(V1, V2, V3, V4, V5, TJoinColumns.Create(alias)).Node),
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            TJoinNullable.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>RIGHT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column sets of the tables before it: they have no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        TNullable1,
+        TNullable1,
+        TNullable2,
+        TNullable2,
+        TNullable3,
+        TNullable3,
+        TNullable4,
+        TNullable4,
+        TNullable5,
+        TNullable5,
+        TJoinColumns,
+        TJoinNullable
+    > RightJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Right, on(V1, V2, V3, V4, V5, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TNullable3.Create(State.Sources[2].Table),
+            TNullable4.Create(State.Sources[3].Table),
+            TNullable5.Create(State.Sources[4].Table),
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>CROSS JOIN t</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        T1,
+        TNullable1,
+        T2,
+        TNullable2,
+        T3,
+        TNullable3,
+        T4,
+        TNullable4,
+        T5,
+        TNullable5,
+        TJoinColumns,
+        TJoinNullable
+    > CrossJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Cross, null), V1, V2, V3, V4, V5, TJoinColumns.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>FULL JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column set of every table.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    internal SelectFrom<
+        TDialect,
+        TMode,
+        TNullable1,
+        TNullable1,
+        TNullable2,
+        TNullable2,
+        TNullable3,
+        TNullable3,
+        TNullable4,
+        TNullable4,
+        TNullable5,
+        TNullable5,
+        TJoinNullable,
+        TJoinNullable
+    > FullJoinCore<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Full, on(V1, V2, V3, V4, V5, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TNullable3.Create(State.Sources[2].Table),
+            TNullable4.Create(State.Sources[3].Table),
+            TNullable5.Create(State.Sources[4].Table),
+            TJoinNullable.Create(alias)
+        );
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after <c>FROM</c>, with 6 tables (<c>docs/design.ja.md</c> §5.1). Joins may follow, then
+/// <c>WHERE</c> once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable1">The column set of table 1 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T2">The column set of table 2, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable2">The column set of table 2 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T3">The column set of table 3, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable3">The column set of table 3 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T4">The column set of table 4, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable4">The column set of table 4 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T5">The column set of table 5, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable5">The column set of table 5 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T6">The column set of table 6, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable6">The column set of table 6 on the nullable side of an outer join.</typeparam>
+public sealed class SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4, T5, TNullable5, T6, TNullable6>
+    : SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TNullable1 : ITableColumns<TNullable1>
+    where TNullable2 : ITableColumns<TNullable2>
+    where TNullable3 : ITableColumns<TNullable3>
+    where TNullable4 : ITableColumns<TNullable4>
+    where TNullable5 : ITableColumns<TNullable5>
+    where TNullable6 : ITableColumns<TNullable6>
+{
+    internal SelectFrom(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6)
+        : base(session, state, v1, v2, v3, v4, v5, v6) { }
+
+    /// <summary>
+    /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref="Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])"/>.
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5, T6> Where(Func<T1, T2, T3, T4, T5, T6, Condition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3, V4, V5, V6).Node }, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form
+    /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5, T6> Where(Func<T1, T2, T3, T4, T5, T6, OptionalCondition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3, V4, V5, V6).Node }, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Joins a table: <c>INNER JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        T1,
+        TNullable1,
+        T2,
+        TNullable2,
+        T3,
+        TNullable3,
+        T4,
+        TNullable4,
+        T5,
+        TNullable5,
+        T6,
+        TNullable6,
+        TJoinColumns,
+        TJoinNullable
+    > InnerJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, T6, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Inner, on(V1, V2, V3, V4, V5, V6, TJoinColumns.Create(alias)).Node),
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>LEFT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's nullable column set: it has no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        T1,
+        TNullable1,
+        T2,
+        TNullable2,
+        T3,
+        TNullable3,
+        T4,
+        TNullable4,
+        T5,
+        TNullable5,
+        T6,
+        TNullable6,
+        TJoinNullable,
+        TJoinNullable
+    > LeftJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, T6, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Left, on(V1, V2, V3, V4, V5, V6, TJoinColumns.Create(alias)).Node),
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            TJoinNullable.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>RIGHT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column sets of the tables before it: they have no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        TNullable1,
+        TNullable1,
+        TNullable2,
+        TNullable2,
+        TNullable3,
+        TNullable3,
+        TNullable4,
+        TNullable4,
+        TNullable5,
+        TNullable5,
+        TNullable6,
+        TNullable6,
+        TJoinColumns,
+        TJoinNullable
+    > RightJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, T6, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Right, on(V1, V2, V3, V4, V5, V6, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TNullable3.Create(State.Sources[2].Table),
+            TNullable4.Create(State.Sources[3].Table),
+            TNullable5.Create(State.Sources[4].Table),
+            TNullable6.Create(State.Sources[5].Table),
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>CROSS JOIN t</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        T1,
+        TNullable1,
+        T2,
+        TNullable2,
+        T3,
+        TNullable3,
+        T4,
+        TNullable4,
+        T5,
+        TNullable5,
+        T6,
+        TNullable6,
+        TJoinColumns,
+        TJoinNullable
+    > CrossJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Cross, null), V1, V2, V3, V4, V5, V6, TJoinColumns.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>FULL JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column set of every table.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    internal SelectFrom<
+        TDialect,
+        TMode,
+        TNullable1,
+        TNullable1,
+        TNullable2,
+        TNullable2,
+        TNullable3,
+        TNullable3,
+        TNullable4,
+        TNullable4,
+        TNullable5,
+        TNullable5,
+        TNullable6,
+        TNullable6,
+        TJoinNullable,
+        TJoinNullable
+    > FullJoinCore<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, T6, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Full, on(V1, V2, V3, V4, V5, V6, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TNullable3.Create(State.Sources[2].Table),
+            TNullable4.Create(State.Sources[3].Table),
+            TNullable5.Create(State.Sources[4].Table),
+            TNullable6.Create(State.Sources[5].Table),
+            TJoinNullable.Create(alias)
+        );
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after <c>FROM</c>, with 7 tables (<c>docs/design.ja.md</c> §5.1). Joins may follow, then
+/// <c>WHERE</c> once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable1">The column set of table 1 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T2">The column set of table 2, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable2">The column set of table 2 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T3">The column set of table 3, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable3">The column set of table 3 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T4">The column set of table 4, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable4">The column set of table 4 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T5">The column set of table 5, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable5">The column set of table 5 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T6">The column set of table 6, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable6">The column set of table 6 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T7">The column set of table 7, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable7">The column set of table 7 on the nullable side of an outer join.</typeparam>
+public sealed class SelectFrom<
+    TDialect,
+    TMode,
+    T1,
+    TNullable1,
+    T2,
+    TNullable2,
+    T3,
+    TNullable3,
+    T4,
+    TNullable4,
+    T5,
+    TNullable5,
+    T6,
+    TNullable6,
+    T7,
+    TNullable7
+> : SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TNullable1 : ITableColumns<TNullable1>
+    where TNullable2 : ITableColumns<TNullable2>
+    where TNullable3 : ITableColumns<TNullable3>
+    where TNullable4 : ITableColumns<TNullable4>
+    where TNullable5 : ITableColumns<TNullable5>
+    where TNullable6 : ITableColumns<TNullable6>
+    where TNullable7 : ITableColumns<TNullable7>
+{
+    internal SelectFrom(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7)
+        : base(session, state, v1, v2, v3, v4, v5, v6, v7) { }
+
+    /// <summary>
+    /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref="Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])"/>.
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7> Where(Func<T1, T2, T3, T4, T5, T6, T7, Condition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3, V4, V5, V6, V7).Node }, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form
+    /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7> Where(Func<T1, T2, T3, T4, T5, T6, T7, OptionalCondition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3, V4, V5, V6, V7).Node }, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Joins a table: <c>INNER JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        T1,
+        TNullable1,
+        T2,
+        TNullable2,
+        T3,
+        TNullable3,
+        T4,
+        TNullable4,
+        T5,
+        TNullable5,
+        T6,
+        TNullable6,
+        T7,
+        TNullable7,
+        TJoinColumns,
+        TJoinNullable
+    > InnerJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, T6, T7, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Inner, on(V1, V2, V3, V4, V5, V6, V7, TJoinColumns.Create(alias)).Node),
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>LEFT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's nullable column set: it has no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        T1,
+        TNullable1,
+        T2,
+        TNullable2,
+        T3,
+        TNullable3,
+        T4,
+        TNullable4,
+        T5,
+        TNullable5,
+        T6,
+        TNullable6,
+        T7,
+        TNullable7,
+        TJoinNullable,
+        TJoinNullable
+    > LeftJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, T6, T7, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Left, on(V1, V2, V3, V4, V5, V6, V7, TJoinColumns.Create(alias)).Node),
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            TJoinNullable.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>RIGHT JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column sets of the tables before it: they have no row when nothing matched.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        TNullable1,
+        TNullable1,
+        TNullable2,
+        TNullable2,
+        TNullable3,
+        TNullable3,
+        TNullable4,
+        TNullable4,
+        TNullable5,
+        TNullable5,
+        TNullable6,
+        TNullable6,
+        TNullable7,
+        TNullable7,
+        TJoinColumns,
+        TJoinNullable
+    > RightJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, T6, T7, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Right, on(V1, V2, V3, V4, V5, V6, V7, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TNullable3.Create(State.Sources[2].Table),
+            TNullable4.Create(State.Sources[3].Table),
+            TNullable5.Create(State.Sources[4].Table),
+            TNullable6.Create(State.Sources[5].Table),
+            TNullable7.Create(State.Sources[6].Table),
+            TJoinColumns.Create(alias)
+        );
+    }
+
+    /// <summary>
+    /// Joins a table: <c>CROSS JOIN t</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the joined table's column set.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    public SelectFrom<
+        TDialect,
+        TMode,
+        T1,
+        TNullable1,
+        T2,
+        TNullable2,
+        T3,
+        TNullable3,
+        T4,
+        TNullable4,
+        T5,
+        TNullable5,
+        T6,
+        TNullable6,
+        T7,
+        TNullable7,
+        TJoinColumns,
+        TJoinNullable
+    > CrossJoin<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table)
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        TableAlias alias = State.NewSource(table);
+        return new(Session, State.Join(alias, JoinKind.Cross, null), V1, V2, V3, V4, V5, V6, V7, TJoinColumns.Create(alias));
+    }
+
+    /// <summary>
+    /// Joins a table: <c>FULL JOIN t ON condition</c> (<c>docs/design.ja.md</c> §5.3). The lambdas that follow get the nullable column set of every table.
+    /// </summary>
+    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
+    /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
+    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
+    /// <returns>The statement with the joined table.</returns>
+    /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
+    /// an alias with <c>As</c>.</exception>
+    internal SelectFrom<
+        TDialect,
+        TMode,
+        TNullable1,
+        TNullable1,
+        TNullable2,
+        TNullable2,
+        TNullable3,
+        TNullable3,
+        TNullable4,
+        TNullable4,
+        TNullable5,
+        TNullable5,
+        TNullable6,
+        TNullable6,
+        TNullable7,
+        TNullable7,
+        TJoinNullable,
+        TJoinNullable
+    > FullJoinCore<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        Func<T1, T2, T3, T4, T5, T6, T7, TJoinColumns, Condition<PerRow>> on
+    )
+        where TJoinRow : class
+        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
+        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
+        where TJoinInsert : InsertModel
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(on);
+        TableAlias alias = State.NewSource(table);
+        return new(
+            Session,
+            State.Join(alias, JoinKind.Full, on(V1, V2, V3, V4, V5, V6, V7, TJoinColumns.Create(alias)).Node),
+            TNullable1.Create(State.Sources[0].Table),
+            TNullable2.Create(State.Sources[1].Table),
+            TNullable3.Create(State.Sources[2].Table),
+            TNullable4.Create(State.Sources[3].Table),
+            TNullable5.Create(State.Sources[4].Table),
+            TNullable6.Create(State.Sources[5].Table),
+            TNullable7.Create(State.Sources[6].Table),
+            TJoinNullable.Create(alias)
+        );
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after <c>FROM</c>, with 8 tables (<c>docs/design.ja.md</c> §5.1). Joins may follow no more
+/// (a statement has at most 8 tables); <c>WHERE</c> may follow once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable1">The column set of table 1 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T2">The column set of table 2, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable2">The column set of table 2 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T3">The column set of table 3, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable3">The column set of table 3 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T4">The column set of table 4, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable4">The column set of table 4 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T5">The column set of table 5, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable5">The column set of table 5 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T6">The column set of table 6, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable6">The column set of table 6 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T7">The column set of table 7, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable7">The column set of table 7 on the nullable side of an outer join.</typeparam>
+/// <typeparam name="T8">The column set of table 8, as the lambdas get it now.</typeparam>
+/// <typeparam name="TNullable8">The column set of table 8 on the nullable side of an outer join.</typeparam>
+public sealed class SelectFrom<
+    TDialect,
+    TMode,
+    T1,
+    TNullable1,
+    T2,
+    TNullable2,
+    T3,
+    TNullable3,
+    T4,
+    TNullable4,
+    T5,
+    TNullable5,
+    T6,
+    TNullable6,
+    T7,
+    TNullable7,
+    T8,
+    TNullable8
+> : SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7, T8>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TNullable1 : ITableColumns<TNullable1>
+    where TNullable2 : ITableColumns<TNullable2>
+    where TNullable3 : ITableColumns<TNullable3>
+    where TNullable4 : ITableColumns<TNullable4>
+    where TNullable5 : ITableColumns<TNullable5>
+    where TNullable6 : ITableColumns<TNullable6>
+    where TNullable7 : ITableColumns<TNullable7>
+    where TNullable8 : ITableColumns<TNullable8>
+{
+    internal SelectFrom(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8)
+        : base(session, state, v1, v2, v3, v4, v5, v6, v7, v8) { }
+
+    /// <summary>
+    /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref="Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])"/>.
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7, T8> Where(Func<T1, T2, T3, T4, T5, T6, T7, T8, Condition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3, V4, V5, V6, V7, V8).Node }, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form
+    /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7, T8> Where(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, OptionalCondition<PerRow>> condition
+    )
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1, V2, V3, V4, V5, V6, V7, V8).Node }, V1, V2, V3, V4, V5, V6, V7, V8);
     }
 }

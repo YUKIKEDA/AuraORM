@@ -15,3 +15,129 @@ public sealed class SelectWhere<TDialect, TMode, T1> : SelectSource<TDialect, TM
     internal SelectWhere(IStatementRunner? session, SelectState state, T1 v1)
         : base(session, state, v1) { }
 }
+
+/// <summary>
+/// A SELECT statement after <c>WHERE</c>, with 2 tables (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+public sealed class SelectWhere<TDialect, TMode, T1, T2> : SelectSource<TDialect, TMode, T1, T2>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    internal SelectWhere(IStatementRunner? session, SelectState state, T1 v1, T2 v2)
+        : base(session, state, v1, v2) { }
+}
+
+/// <summary>
+/// A SELECT statement after <c>WHERE</c>, with 3 tables (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+public sealed class SelectWhere<TDialect, TMode, T1, T2, T3> : SelectSource<TDialect, TMode, T1, T2, T3>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    internal SelectWhere(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3)
+        : base(session, state, v1, v2, v3) { }
+}
+
+/// <summary>
+/// A SELECT statement after <c>WHERE</c>, with 4 tables (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+public sealed class SelectWhere<TDialect, TMode, T1, T2, T3, T4> : SelectSource<TDialect, TMode, T1, T2, T3, T4>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    internal SelectWhere(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4)
+        : base(session, state, v1, v2, v3, v4) { }
+}
+
+/// <summary>
+/// A SELECT statement after <c>WHERE</c>, with 5 tables (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+public sealed class SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5> : SelectSource<TDialect, TMode, T1, T2, T3, T4, T5>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    internal SelectWhere(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5)
+        : base(session, state, v1, v2, v3, v4, v5) { }
+}
+
+/// <summary>
+/// A SELECT statement after <c>WHERE</c>, with 6 tables (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+/// <typeparam name="T6">The column set of table 6.</typeparam>
+public sealed class SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5, T6> : SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    internal SelectWhere(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6)
+        : base(session, state, v1, v2, v3, v4, v5, v6) { }
+}
+
+/// <summary>
+/// A SELECT statement after <c>WHERE</c>, with 7 tables (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+/// <typeparam name="T6">The column set of table 6.</typeparam>
+/// <typeparam name="T7">The column set of table 7.</typeparam>
+public sealed class SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7> : SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    internal SelectWhere(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7)
+        : base(session, state, v1, v2, v3, v4, v5, v6, v7) { }
+}
+
+/// <summary>
+/// A SELECT statement after <c>WHERE</c>, with 8 tables (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+/// <typeparam name="T6">The column set of table 6.</typeparam>
+/// <typeparam name="T7">The column set of table 7.</typeparam>
+/// <typeparam name="T8">The column set of table 8.</typeparam>
+public sealed class SelectWhere<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7, T8> : SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7, T8>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    internal SelectWhere(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8)
+        : base(session, state, v1, v2, v3, v4, v5, v6, v7, v8) { }
+}

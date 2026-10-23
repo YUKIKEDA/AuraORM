@@ -37,3 +37,373 @@ public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1> : Sele
         return new(Session, State.WithOrderBy(orderings(_v1)), Factory);
     }
 }
+
+/// <summary>
+/// A SELECT statement right after its projection, with 2 tables (<c>docs/design.ja.md</c> §5.1). <c>ORDER BY</c> may
+/// follow once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="TResult">The type that each row is read as.</typeparam>
+/// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2> : SelectProjection<TDialect, TMode, TResult, TLevel>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TLevel : EvaluationLevel
+{
+    private readonly T1 _v1;
+    private readonly T2 _v2;
+
+    internal SelectProjected(IStatementRunner? session, SelectState state, IProjection<TResult, TLevel> projection, T1 v1, T2 v2)
+        : base(session, state, FactoryOf(projection))
+    {
+        _v1 = v1;
+        _v2 = v2;
+    }
+
+    /// <summary>
+    /// Orders the rows: <c>ORDER BY a ASC, b DESC</c> (<c>docs/design.ja.md</c> §5.8). The keys have the level of the
+    /// projection.
+    /// </summary>
+    /// <param name="orderings">The keys, in order, from the column sets: <c>u =&gt; [Asc(u.Name), Desc(u.Id)]</c>.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException">There is no key.</exception>
+    public SelectOrdered<TDialect, TMode, TResult> OrderBy(Func<T1, T2, Ordering<TLevel>[]> orderings)
+    {
+        ArgumentNullException.ThrowIfNull(orderings);
+        return new(Session, State.WithOrderBy(orderings(_v1, _v2)), Factory);
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after its projection, with 3 tables (<c>docs/design.ja.md</c> §5.1). <c>ORDER BY</c> may
+/// follow once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="TResult">The type that each row is read as.</typeparam>
+/// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3> : SelectProjection<TDialect, TMode, TResult, TLevel>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TLevel : EvaluationLevel
+{
+    private readonly T1 _v1;
+    private readonly T2 _v2;
+    private readonly T3 _v3;
+
+    internal SelectProjected(IStatementRunner? session, SelectState state, IProjection<TResult, TLevel> projection, T1 v1, T2 v2, T3 v3)
+        : base(session, state, FactoryOf(projection))
+    {
+        _v1 = v1;
+        _v2 = v2;
+        _v3 = v3;
+    }
+
+    /// <summary>
+    /// Orders the rows: <c>ORDER BY a ASC, b DESC</c> (<c>docs/design.ja.md</c> §5.8). The keys have the level of the
+    /// projection.
+    /// </summary>
+    /// <param name="orderings">The keys, in order, from the column sets: <c>u =&gt; [Asc(u.Name), Desc(u.Id)]</c>.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException">There is no key.</exception>
+    public SelectOrdered<TDialect, TMode, TResult> OrderBy(Func<T1, T2, T3, Ordering<TLevel>[]> orderings)
+    {
+        ArgumentNullException.ThrowIfNull(orderings);
+        return new(Session, State.WithOrderBy(orderings(_v1, _v2, _v3)), Factory);
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after its projection, with 4 tables (<c>docs/design.ja.md</c> §5.1). <c>ORDER BY</c> may
+/// follow once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="TResult">The type that each row is read as.</typeparam>
+/// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4> : SelectProjection<TDialect, TMode, TResult, TLevel>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TLevel : EvaluationLevel
+{
+    private readonly T1 _v1;
+    private readonly T2 _v2;
+    private readonly T3 _v3;
+    private readonly T4 _v4;
+
+    internal SelectProjected(IStatementRunner? session, SelectState state, IProjection<TResult, TLevel> projection, T1 v1, T2 v2, T3 v3, T4 v4)
+        : base(session, state, FactoryOf(projection))
+    {
+        _v1 = v1;
+        _v2 = v2;
+        _v3 = v3;
+        _v4 = v4;
+    }
+
+    /// <summary>
+    /// Orders the rows: <c>ORDER BY a ASC, b DESC</c> (<c>docs/design.ja.md</c> §5.8). The keys have the level of the
+    /// projection.
+    /// </summary>
+    /// <param name="orderings">The keys, in order, from the column sets: <c>u =&gt; [Asc(u.Name), Desc(u.Id)]</c>.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException">There is no key.</exception>
+    public SelectOrdered<TDialect, TMode, TResult> OrderBy(Func<T1, T2, T3, T4, Ordering<TLevel>[]> orderings)
+    {
+        ArgumentNullException.ThrowIfNull(orderings);
+        return new(Session, State.WithOrderBy(orderings(_v1, _v2, _v3, _v4)), Factory);
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after its projection, with 5 tables (<c>docs/design.ja.md</c> §5.1). <c>ORDER BY</c> may
+/// follow once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="TResult">The type that each row is read as.</typeparam>
+/// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5> : SelectProjection<TDialect, TMode, TResult, TLevel>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TLevel : EvaluationLevel
+{
+    private readonly T1 _v1;
+    private readonly T2 _v2;
+    private readonly T3 _v3;
+    private readonly T4 _v4;
+    private readonly T5 _v5;
+
+    internal SelectProjected(IStatementRunner? session, SelectState state, IProjection<TResult, TLevel> projection, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5)
+        : base(session, state, FactoryOf(projection))
+    {
+        _v1 = v1;
+        _v2 = v2;
+        _v3 = v3;
+        _v4 = v4;
+        _v5 = v5;
+    }
+
+    /// <summary>
+    /// Orders the rows: <c>ORDER BY a ASC, b DESC</c> (<c>docs/design.ja.md</c> §5.8). The keys have the level of the
+    /// projection.
+    /// </summary>
+    /// <param name="orderings">The keys, in order, from the column sets: <c>u =&gt; [Asc(u.Name), Desc(u.Id)]</c>.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException">There is no key.</exception>
+    public SelectOrdered<TDialect, TMode, TResult> OrderBy(Func<T1, T2, T3, T4, T5, Ordering<TLevel>[]> orderings)
+    {
+        ArgumentNullException.ThrowIfNull(orderings);
+        return new(Session, State.WithOrderBy(orderings(_v1, _v2, _v3, _v4, _v5)), Factory);
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after its projection, with 6 tables (<c>docs/design.ja.md</c> §5.1). <c>ORDER BY</c> may
+/// follow once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="TResult">The type that each row is read as.</typeparam>
+/// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+/// <typeparam name="T6">The column set of table 6.</typeparam>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6> : SelectProjection<TDialect, TMode, TResult, TLevel>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TLevel : EvaluationLevel
+{
+    private readonly T1 _v1;
+    private readonly T2 _v2;
+    private readonly T3 _v3;
+    private readonly T4 _v4;
+    private readonly T5 _v5;
+    private readonly T6 _v6;
+
+    internal SelectProjected(
+        IStatementRunner? session,
+        SelectState state,
+        IProjection<TResult, TLevel> projection,
+        T1 v1,
+        T2 v2,
+        T3 v3,
+        T4 v4,
+        T5 v5,
+        T6 v6
+    )
+        : base(session, state, FactoryOf(projection))
+    {
+        _v1 = v1;
+        _v2 = v2;
+        _v3 = v3;
+        _v4 = v4;
+        _v5 = v5;
+        _v6 = v6;
+    }
+
+    /// <summary>
+    /// Orders the rows: <c>ORDER BY a ASC, b DESC</c> (<c>docs/design.ja.md</c> §5.8). The keys have the level of the
+    /// projection.
+    /// </summary>
+    /// <param name="orderings">The keys, in order, from the column sets: <c>u =&gt; [Asc(u.Name), Desc(u.Id)]</c>.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException">There is no key.</exception>
+    public SelectOrdered<TDialect, TMode, TResult> OrderBy(Func<T1, T2, T3, T4, T5, T6, Ordering<TLevel>[]> orderings)
+    {
+        ArgumentNullException.ThrowIfNull(orderings);
+        return new(Session, State.WithOrderBy(orderings(_v1, _v2, _v3, _v4, _v5, _v6)), Factory);
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after its projection, with 7 tables (<c>docs/design.ja.md</c> §5.1). <c>ORDER BY</c> may
+/// follow once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="TResult">The type that each row is read as.</typeparam>
+/// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+/// <typeparam name="T6">The column set of table 6.</typeparam>
+/// <typeparam name="T7">The column set of table 7.</typeparam>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6, T7> : SelectProjection<TDialect, TMode, TResult, TLevel>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TLevel : EvaluationLevel
+{
+    private readonly T1 _v1;
+    private readonly T2 _v2;
+    private readonly T3 _v3;
+    private readonly T4 _v4;
+    private readonly T5 _v5;
+    private readonly T6 _v6;
+    private readonly T7 _v7;
+
+    internal SelectProjected(
+        IStatementRunner? session,
+        SelectState state,
+        IProjection<TResult, TLevel> projection,
+        T1 v1,
+        T2 v2,
+        T3 v3,
+        T4 v4,
+        T5 v5,
+        T6 v6,
+        T7 v7
+    )
+        : base(session, state, FactoryOf(projection))
+    {
+        _v1 = v1;
+        _v2 = v2;
+        _v3 = v3;
+        _v4 = v4;
+        _v5 = v5;
+        _v6 = v6;
+        _v7 = v7;
+    }
+
+    /// <summary>
+    /// Orders the rows: <c>ORDER BY a ASC, b DESC</c> (<c>docs/design.ja.md</c> §5.8). The keys have the level of the
+    /// projection.
+    /// </summary>
+    /// <param name="orderings">The keys, in order, from the column sets: <c>u =&gt; [Asc(u.Name), Desc(u.Id)]</c>.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException">There is no key.</exception>
+    public SelectOrdered<TDialect, TMode, TResult> OrderBy(Func<T1, T2, T3, T4, T5, T6, T7, Ordering<TLevel>[]> orderings)
+    {
+        ArgumentNullException.ThrowIfNull(orderings);
+        return new(Session, State.WithOrderBy(orderings(_v1, _v2, _v3, _v4, _v5, _v6, _v7)), Factory);
+    }
+}
+
+/// <summary>
+/// A SELECT statement right after its projection, with 8 tables (<c>docs/design.ja.md</c> §5.1). <c>ORDER BY</c> may
+/// follow once.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="TResult">The type that each row is read as.</typeparam>
+/// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+/// <typeparam name="T6">The column set of table 6.</typeparam>
+/// <typeparam name="T7">The column set of table 7.</typeparam>
+/// <typeparam name="T8">The column set of table 8.</typeparam>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6, T7, T8>
+    : SelectProjection<TDialect, TMode, TResult, TLevel>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+    where TLevel : EvaluationLevel
+{
+    private readonly T1 _v1;
+    private readonly T2 _v2;
+    private readonly T3 _v3;
+    private readonly T4 _v4;
+    private readonly T5 _v5;
+    private readonly T6 _v6;
+    private readonly T7 _v7;
+    private readonly T8 _v8;
+
+    internal SelectProjected(
+        IStatementRunner? session,
+        SelectState state,
+        IProjection<TResult, TLevel> projection,
+        T1 v1,
+        T2 v2,
+        T3 v3,
+        T4 v4,
+        T5 v5,
+        T6 v6,
+        T7 v7,
+        T8 v8
+    )
+        : base(session, state, FactoryOf(projection))
+    {
+        _v1 = v1;
+        _v2 = v2;
+        _v3 = v3;
+        _v4 = v4;
+        _v5 = v5;
+        _v6 = v6;
+        _v7 = v7;
+        _v8 = v8;
+    }
+
+    /// <summary>
+    /// Orders the rows: <c>ORDER BY a ASC, b DESC</c> (<c>docs/design.ja.md</c> §5.8). The keys have the level of the
+    /// projection.
+    /// </summary>
+    /// <param name="orderings">The keys, in order, from the column sets: <c>u =&gt; [Asc(u.Name), Desc(u.Id)]</c>.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException">There is no key.</exception>
+    public SelectOrdered<TDialect, TMode, TResult> OrderBy(Func<T1, T2, T3, T4, T5, T6, T7, T8, Ordering<TLevel>[]> orderings)
+    {
+        ArgumentNullException.ThrowIfNull(orderings);
+        return new(Session, State.WithOrderBy(orderings(_v1, _v2, _v3, _v4, _v5, _v6, _v7, _v8)), Factory);
+    }
+}

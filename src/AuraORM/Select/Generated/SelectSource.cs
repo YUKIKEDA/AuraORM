@@ -1050,3 +1050,8101 @@ public abstract class SelectSource<TDialect, TMode, T1>
         return new(Session, State.WithProjection(selected, distinct: true), selected);
     }
 }
+
+/// <summary>
+/// The sources of a SELECT statement with 2 tables, before its projection. The lambdas of the stage get the column set
+/// of each table (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+public abstract class SelectSource<TDialect, TMode, T1, T2>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    private protected SelectSource(IStatementRunner? session, SelectState state, T1 v1, T2 v2)
+    {
+        Session = session;
+        State = state;
+        V1 = v1;
+        V2 = v2;
+    }
+
+    private protected IStatementRunner? Session { get; }
+
+    private protected SelectState State { get; }
+
+    private protected T1 V1 { get; }
+
+    private protected T2 V2 { get; }
+
+    /// <summary>
+    /// Sets the projection: <c>SELECT …</c>. The projection is a column, an expression, a whole row, or a result type's
+    /// projection, all of one evaluation level (<c>docs/design.ja.md</c> §5.6). A <see cref="PerGroup"/> projection
+    /// aggregates the whole table as one group.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2> Select<TResult, TLevel>(Func<T1, T2, IProjection<TResult, TLevel>> projection)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2);
+    }
+
+    /// <summary>
+    /// Sets the projection of one expression: <c>SELECT DISTINCT a</c> (<c>docs/design.ja.md</c> §5.7). The
+    /// <c>OrderBy</c> that may follow gets the selected item.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the expression.</typeparam>
+    /// <param name="projection">The expression, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<TDialect, TMode, TResult, TLevel, DistinctItem<TResult, TLevel>> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, IExpr<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IExpr<TResult, TLevel> selected = projection(V1, V2);
+        return new(Session, State.WithProjection(selected, distinct: true), selected, new DistinctItem<TResult, TLevel>(1));
+    }
+
+    /// <summary>
+    /// Sets the projection of a whole row or a result type's projection: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, TResult, TLevel> SelectDistinct<TResult, TLevel>(Func<T1, T2, IProjection<TResult, TLevel>> projection)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2), TLevel, T1, T2> Select<TItem1, TItem2, TLevel>(
+        Func<T1, T2, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TLevel>(Func<T1, T2, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>)> projection)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2), TLevel> SelectDistinct<TItem1, TItem2, TLevel>(
+        Func<T1, T2, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel, T1, T2> Select<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TLevel>(Func<T1, T2, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>)> projection)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2), new DistinctItem<TItem3, TLevel>(3))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel, T1, T2> Select<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<T1, T2, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>, DistinctItem<TItem4, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<T1, T2, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<T1, T2, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel, T1, T2> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+        Func<T1, T2, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>) items = projection(
+            V1,
+            V2
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel, T1, T2> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+        Func<
+            T1,
+            T2,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>, IExpr<TItem6, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel, T1, T2> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+        Func<
+            T1,
+            T2,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel, T1, T2> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>,
+            DistinctItem<TItem8, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+        Func<
+            T1,
+            T2,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>,
+                IExpr<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>,
+            IExpr<TItem8, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7),
+                new DistinctItem<TItem8, TLevel>(8)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+}
+
+/// <summary>
+/// The sources of a SELECT statement with 3 tables, before its projection. The lambdas of the stage get the column set
+/// of each table (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+public abstract class SelectSource<TDialect, TMode, T1, T2, T3>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    private protected SelectSource(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3)
+    {
+        Session = session;
+        State = state;
+        V1 = v1;
+        V2 = v2;
+        V3 = v3;
+    }
+
+    private protected IStatementRunner? Session { get; }
+
+    private protected SelectState State { get; }
+
+    private protected T1 V1 { get; }
+
+    private protected T2 V2 { get; }
+
+    private protected T3 V3 { get; }
+
+    /// <summary>
+    /// Sets the projection: <c>SELECT …</c>. The projection is a column, an expression, a whole row, or a result type's
+    /// projection, all of one evaluation level (<c>docs/design.ja.md</c> §5.6). A <see cref="PerGroup"/> projection
+    /// aggregates the whole table as one group.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3> Select<TResult, TLevel>(
+        Func<T1, T2, T3, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Sets the projection of one expression: <c>SELECT DISTINCT a</c> (<c>docs/design.ja.md</c> §5.7). The
+    /// <c>OrderBy</c> that may follow gets the selected item.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the expression.</typeparam>
+    /// <param name="projection">The expression, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<TDialect, TMode, TResult, TLevel, DistinctItem<TResult, TLevel>> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, IExpr<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IExpr<TResult, TLevel> selected = projection(V1, V2, V3);
+        return new(Session, State.WithProjection(selected, distinct: true), selected, new DistinctItem<TResult, TLevel>(1));
+    }
+
+    /// <summary>
+    /// Sets the projection of a whole row or a result type's projection: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, TResult, TLevel> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2), TLevel, T1, T2, T3> Select<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TLevel>(Func<T1, T2, T3, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>)> projection)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2), TLevel> SelectDistinct<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel, T1, T2, T3> Select<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2), new DistinctItem<TItem3, TLevel>(3))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel, T1, T2, T3> Select<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>, DistinctItem<TItem4, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<T1, T2, T3, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel, T1, T2, T3> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>) items = projection(
+            V1,
+            V2,
+            V3
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel, T1, T2, T3> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>, IExpr<TItem6, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel, T1, T2, T3> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel, T1, T2, T3> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>,
+            DistinctItem<TItem8, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>,
+                IExpr<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>,
+            IExpr<TItem8, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7),
+                new DistinctItem<TItem8, TLevel>(8)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+}
+
+/// <summary>
+/// The sources of a SELECT statement with 4 tables, before its projection. The lambdas of the stage get the column set
+/// of each table (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+public abstract class SelectSource<TDialect, TMode, T1, T2, T3, T4>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    private protected SelectSource(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4)
+    {
+        Session = session;
+        State = state;
+        V1 = v1;
+        V2 = v2;
+        V3 = v3;
+        V4 = v4;
+    }
+
+    private protected IStatementRunner? Session { get; }
+
+    private protected SelectState State { get; }
+
+    private protected T1 V1 { get; }
+
+    private protected T2 V2 { get; }
+
+    private protected T3 V3 { get; }
+
+    private protected T4 V4 { get; }
+
+    /// <summary>
+    /// Sets the projection: <c>SELECT …</c>. The projection is a column, an expression, a whole row, or a result type's
+    /// projection, all of one evaluation level (<c>docs/design.ja.md</c> §5.6). A <see cref="PerGroup"/> projection
+    /// aggregates the whole table as one group.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4> Select<TResult, TLevel>(
+        Func<T1, T2, T3, T4, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3, V4);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Sets the projection of one expression: <c>SELECT DISTINCT a</c> (<c>docs/design.ja.md</c> §5.7). The
+    /// <c>OrderBy</c> that may follow gets the selected item.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the expression.</typeparam>
+    /// <param name="projection">The expression, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<TDialect, TMode, TResult, TLevel, DistinctItem<TResult, TLevel>> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, T4, IExpr<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IExpr<TResult, TLevel> selected = projection(V1, V2, V3, V4);
+        return new(Session, State.WithProjection(selected, distinct: true), selected, new DistinctItem<TResult, TLevel>(1));
+    }
+
+    /// <summary>
+    /// Sets the projection of a whole row or a result type's projection: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, TResult, TLevel> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, T4, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3, V4);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2), TLevel, T1, T2, T3, T4> Select<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, T4, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TLevel>(Func<T1, T2, T3, T4, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>)> projection)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2), TLevel> SelectDistinct<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, T4, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel, T1, T2, T3, T4> Select<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2), new DistinctItem<TItem3, TLevel>(3))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel, T1, T2, T3, T4> Select<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>, DistinctItem<TItem4, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<T1, T2, T3, T4, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel, T1, T2, T3, T4> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel, T1, T2, T3, T4> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>, IExpr<TItem6, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel, T1, T2, T3, T4> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel, T1, T2, T3, T4> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>,
+            DistinctItem<TItem8, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>,
+                IExpr<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>,
+            IExpr<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7),
+                new DistinctItem<TItem8, TLevel>(8)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+}
+
+/// <summary>
+/// The sources of a SELECT statement with 5 tables, before its projection. The lambdas of the stage get the column set
+/// of each table (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+public abstract class SelectSource<TDialect, TMode, T1, T2, T3, T4, T5>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    private protected SelectSource(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5)
+    {
+        Session = session;
+        State = state;
+        V1 = v1;
+        V2 = v2;
+        V3 = v3;
+        V4 = v4;
+        V5 = v5;
+    }
+
+    private protected IStatementRunner? Session { get; }
+
+    private protected SelectState State { get; }
+
+    private protected T1 V1 { get; }
+
+    private protected T2 V2 { get; }
+
+    private protected T3 V3 { get; }
+
+    private protected T4 V4 { get; }
+
+    private protected T5 V5 { get; }
+
+    /// <summary>
+    /// Sets the projection: <c>SELECT …</c>. The projection is a column, an expression, a whole row, or a result type's
+    /// projection, all of one evaluation level (<c>docs/design.ja.md</c> §5.6). A <see cref="PerGroup"/> projection
+    /// aggregates the whole table as one group.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5> Select<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Sets the projection of one expression: <c>SELECT DISTINCT a</c> (<c>docs/design.ja.md</c> §5.7). The
+    /// <c>OrderBy</c> that may follow gets the selected item.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the expression.</typeparam>
+    /// <param name="projection">The expression, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<TDialect, TMode, TResult, TLevel, DistinctItem<TResult, TLevel>> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, IExpr<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IExpr<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5);
+        return new(Session, State.WithProjection(selected, distinct: true), selected, new DistinctItem<TResult, TLevel>(1));
+    }
+
+    /// <summary>
+    /// Sets the projection of a whole row or a result type's projection: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, TResult, TLevel> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2), TLevel, T1, T2, T3, T4, T5> Select<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, T4, T5, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TLevel>(Func<T1, T2, T3, T4, T5, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>)> projection)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2), TLevel> SelectDistinct<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, T4, T5, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel, T1, T2, T3, T4, T5> Select<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2), new DistinctItem<TItem3, TLevel>(3))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel, T1, T2, T3, T4, T5> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>, DistinctItem<TItem4, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<T1, T2, T3, T4, T5, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel, T1, T2, T3, T4, T5> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel, T1, T2, T3, T4, T5> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>, IExpr<TItem6, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel, T1, T2, T3, T4, T5> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel, T1, T2, T3, T4, T5> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>,
+            DistinctItem<TItem8, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>,
+                IExpr<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>,
+            IExpr<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7),
+                new DistinctItem<TItem8, TLevel>(8)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+}
+
+/// <summary>
+/// The sources of a SELECT statement with 6 tables, before its projection. The lambdas of the stage get the column set
+/// of each table (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+/// <typeparam name="T6">The column set of table 6.</typeparam>
+public abstract class SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    private protected SelectSource(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6)
+    {
+        Session = session;
+        State = state;
+        V1 = v1;
+        V2 = v2;
+        V3 = v3;
+        V4 = v4;
+        V5 = v5;
+        V6 = v6;
+    }
+
+    private protected IStatementRunner? Session { get; }
+
+    private protected SelectState State { get; }
+
+    private protected T1 V1 { get; }
+
+    private protected T2 V2 { get; }
+
+    private protected T3 V3 { get; }
+
+    private protected T4 V4 { get; }
+
+    private protected T5 V5 { get; }
+
+    private protected T6 V6 { get; }
+
+    /// <summary>
+    /// Sets the projection: <c>SELECT …</c>. The projection is a column, an expression, a whole row, or a result type's
+    /// projection, all of one evaluation level (<c>docs/design.ja.md</c> §5.6). A <see cref="PerGroup"/> projection
+    /// aggregates the whole table as one group.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6> Select<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5, V6);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Sets the projection of one expression: <c>SELECT DISTINCT a</c> (<c>docs/design.ja.md</c> §5.7). The
+    /// <c>OrderBy</c> that may follow gets the selected item.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the expression.</typeparam>
+    /// <param name="projection">The expression, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<TDialect, TMode, TResult, TLevel, DistinctItem<TResult, TLevel>> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, IExpr<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IExpr<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5, V6);
+        return new(Session, State.WithProjection(selected, distinct: true), selected, new DistinctItem<TResult, TLevel>(1));
+    }
+
+    /// <summary>
+    /// Sets the projection of a whole row or a result type's projection: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, TResult, TLevel> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5, V6);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2), TLevel, T1, T2, T3, T4, T5, T6> Select<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TLevel>(Func<T1, T2, T3, T4, T5, T6, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>)> projection)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2), TLevel> SelectDistinct<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel, T1, T2, T3, T4, T5, T6> Select<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2), new DistinctItem<TItem3, TLevel>(3))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel, T1, T2, T3, T4, T5, T6> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>, DistinctItem<TItem4, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel, T1, T2, T3, T4, T5, T6> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel, T1, T2, T3, T4, T5, T6> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>, IExpr<TItem6, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel, T1, T2, T3, T4, T5, T6> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel, T1, T2, T3, T4, T5, T6> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>,
+            DistinctItem<TItem8, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>,
+                IExpr<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>,
+            IExpr<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7),
+                new DistinctItem<TItem8, TLevel>(8)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+}
+
+/// <summary>
+/// The sources of a SELECT statement with 7 tables, before its projection. The lambdas of the stage get the column set
+/// of each table (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+/// <typeparam name="T6">The column set of table 6.</typeparam>
+/// <typeparam name="T7">The column set of table 7.</typeparam>
+public abstract class SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    private protected SelectSource(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7)
+    {
+        Session = session;
+        State = state;
+        V1 = v1;
+        V2 = v2;
+        V3 = v3;
+        V4 = v4;
+        V5 = v5;
+        V6 = v6;
+        V7 = v7;
+    }
+
+    private protected IStatementRunner? Session { get; }
+
+    private protected SelectState State { get; }
+
+    private protected T1 V1 { get; }
+
+    private protected T2 V2 { get; }
+
+    private protected T3 V3 { get; }
+
+    private protected T4 V4 { get; }
+
+    private protected T5 V5 { get; }
+
+    private protected T6 V6 { get; }
+
+    private protected T7 V7 { get; }
+
+    /// <summary>
+    /// Sets the projection: <c>SELECT …</c>. The projection is a column, an expression, a whole row, or a result type's
+    /// projection, all of one evaluation level (<c>docs/design.ja.md</c> §5.6). A <see cref="PerGroup"/> projection
+    /// aggregates the whole table as one group.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6, T7> Select<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5, V6, V7);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Sets the projection of one expression: <c>SELECT DISTINCT a</c> (<c>docs/design.ja.md</c> §5.7). The
+    /// <c>OrderBy</c> that may follow gets the selected item.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the expression.</typeparam>
+    /// <param name="projection">The expression, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<TDialect, TMode, TResult, TLevel, DistinctItem<TResult, TLevel>> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, IExpr<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IExpr<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5, V6, V7);
+        return new(Session, State.WithProjection(selected, distinct: true), selected, new DistinctItem<TResult, TLevel>(1));
+    }
+
+    /// <summary>
+    /// Sets the projection of a whole row or a result type's projection: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, TResult, TLevel> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5, V6, V7);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2), TLevel, T1, T2, T3, T4, T5, T6, T7> Select<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TLevel>(Func<T1, T2, T3, T4, T5, T6, T7, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>)> projection)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2), TLevel> SelectDistinct<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel, T1, T2, T3, T4, T5, T6, T7> Select<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2), new DistinctItem<TItem3, TLevel>(3))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel, T1, T2, T3, T4, T5, T6, T7> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>, DistinctItem<TItem4, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel, T1, T2, T3, T4, T5, T6, T7> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel, T1, T2, T3, T4, T5, T6, T7> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>, IExpr<TItem6, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel, T1, T2, T3, T4, T5, T6, T7> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8),
+        TLevel,
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7
+    > Select<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>,
+            DistinctItem<TItem8, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>,
+                IExpr<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>,
+            IExpr<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7),
+                new DistinctItem<TItem8, TLevel>(8)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+}
+
+/// <summary>
+/// The sources of a SELECT statement with 8 tables, before its projection. The lambdas of the stage get the column set
+/// of each table (<c>docs/design.ja.md</c> §5.1).
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
+/// <typeparam name="T1">The column set of table 1.</typeparam>
+/// <typeparam name="T2">The column set of table 2.</typeparam>
+/// <typeparam name="T3">The column set of table 3.</typeparam>
+/// <typeparam name="T4">The column set of table 4.</typeparam>
+/// <typeparam name="T5">The column set of table 5.</typeparam>
+/// <typeparam name="T6">The column set of table 6.</typeparam>
+/// <typeparam name="T7">The column set of table 7.</typeparam>
+/// <typeparam name="T8">The column set of table 8.</typeparam>
+public abstract class SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7, T8>
+    where TDialect : IDialect
+    where TMode : ExecutionMode
+{
+    private protected SelectSource(IStatementRunner? session, SelectState state, T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8)
+    {
+        Session = session;
+        State = state;
+        V1 = v1;
+        V2 = v2;
+        V3 = v3;
+        V4 = v4;
+        V5 = v5;
+        V6 = v6;
+        V7 = v7;
+        V8 = v8;
+    }
+
+    private protected IStatementRunner? Session { get; }
+
+    private protected SelectState State { get; }
+
+    private protected T1 V1 { get; }
+
+    private protected T2 V2 { get; }
+
+    private protected T3 V3 { get; }
+
+    private protected T4 V4 { get; }
+
+    private protected T5 V5 { get; }
+
+    private protected T6 V6 { get; }
+
+    private protected T7 V7 { get; }
+
+    private protected T8 V8 { get; }
+
+    /// <summary>
+    /// Sets the projection: <c>SELECT …</c>. The projection is a column, an expression, a whole row, or a result type's
+    /// projection, all of one evaluation level (<c>docs/design.ja.md</c> §5.6). A <see cref="PerGroup"/> projection
+    /// aggregates the whole table as one group.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6, T7, T8> Select<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Sets the projection of one expression: <c>SELECT DISTINCT a</c> (<c>docs/design.ja.md</c> §5.7). The
+    /// <c>OrderBy</c> that may follow gets the selected item.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the expression.</typeparam>
+    /// <param name="projection">The expression, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<TDialect, TMode, TResult, TLevel, DistinctItem<TResult, TLevel>> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, IExpr<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IExpr<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        return new(Session, State.WithProjection(selected, distinct: true), selected, new DistinctItem<TResult, TLevel>(1));
+    }
+
+    /// <summary>
+    /// Sets the projection of a whole row or a result type's projection: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+    /// <param name="projection">The projection, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, TResult, TLevel> SelectDistinct<TResult, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, IProjection<TResult, TLevel>> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        IProjection<TResult, TLevel> selected = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2), TLevel, T1, T2, T3, T4, T5, T6, T7, T8> Select<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TLevel>(Func<T1, T2, T3, T4, T5, T6, T7, T8, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>)> projection)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 2 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2), TLevel> SelectDistinct<TItem1, TItem2, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TLevel>(items.Item1, items.Item2);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel, T1, T2, T3, T4, T5, T6, T7, T8> Select<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (new DistinctItem<TItem1, TLevel>(1), new DistinctItem<TItem2, TLevel>(2), new DistinctItem<TItem3, TLevel>(3))
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 3 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TLevel>(items.Item1, items.Item2, items.Item3);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel, T1, T2, T3, T4, T5, T6, T7, T8> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4),
+        TLevel,
+        (DistinctItem<TItem1, TLevel>, DistinctItem<TItem2, TLevel>, DistinctItem<TItem3, TLevel>, DistinctItem<TItem4, TLevel>)
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>)> projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 4 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4), TLevel> SelectDistinct<TItem1, TItem2, TItem3, TItem4, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, TLevel>, IProjection<TItem2, TLevel>, IProjection<TItem3, TLevel>, IProjection<TItem4, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(items.Item1, items.Item2, items.Item3, items.Item4);
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel, T1, T2, T3, T4, T5, T6, T7, T8> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>) items = projection(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 5 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel, T1, T2, T3, T4, T5, T6, T7, T8> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (IExpr<TItem1, TLevel>, IExpr<TItem2, TLevel>, IExpr<TItem3, TLevel>, IExpr<TItem4, TLevel>, IExpr<TItem5, TLevel>, IExpr<TItem6, TLevel>)
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 6 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel, T1, T2, T3, T4, T5, T6, T7, T8> Select<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 7 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+    /// (<c>docs/design.ja.md</c> §5.6).
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8),
+        TLevel,
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7,
+        T8
+    > Select<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: false), selected, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The expressions, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctProjected<
+        TDialect,
+        TMode,
+        (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8),
+        TLevel,
+        (
+            DistinctItem<TItem1, TLevel>,
+            DistinctItem<TItem2, TLevel>,
+            DistinctItem<TItem3, TLevel>,
+            DistinctItem<TItem4, TLevel>,
+            DistinctItem<TItem5, TLevel>,
+            DistinctItem<TItem6, TLevel>,
+            DistinctItem<TItem7, TLevel>,
+            DistinctItem<TItem8, TLevel>
+        )
+    > SelectDistinct<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IExpr<TItem1, TLevel>,
+                IExpr<TItem2, TLevel>,
+                IExpr<TItem3, TLevel>,
+                IExpr<TItem4, TLevel>,
+                IExpr<TItem5, TLevel>,
+                IExpr<TItem6, TLevel>,
+                IExpr<TItem7, TLevel>,
+                IExpr<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IExpr<TItem1, TLevel>,
+            IExpr<TItem2, TLevel>,
+            IExpr<TItem3, TLevel>,
+            IExpr<TItem4, TLevel>,
+            IExpr<TItem5, TLevel>,
+            IExpr<TItem6, TLevel>,
+            IExpr<TItem7, TLevel>,
+            IExpr<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(
+            Session,
+            State.WithProjection(selected, distinct: true),
+            selected,
+            (
+                new DistinctItem<TItem1, TLevel>(1),
+                new DistinctItem<TItem2, TLevel>(2),
+                new DistinctItem<TItem3, TLevel>(3),
+                new DistinctItem<TItem4, TLevel>(4),
+                new DistinctItem<TItem5, TLevel>(5),
+                new DistinctItem<TItem6, TLevel>(6),
+                new DistinctItem<TItem7, TLevel>(7),
+                new DistinctItem<TItem8, TLevel>(8)
+            )
+        );
+    }
+
+    /// <summary>
+    /// Sets the projection as a tuple of 8 items, some of them whole rows: <c>SELECT DISTINCT …</c>
+    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+    /// </summary>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+    /// <param name="projection">The items, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectDistinctRows<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel> SelectDistinct<
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8,
+        TLevel
+    >(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IProjection<TItem1, TLevel>,
+                IProjection<TItem2, TLevel>,
+                IProjection<TItem3, TLevel>,
+                IProjection<TItem4, TLevel>,
+                IProjection<TItem5, TLevel>,
+                IProjection<TItem6, TLevel>,
+                IProjection<TItem7, TLevel>,
+                IProjection<TItem8, TLevel>
+            )
+        > projection
+    )
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, TLevel>,
+            IProjection<TItem2, TLevel>,
+            IProjection<TItem3, TLevel>,
+            IProjection<TItem4, TLevel>,
+            IProjection<TItem5, TLevel>,
+            IProjection<TItem6, TLevel>,
+            IProjection<TItem7, TLevel>,
+            IProjection<TItem8, TLevel>
+        ) items = projection(V1, V2, V3, V4, V5, V6, V7, V8);
+        var selected = new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, TLevel>(
+            items.Item1,
+            items.Item2,
+            items.Item3,
+            items.Item4,
+            items.Item5,
+            items.Item6,
+            items.Item7,
+            items.Item8
+        );
+        return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+}

@@ -9,4 +9,9 @@ internal interface ITableReference
     /// Gets what the schema declares about the table.
     /// </summary>
     TableInfo Info { get; }
+
+    /// <summary>
+    /// Gets the alias of the reference (<c>User.Table.As("u")</c>), or <see langword="null"/>.
+    /// </summary>
+    string? Alias { get; }
 }
