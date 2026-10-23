@@ -347,7 +347,7 @@ public sealed class UserIdConverter : IValueConverter<UserId, long>
 | `Coalesce(a, b)` | `COALESCE(a, b)` | 同左 | 同左 | 同左 |
 | `NullIf(a, b)` | `NULLIF(a, b)` | 同左 | 同左 | 同左 |
 
-SQL Server 2019 には `IS [NOT] DISTINCT FROM` がないので展開する。展開は、片方だけが NULL のときも UNKNOWN にならず TRUE か FALSE になる（`a = b OR (a IS NULL AND b IS NULL)` の形は、片方だけ NULL のとき UNKNOWN になり、`IsDistinctFrom` が行を返さない）。展開では `a` と `b` が三度ずつ現れる。値の引数は、現れるたびに別のパラメータになる。`Coalesce` は二つの引数を取り、三つ以上は入れ子にする。`b` が NULL を許さない値型なら、結果は NULL を許さない型になる。`NullIf` の結果は NULL を許す型で、`a` は値型か `string` に限る（C# の制約で、ほかの参照型を NULL を許す型として表せないため）。
+SQL Server 2019 には `IS [NOT] DISTINCT FROM` がないので展開する。展開は、片方だけが NULL のときも UNKNOWN にならず TRUE か FALSE になる（`a = b OR (a IS NULL AND b IS NULL)` の形は、片方だけ NULL のとき UNKNOWN になり、`IsDistinctFrom` が行を返さない）。展開では `a` と `b` が三度ずつ現れる。同じ式を三度書くので、値の引数は三か所で同じパラメータになる（§5.12）。`Coalesce` は二つの引数を取り、三つ以上は入れ子にする。`b` が NULL を許さない値型なら、結果は NULL を許さない型になる。`NullIf` の結果は NULL を許す型で、`a` は値型か `string` に限る（C# の制約で、ほかの参照型を NULL を許す型として表せないため）。
 
 **論理**
 
@@ -559,7 +559,8 @@ db.From(Order.Table)
 ```
 
 - `GroupBy` のラムダは、一つの式か、式のタプル（8 つまで）を返す。
-- 後の段階のラムダは、最初の引数にキー（`k`）を、続いて各テーブルの列の集合を受け取る。キーの要素は `k.Item1` から順に `PerGroup` の式である。
+- 後の段階のラムダは、最初の引数にキー（`k`）を、続いて各テーブルの列の集合を受け取る。キーが一つの式なら `k` はその式（`PerGroup`）で、タプルなら `k.Item1` から順に `PerGroup` の式である（`GroupBy(o => o.Customer).Select((k, o) => (k, Count()))`）。
+- キーにパラメータを含む式（`Add(o.Price, 1)`）を書いてもよい。キーの式を SELECT や HAVING で使うと、同じパラメータが使われる（§5.12）。
 - 列の集合は集計関数の引数にだけ使える（§4.5）。
 
 ### 5.6 射影
@@ -645,7 +646,7 @@ var q = db.From(User.Table).Select(u => u.Name)
 
 - キーワードは大文字。要素の区切りは `, `。句の間は半角空白一つ。改行と末尾の `;` は出さない。
 - 識別子は常にクォートする。SQLite と PostgreSQL は `"x"`（中の `"` は `""`）、MySQL と MariaDB は `` `x` ``（中の `` ` `` は ``` `` ```）、SQL Server は `[x]`（中の `]` は `]]`）。
-- パラメータの名前は、PostgreSQL が `$1`、`$2`、…（名前のないパラメータ）、ほかの方言は `@p0`、`@p1`、… である。番号は、SQL の文字列に現れる順に振る（`SqlStatement.Parameters` の順でもある）。同じ値でも現れるたびに別のパラメータになる。
+- パラメータの名前は、PostgreSQL が `$1`、`$2`、…（名前のないパラメータ）、ほかの方言は `@p0`、`@p1`、… である。番号は、SQL の文字列に現れる順に振る（`SqlStatement.Parameters` の順でもある）。別々に書いた値は、同じ値でも別のパラメータになる。同じ式（同じ値の引数から作った式）を一つの文の中でもう一度書くときは、同じパラメータをもう一度使う（`GROUP BY ("orders"."Price" + $1)` と `SELECT ("orders"."Price" + $1)`）。PostgreSQL は、GROUP BY のキーと SELECT の式を、パラメータの番号まで含めて比べるためである（PostgreSQL 18 で、`$1` と `$2` に分かれると `must appear in the GROUP BY clause` で失敗し、同じ `$1` なら通ることを確かめた）。`SqlStatement.Parameters` には、そのパラメータが一度だけ入る。
 - 複合の式（`And`、`Or`、算術、`Concat`）は常にかっこで囲む。比較とそれ以外の関数呼び出しは囲まない。
 - 本書の例では、読みやすさのために SQL を改行して示すことがある。実際の出力は一行である。
 
