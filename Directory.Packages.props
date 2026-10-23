@@ -16,6 +16,10 @@
   <ItemGroup Label="Tests">
     <PackageVersion Include="xunit.v3" Version="4.0.2" />
   </ItemGroup>
+  <ItemGroup Label="Providers">
+    <!-- ADO.NET providers for the integration tests and samples only; the library depends on none (.cursor/rules/dependencies.mdc). -->
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+  </ItemGroup>
   <ItemGroup Label="Packaging">
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
   </ItemGroup>

@@ -1,7 +1,9 @@
+using Microsoft.CodeAnalysis.CSharp;
+
 namespace AuraORM.Generators;
 
 /// <summary>
-/// Emits the members of a <c>[QueryResult]</c> type (<c>docs/design.ja.md</c> §3.5). The output compiles with C# 12.
+/// Emits the members of a <c>[QueryResult]</c> type (<c>docs/design.ja.md</c> §3.5, §11.3). The output compiles with C# 12.
 /// </summary>
 internal static class ResultEmitter
 {
@@ -10,10 +12,13 @@ internal static class ResultEmitter
     public static string Emit(ResultModel result)
     {
         var w = new CodeWriter();
-        int opened = w.BeginTarget(result.Target);
+        string type = result.Target.Name;
+        int opened = w.BeginTarget(result.Target, " : " + Lib + "IQueryResult<" + type + ">");
         EmitProjection(w, result, "RowProjection", "PerRow", "evaluated for each row");
         w.Line();
         EmitProjection(w, result, "GroupProjection", "PerGroup", "evaluated once for each group (keys and aggregates)");
+        w.Line();
+        NamedReading.Emit(w, type, result.Members.Select(m => (m.Member, m.ColumnName)).ToList(), values => Construct(result, values));
         w.EndTarget(opened);
         return w.ToString();
     }
@@ -25,41 +30,55 @@ internal static class ResultEmitter
         w.Line("/// The projection of <see cref=\"" + type + "\"/> with members " + description + ". Set every member.");
         w.Line("/// </summary>");
         w.Open("public sealed class " + name + " : " + Lib + "ResultProjection<" + type + ", " + Lib + level + ">");
-        foreach (MemberModel member in result.Members)
+        foreach (ResultMemberModel member in result.Members)
         {
             w.Line("/// <summary>");
-            w.Line("/// Gets the projection of <see cref=\"" + type + "." + member.MemberName + "\"/>.");
+            w.Line("/// Gets the projection of <see cref=\"" + type + "." + member.Member.MemberName + "\"/>.");
             w.Line("/// </summary>");
-            w.Line("public required " + Lib + "IProjection<" + member.TypeName + ", " + Lib + level + "> " + member.MemberName + " { get; init; }");
+            w.Line(
+                "public required "
+                    + Lib
+                    + "IProjection<"
+                    + member.Member.TypeName
+                    + ", "
+                    + Lib
+                    + level
+                    + "> "
+                    + member.Member.MemberName
+                    + " { get; init; }"
+            );
             w.Line();
         }
 
         w.Line("/// <inheritdoc/>");
         w.Open("protected override void AddItems(" + Lib + "ProjectionItems<" + Lib + level + "> items)");
-        foreach (MemberModel member in result.Members)
+        foreach (ResultMemberModel member in result.Members)
         {
-            w.Line("items.Add(" + member.MemberName + ");");
+            w.Line("items.Add(" + member.Member.MemberName + ");");
         }
 
         w.Close();
         w.Line();
         w.Line("/// <inheritdoc/>");
         w.Open("protected override " + type + " ReadResult(ref " + Lib + "RowReader reader)");
-        foreach (MemberModel member in result.Members)
+        foreach (ResultMemberModel member in result.Members)
         {
-            w.Line("var @" + Camel(member.MemberName) + " = reader.Read(" + member.MemberName + ");");
+            w.Line("var " + Local(member.Member) + " = reader.Read(" + member.Member.MemberName + ");");
         }
 
-        string arguments = string.Join(", ", result.Members.Where(m => m.IsPositional).Select(m => "@" + Camel(m.MemberName)));
-        List<MemberModel> initialized = result.Members.Where(m => !m.IsPositional).ToList();
-        string initializer =
-            initialized.Count == 0
-                ? string.Empty
-                : " { " + string.Join(", ", initialized.Select(m => m.MemberName + " = @" + Camel(m.MemberName))) + " }";
-        w.Line("return new " + type + "(" + (result.UsesConstructor ? arguments : string.Empty) + ")" + initializer + ";");
+        w.Line("return " + Construct(result, Local) + ";");
         w.Close();
         w.Close();
     }
 
-    private static string Camel(string name) => char.ToLowerInvariant(name[0]) + name.Substring(1);
+    private static string Construct(ResultModel result, Func<MemberModel, string> value)
+    {
+        string arguments = string.Join(", ", result.Members.Where(m => m.Member.IsPositional).Select(m => value(m.Member)));
+        List<MemberModel> initialized = result.Members.Where(m => !m.Member.IsPositional).Select(m => m.Member).ToList();
+        string initializer =
+            initialized.Count == 0 ? string.Empty : " { " + string.Join(", ", initialized.Select(m => m.MemberName + " = " + value(m))) + " }";
+        return "new " + result.Target.Name + "(" + (result.UsesConstructor ? arguments : string.Empty) + ")" + initializer;
+    }
+
+    private static string Local(MemberModel member) => "@" + char.ToLowerInvariant(member.MemberName[0]) + member.MemberName.Substring(1);
 }

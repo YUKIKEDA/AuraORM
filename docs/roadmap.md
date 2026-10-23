@@ -2,7 +2,7 @@
 
 作業の順序と状態だけを置く。受け入れ条件は各 Issue に書く。行の追加と削除は Grill を経る（`.cursor/rules/workflow.mdc`）。設計は [design.ja.md](./design.ja.md) にある。
 
-**今**: X1
+**今**: I1
 
 ## v0.1
 
@@ -12,7 +12,7 @@
 | D1 | 設計書: コンセプト・要件・仕様 | #3 | done |
 | C1 | 式と文の木、方言ごとの SQL の出力、パラメータ、ゴールデンテストの仕組み（§4、§5.12） | #5 | done |
 | G1 | ソースジェネレーター: テーブルと結果の型、診断、コンパイルテストの仕組み（§3、§15） | #8 | done |
-| X1 | 実行: `Database` / `Transaction`、接続の扱い、行の読み取り、生 SQL の断片、生のクエリとコマンド（§11、§12） | - | planned |
+| X1 | 実行: `Database` / `Transaction`、接続の扱い、行の読み取り、生 SQL の断片、生のクエリとコマンド（§11、§12） | #10 | done |
 | I1 | 結合テストの基盤: CI のサービスコンテナと WSL コンテナのスクリプト、全方言での X1 の結合テスト（§17） | - | planned |
 | N1 | NativeAOT のサンプルと CI の検査（§16.3） | - | planned |
 | Q1 | SELECT: 単一テーブル、WHERE、射影、DISTINCT、ORDER BY、LIMIT / OFFSET（§5.1〜§5.9） | - | planned |

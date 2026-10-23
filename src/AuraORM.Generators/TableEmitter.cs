@@ -12,8 +12,8 @@ internal static class TableEmitter
     public static string Emit(TableModel table)
     {
         var w = new CodeWriter();
-        int opened = w.BeginTarget(table.Target);
         string row = table.Target.Name;
+        int opened = w.BeginTarget(table.Target, " : " + Lib + "IQueryResult<" + row + ">");
 
         EmitTable(w, table, row);
         w.Line();
@@ -22,6 +22,8 @@ internal static class TableEmitter
         EmitNullableColumns(w, table, row);
         w.Line();
         EmitInsert(w, table);
+        w.Line();
+        NamedReading.Emit(w, row, table.Columns.Select(c => (c.Member, c.ColumnName)).ToList(), value => Construct(table, row, c => value(c.Member)));
 
         w.EndTarget(opened);
         return w.ToString();

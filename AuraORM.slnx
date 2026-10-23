@@ -5,6 +5,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AuraORM.Generators.Tests/AuraORM.Generators.Tests.csproj" />
+    <Project Path="tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj" />
     <Project Path="tests/AuraORM.Tests/AuraORM.Tests.csproj" />
   </Folder>
 </Solution>

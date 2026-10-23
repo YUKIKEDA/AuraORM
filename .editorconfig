@@ -96,6 +96,9 @@ dotnet_diagnostic.SA1204.severity = none
 dotnet_diagnostic.SA1401.severity = none
 dotnet_diagnostic.SA1649.severity = none
 dotnet_diagnostic.SA1402.severity = none
+# SA1414: query results read as tuples are positional (a projection's or a raw query's columns); the API has no element
+# names to give, and the caller names the elements by deconstruction.
+dotnet_diagnostic.SA1414.severity = none
 # File headers are not used.
 dotnet_diagnostic.SA1633.severity = none
 dotnet_diagnostic.SA1636.severity = none

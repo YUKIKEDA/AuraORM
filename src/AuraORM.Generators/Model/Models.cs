@@ -68,9 +68,14 @@ internal sealed record TableModel(
 );
 
 /// <summary>
+/// A member of a <c>[QueryResult]</c> type and the column name a raw query reads it from.
+/// </summary>
+internal sealed record ResultMemberModel(MemberModel Member, string ColumnName);
+
+/// <summary>
 /// A <c>[QueryResult]</c> type.
 /// </summary>
-internal sealed record ResultModel(TypeTarget Target, EquatableArray<MemberModel> Members, bool UsesConstructor);
+internal sealed record ResultModel(TypeTarget Target, EquatableArray<ResultMemberModel> Members, bool UsesConstructor);
 
 /// <summary>
 /// The model of one type and the diagnostics found while reading it. The model is <see langword="null"/> when an error

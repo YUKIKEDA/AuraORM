@@ -23,6 +23,11 @@ internal abstract class DialectRenderer
     public abstract int MaxParameters { get; }
 
     /// <summary>
+    /// Gets a value indicating whether parameters are unnamed and bound by position (PostgreSQL, §5.12).
+    /// </summary>
+    public virtual bool UsesPositionalParameters => false;
+
+    /// <summary>
     /// Gets the function that counts the characters of a string (§4.2).
     /// </summary>
     public virtual string LengthFunction => "CHAR_LENGTH";

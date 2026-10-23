@@ -21,3 +21,8 @@ version has been published to NuGet.
 - The source generator, shipped inside the package: `[Table]` records and classes get `Table`, `Columns`,
   `NullableColumns`, and `Insert`; `[QueryResult]` types get `RowProjection` and `GroupProjection`. Schema errors are
   reported as AURA0101 to AURA0111.
+- `Database<TDialect>` on a `DbDataSource` or a `DbConnection`, and `Transaction<TDialect>` (`BeginTransactionAsync`,
+  `InTransactionAsync`).
+- Raw SQL through interpolated strings, where values become parameters: fragments (`Raw`, `Raw<T>`, `RawAggregate<T>`,
+  `RawHaving`, `Unsafe`, `Identifier`), queries read by column name (`QueryAsync<T>`) or as tuples, scalars, and commands
+  (`ExecuteAsync`).

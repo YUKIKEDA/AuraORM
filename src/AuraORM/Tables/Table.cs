@@ -8,7 +8,7 @@ namespace AuraORM;
 /// <typeparam name="TColumns">The column set.</typeparam>
 /// <typeparam name="TNullable">The column set on the nullable side of an outer join.</typeparam>
 /// <typeparam name="TInsert">The <c>INSERT</c> model.</typeparam>
-public sealed class Table<TRow, TColumns, TNullable, TInsert>
+public sealed class Table<TRow, TColumns, TNullable, TInsert> : ITableReference
     where TRow : class
     where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
     where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>

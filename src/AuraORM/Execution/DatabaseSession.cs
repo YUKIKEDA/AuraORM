@@ -1,0 +1,71 @@
+namespace AuraORM;
+
+/// <summary>
+/// The statements that a <see cref="Database{TDialect}"/> and a <see cref="Transaction{TDialect}"/> both run.
+/// </summary>
+/// <typeparam name="TDialect">The SQL dialect.</typeparam>
+public abstract partial class DatabaseSession<TDialect> : IStatementRunner
+    where TDialect : IDialect
+{
+    private protected DatabaseSession(DatabaseOptions options)
+    {
+        Options = options;
+    }
+
+    /// <inheritdoc />
+    DialectRenderer IStatementRunner.Renderer => DialectRenderer.For<TDialect>();
+
+    /// <summary>
+    /// Gets the settings of the database.
+    /// </summary>
+    public DatabaseOptions Options { get; }
+
+    /// <summary>
+    /// Runs a raw query and reads each row into a <c>[Table]</c> or <c>[QueryResult]</c> type by column name
+    /// (<c>docs/design.ja.md</c> §11.3).
+    /// </summary>
+    /// <typeparam name="T">The result type.</typeparam>
+    /// <param name="sql">The query. Values in holes become parameters.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The rows.</returns>
+    /// <exception cref="InvalidOperationException">The result has no column for a member of <typeparamref name="T"/>.</exception>
+    public Task<List<T>> QueryAsync<T>(SqlInterpolatedStringHandler sql, CancellationToken cancellationToken = default)
+        where T : IQueryResult<T> => Executor.ListNamedAsync<T>(this, Render(sql.ToNode()), cancellationToken);
+
+    /// <summary>
+    /// Runs a raw query and returns the first column of the first row.
+    /// </summary>
+    /// <typeparam name="T">The CLR type of the value.</typeparam>
+    /// <param name="sql">The query. Values in holes become parameters.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The value.</returns>
+    /// <exception cref="InvalidOperationException">The query returned no row.</exception>
+    public Task<T> QueryScalarAsync<T>(SqlInterpolatedStringHandler sql, CancellationToken cancellationToken = default) =>
+        Executor.ScalarAsync<T>(this, Render(sql.ToNode()), orDefault: false, cancellationToken);
+
+    /// <summary>
+    /// Runs a raw query and returns the first column of the first row, or <see langword="default"/> when there is no row.
+    /// </summary>
+    /// <typeparam name="T">The CLR type of the value.</typeparam>
+    /// <param name="sql">The query. Values in holes become parameters.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The value, or <see langword="default"/>.</returns>
+    public Task<T?> QueryScalarOrDefaultAsync<T>(SqlInterpolatedStringHandler sql, CancellationToken cancellationToken = default) =>
+        Executor.ScalarAsync<T?>(this, Render(sql.ToNode()), orDefault: true, cancellationToken);
+
+    /// <summary>
+    /// Runs a raw command.
+    /// </summary>
+    /// <param name="sql">The command. Values in holes become parameters.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The number of rows affected, as the provider reports it.</returns>
+    public Task<int> ExecuteAsync(SqlInterpolatedStringHandler sql, CancellationToken cancellationToken = default) =>
+        Executor.ExecuteAsync(this, Render(sql.ToNode()), cancellationToken);
+
+    /// <inheritdoc />
+    ValueTask<ConnectionLease> IStatementRunner.LeaseAsync(CancellationToken cancellationToken) => LeaseAsync(cancellationToken);
+
+    private protected abstract ValueTask<ConnectionLease> LeaseAsync(CancellationToken cancellationToken);
+
+    private protected static SqlStatement Render(SqlNode node) => SqlRenderContext.Render(DialectRenderer.For<TDialect>(), node);
+}

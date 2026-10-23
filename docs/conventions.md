@@ -30,6 +30,7 @@ docs/                        設計・判断・ロードマップ・規約（本
 | `src/AuraORM` | ランタイムのライブラリ（`net8.0`、`IsAotCompatible`、パッケージ依存なし）。式と関数（`Expressions/`）、方言の型と機能のインターフェース（`Dialects/`）、文の木と方言ごとの SQL の出力（`Rendering/`）、`SqlStatement`（`Statements/`）、生成コードが使う型（`Tables/`、`Projections/`）、行の読み取り（`Reading/`）、属性とテーブルの情報（`Schema/`） |
 | `src/AuraORM.Generators` | ソースジェネレーター（`netstandard2.0`、Roslyn 4.8）。`[Table]` と `[QueryResult]` の型を読み（`SchemaReader`）、モデル（`Model/`）から C# 12 のコードを出す（`TableEmitter`、`ResultEmitter`）。診断の ID は `Diagnostics` と `AnalyzerReleases.*.md`。`AuraORM` のパッケージの `analyzers/dotnet/cs` に入る |
 | `tests/AuraORM.Generators.Tests` | ジェネレーターのテスト（`net8.0` と `net10.0`）。断片を C# 12 の利用者のコードとしてジェネレーター付きでコンパイルし、成功するか、診断の ID を確かめる（`Support/GeneratorHarness`） |
+| `tests/AuraORM.Integration.Tests` | 結合テスト（`net8.0` と `net10.0`）。同じテストを方言ごとに回すため、テストのクラスは方言を型引数に取る抽象クラスで、方言ごとに派生クラスを置く（`RawQueryTests<TDialect>` と `SqliteRawQueryTests`）。データベースは `Support/ITestTarget<TDialect>` が用意する。SQLite はプロセス内のメモリ上のデータベース |
 | `tests/AuraORM.Tests` | ランタイムのテスト（`net8.0` と `net10.0`）。SQL のゴールデンテスト（`Support/SqlAssert`、期待値は方言ごとに手で書く）、利用者のコードとしてのコンパイルテスト（`Support/CompileAssert`、Roslyn 4.8、C# 12）、ジェネレーターが作ったテスト用のテーブル（`Support/Schema.cs`）を使うテスト。行の読み取りは `DataTableReader` で確かめる |
 
 ## ビルドとゲート

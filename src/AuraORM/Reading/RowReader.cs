@@ -10,11 +10,20 @@ namespace AuraORM;
 public ref struct RowReader
 {
     private readonly DbDataReader _reader;
+    private readonly int[]? _ordinals;
     private int _ordinal;
 
     internal RowReader(DbDataReader reader)
     {
         _reader = reader;
+        _ordinals = null;
+        _ordinal = 0;
+    }
+
+    internal RowReader(DbDataReader reader, int[] ordinals)
+    {
+        _reader = reader;
+        _ordinals = ordinals;
         _ordinal = 0;
     }
 
@@ -53,9 +62,41 @@ public ref struct RowReader
     }
 
     /// <summary>
+    /// Reads the column of a member of an <see cref="IQueryResult{TSelf}"/> type, found by its name when the reading started.
+    /// </summary>
+    /// <typeparam name="T">The CLR type of the member.</typeparam>
+    /// <param name="member">The position of the member in <see cref="IQueryResult{TSelf}.ColumnNames"/>.</param>
+    /// <returns>The value.</returns>
+    public readonly T ReadNamed<T>(int member) => ValueReader<T>.Read(_reader, Ordinal(member));
+
+    /// <summary>
+    /// Reads the column of a member that the type declares as not nullable.
+    /// </summary>
+    /// <typeparam name="T">The reference type of the member.</typeparam>
+    /// <param name="member">The position of the member in <see cref="IQueryResult{TSelf}.ColumnNames"/>.</param>
+    /// <returns>The value.</returns>
+    /// <exception cref="InvalidOperationException">The column is <c>NULL</c>.</exception>
+    public readonly T ReadNamedNotNull<T>(int member)
+        where T : class
+    {
+        int ordinal = Ordinal(member);
+        return ValueReader<T>.Read(_reader, ordinal)
+            ?? throw new InvalidOperationException(
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "The column {0} is NULL, but the type declares it as not nullable.",
+                    _reader.GetName(ordinal)
+                )
+            );
+    }
+
+    /// <summary>
     /// Reads the next column as a value of a supported CLR type (<c>docs/design.ja.md</c> §3.3).
     /// </summary>
     /// <typeparam name="T">The CLR type, including whether it can be null.</typeparam>
     /// <returns>The value.</returns>
     internal T ReadValue<T>() => ValueReader<T>.Read(_reader, _ordinal++);
+
+    private readonly int Ordinal(int member) =>
+        _ordinals is null ? throw new InvalidOperationException("The row is not read by column name.") : _ordinals[member];
 }

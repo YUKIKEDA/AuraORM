@@ -91,7 +91,7 @@ internal static class SchemaReader
         CheckReservedNames(type, members, ResultGeneratedNames, ResultReservedMemberNames, diagnostics);
         bool usesConstructor = CheckConstructor(type, members, diagnostics);
 
-        var models = new List<MemberModel>();
+        var models = new List<ResultMemberModel>();
         foreach (Member member in members)
         {
             if (ColumnTypeOf(member.Type) is null)
@@ -100,7 +100,8 @@ internal static class SchemaReader
                 continue;
             }
 
-            models.Add(member.Model);
+            string column = member.Attribute(ColumnAttribute)?.ConstructorArguments[0].Value as string ?? member.Name;
+            models.Add(new ResultMemberModel(member.Model, column));
         }
 
         ResultModel? model = target is null || diagnostics.Count > 0 ? null : new ResultModel(target, Equatable(models), usesConstructor);

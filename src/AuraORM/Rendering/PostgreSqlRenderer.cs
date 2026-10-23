@@ -12,6 +12,8 @@ internal sealed class PostgreSqlRenderer : DialectRenderer
     // The protocol carries the parameter count as a 16-bit number; Npgsql rejects more than 65535.
     public override int MaxParameters => 65535;
 
+    public override bool UsesPositionalParameters => true;
+
     protected override char IdentifierOpen => '"';
 
     protected override char IdentifierClose => '"';

@@ -236,6 +236,7 @@ public sealed partial record User(
 | `User.Columns` | クラス | 列の集合。ラムダの引数になる。`IProjection<User, PerRow>` でもあり、`Select(u => u)` で行全体を表す |
 | `User.NullableColumns` | クラス | 外部結合で NULL になりうる側の列の集合。各列は NULL を許す型になる。`IProjection<User?, PerRow>` |
 | `User.Insert` | クラス | INSERT のモデル（§6） |
+| `IQueryResult<User>` の実装 | 静的メンバー | 生のクエリ（§11.3）で、列名から行を読む。列名の一覧は `__AuraColumnNames` という private の静的フィールドに持つ |
 
 - `User.Columns` の各プロパティは `Column<T>` 型で、`T` は列の CLR の型（`long`、`string`、`int?`）である。`[AutoIncrement]` の列は `ReadOnlyColumn<T>` で、UPDATE の代入先にできない（§7）。
 - `User.NullableColumns` の各プロパティは `IExpr<T?, PerRow>` 型である。`long` の列は `long?`、`string` の列は `string?` になる。列ではないので、代入先にはできない。
@@ -256,7 +257,7 @@ public sealed partial record UserOrderTotal(string Name, decimal? Total);
 
 - `UserOrderTotal.RowProjection` と `UserOrderTotal.GroupProjection`: `required` な `init` プロパティを持つクラス。各プロパティの型は、前者が `IProjection<T, PerRow>`、後者が `IProjection<T, PerGroup>` で、`T` は対応するメンバーの型である（§4.5）。`Select` で `new UserOrderTotal.GroupProjection { Name = k.Item1, Total = Sum(o.Amount) }` のように使う。メンバーを書き忘れると CS9035、型や評価の段階が違うと CS0029 になる。
 - `UserOrderTotal.Columns`: この型を派生テーブルと CTE（§5.11）の行として使うときの列の集合。
-- 生 SQL のクエリ（§11.3）で、列名から値を読むコード。
+- `IQueryResult<UserOrderTotal>` の実装: 生のクエリ（§11.3）で、列名から値を読むコード。列名はメンバー名（`[Column]` があればその名前）である。
 
 ### 3.6 値コンバーター
 
@@ -731,9 +732,9 @@ API で書けない式は、補間文字列で書く。
 引数は `SqlInterpolatedStringHandler`（補間文字列ハンドラー）で受け取る。
 
 - 文字列の部分（リテラル）は、そのまま SQL になる。
-- 補間の穴に式（`Expr`、`Condition`、列）を書くと、その SQL が展開される。
+- 補間の穴に式（`IExpr`、`Condition`、列）を書くと、その SQL が展開される。テーブル参照（`User.Table`）を書くと、クォートしたテーブル名（スキーマがあれば `"スキーマ"."テーブル"`）になる。
 - それ以外の値は、パラメータになる。値の型は §3.3 の表の型でなければならない（違えばアナライザーのエラー AURA0301）。
-- 書式指定（`{x:N2}`）と幅の指定（`{x,5}`）は書けない（AURA0302）。
+- 書式指定（`{x:N2}`）と幅の指定（`{x,5}`）は書けない。ハンドラーにそれを受け取る `AppendFormatted` がないので、コンパイラーが CS1739 を出す。
 - 補間でない `string` は受け取らない。実行時に組み立てた文字列を SQL に入れるには、`Unsafe(string)` を穴に書く。名前のとおり、その文字列は検査されずに SQL に入る。
 - 実行時に決まる識別子は `Identifier(string)` を穴に書く。方言のクォートで囲み、中の引用符を二重にする。
 
@@ -894,6 +895,7 @@ CREATE TABLE "users" (
 | 方言にない機能（§2.4 の表） | 方言のインターフェースの制約 | CS0311 / CS1061 |
 | SQL Server で `ORDER BY` のない `Limit` | 同上 | CS0311 |
 | 文字列の SQL を断片に入れる | 補間文字列ハンドラーだけを受け取る | CS1503 |
+| 生 SQL の穴に書式指定か幅の指定を書く | ハンドラーにその `AppendFormatted` がない | CS1739 |
 | 生 SQL の穴に扱えない型の値を入れる | アナライザー | AURA0301 |
 | 文字列の関数（`Like`、`Concat` など）に文字列でない値を渡す | 型引数の制約（`IEnumerable<char>?`） | CS0313 / CS0315 |
 | スキーマの定義の誤り | ジェネレーター | AURA01xx |
@@ -936,7 +938,6 @@ CREATE TABLE "users" (
 | AURA0201 | アナライザー | 比較の値に `null` リテラルを書いた |
 | AURA0202 | アナライザー | 比較の値の型が nullable である |
 | AURA0301 | アナライザー | 生 SQL の穴の値の型が使えない |
-| AURA0302 | アナライザー | 生 SQL の穴に書式指定か幅の指定がある |
 
 メッセージは英語の一文で、何が誤りかと、代わりに何を書くかを示す（`.agents/skills/english-writing/SKILL.md`）。診断はすべてエラーである。
 
