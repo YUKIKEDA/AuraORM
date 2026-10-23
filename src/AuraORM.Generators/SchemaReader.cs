@@ -222,7 +222,7 @@ internal static class SchemaReader
         ITypeSymbol column = Underlying(member.Type);
         bool converts = value.Type is null
             ? member.Type.IsReferenceType || !SymbolEqualityComparer.Default.Equals(column, member.Type)
-            : compilation.ClassifyConversion(value.Type, column).IsImplicit;
+            : compilation.ClassifyConversion(value.Type, column).IsImplicit || IsImplicitConstantConversion(value.Value, column);
         if (!converts)
         {
             diagnostics.Add(
@@ -583,6 +583,22 @@ internal static class SchemaReader
             bool b => b ? "true" : "false",
             char c => SymbolDisplay.FormatLiteral(c, quote: true),
             _ => SymbolDisplay.FormatPrimitive(value, quoteStrings: true, useHexadecimalNumbers: false),
+        };
+
+    // C# also converts a constant implicitly where the type conversion is not implicit: an int constant in the range of
+    // sbyte, byte, short, ushort, uint, or ulong, a non-negative long constant to ulong, and the literal 0 to an enum. An
+    // attribute argument is a constant, so [Default(1)] on a byte column is valid C# and passes.
+    private static bool IsImplicitConstantConversion(object? constant, ITypeSymbol column) =>
+        (constant, column.SpecialType) switch
+        {
+            (int v, SpecialType.System_SByte) => v is >= sbyte.MinValue and <= sbyte.MaxValue,
+            (int v, SpecialType.System_Byte) => v is >= byte.MinValue and <= byte.MaxValue,
+            (int v, SpecialType.System_Int16) => v is >= short.MinValue and <= short.MaxValue,
+            (int v, SpecialType.System_UInt16) => v is >= ushort.MinValue and <= ushort.MaxValue,
+            (int v, SpecialType.System_UInt32 or SpecialType.System_UInt64) => v >= 0,
+            (long v, SpecialType.System_UInt64) => v >= 0,
+            (0, _) => column.TypeKind == TypeKind.Enum,
+            _ => false,
         };
 
     private static ITypeSymbol Underlying(ITypeSymbol type) =>
