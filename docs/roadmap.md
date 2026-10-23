@@ -25,7 +25,7 @@
 | V1 | 値コンバーター（§3.6） | - | planned |
 | S1 | DDL（§13） | - | planned |
 | P1 | ベンチマークと性能の目標（§16.1） | - | planned |
-| R1 | リリースの仕組み: NuGet の Trusted Publishing、パッケージの検査（ジェネレーターが `analyzers/dotnet/cs` に入り、依存が空であること。NativeAOT のサンプルをパックしたパッケージで参照する）、README のサンプルの検査 | - | planned |
+| R1 | リリースの仕組み: NuGet の Trusted Publishing、パッケージの検査（ジェネレーターが `analyzers/dotnet/cs` に入り、依存が空であること。NativeAOT のサンプルをパックしたパッケージで参照する）、README のサンプルの検査、README に null 許容参照型の設定（`<Nullable>enable</Nullable>` と null 許容の警告をエラーにすること）が参照型の保証に要ると書く（§14.2） | - | planned |
 
 ## v0.1 の後
 

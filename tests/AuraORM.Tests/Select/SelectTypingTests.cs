@@ -246,6 +246,94 @@ public sealed class SelectTypingTests
     }
 
     /// <summary>
+    /// For every number of tables, a join makes nullable exactly the tables that the design says: <c>LeftJoin</c> the joined
+    /// table, <c>RightJoin</c> every table before it, <c>FullJoin</c> all of them, and <c>InnerJoin</c> none (design §5.3).
+    /// The stage types are written by the stage generator per number of tables, so each number is checked.
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - A statement of <paramref name="before"/> tables (<see cref="Account"/> under the aliases t1, t2, …), joined with
+    ///   <c>CrossJoin</c>, which makes nothing nullable.
+    ///
+    /// Steps:
+    /// - Join one more table with <paramref name="kind"/>, select the <c>long</c> id of every table, and assign the statement to
+    ///   a <see cref="SelectQuery{TDialect, TMode, TResult}"/> whose tuple has <c>long?</c> exactly where the table is
+    ///   nullable.
+    ///
+    /// Expected:
+    /// - No error and no warning; a table nullable where it should not be, or the reverse, would be CS0029.
+    /// </remarks>
+    /// <param name="before">The number of tables before the join, 1 to 7.</param>
+    /// <param name="kind">The join.</param>
+    [Theory]
+    [MemberData(nameof(JoinNullingCases))]
+    public void Join_EveryTableCount_NullsTheRightTables(int before, string kind)
+    {
+        int count = before + 1;
+        string chain =
+            "sqlite.From(Account.Table.As(\"t1\"))"
+            + string.Concat(Enumerable.Range(2, before - 1).Select(i => $".CrossJoin(Account.Table.As(\"t{i}\"))"));
+        string join =
+            kind == "Cross"
+                ? $".CrossJoin(Account.Table.As(\"t{count}\"))"
+                : $".{kind}Join(Account.Table.As(\"t{count}\"), {Lambda(count)} => Eq(t{count}.Id, t1.Id))";
+        string tuple = string.Join(", ", Enumerable.Range(1, count).Select(i => NullableAfter(kind, i, count) ? "long?" : "long"));
+        string items = string.Join(", ", Enumerable.Range(1, count).Select(i => $"t{i}.Id"));
+
+        CompileAssert.Compiles($"SelectQuery<SqliteDialect, Executable, ({tuple})> q = {chain}{join}.Select({Lambda(count)} => ({items}));");
+    }
+
+    /// <summary>
+    /// The <c>ON</c> of a join after an outer join gets the nullable side as nullable, and the joined table as non-nullable
+    /// (design §5.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/> left join <see cref="Membership"/>, then an inner join of <see cref="Account"/> as <c>c</c>.
+    ///
+    /// Steps:
+    /// - In the <c>ON</c> of the inner join, assign the membership's account id to <c>IExpr&lt;long?, PerRow&gt;</c> and the
+    ///   joined id to <c>IExpr&lt;long, PerRow&gt;</c>; then assign the membership's account id to <c>IExpr&lt;long, PerRow&gt;</c>.
+    ///
+    /// Expected:
+    /// - The first compiles; the second does not (CS0029).
+    /// </remarks>
+    [Fact]
+    public void Join_OnAfterOuterJoin_GetsNullableSide()
+    {
+        const string Chain =
+            "var q = sqlite.From(Account.Table).LeftJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id)).InnerJoin(Account.Table.As(\"c\"), (a, m, c) => { ";
+        CompileAssert.Compiles(Chain + "IExpr<long?, PerRow> k = m.AccountId; IExpr<long, PerRow> id = c.Id; return Eq(c.Id, k); });");
+        CompileAssert.Fails(Chain + "IExpr<long, PerRow> k = m.AccountId; return Eq(c.Id, k); });", "CS0029");
+    }
+
+    public static TheoryData<int, string> JoinNullingCases()
+    {
+        var data = new TheoryData<int, string>();
+        for (int before = 1; before <= 7; before++)
+        {
+            foreach (string kind in (string[])["Inner", "Left", "Right", "Full", "Cross"])
+            {
+                data.Add(before, kind);
+            }
+        }
+
+        return data;
+    }
+
+    private static string Lambda(int count) => "(" + string.Join(", ", Enumerable.Range(1, count).Select(i => $"t{i}")) + ")";
+
+    // Whether table i of count is nullable after joining table count with the kind.
+    private static bool NullableAfter(string kind, int i, int count) =>
+        kind switch
+        {
+            "Left" => i == count,
+            "Right" => i < count,
+            "Full" => true,
+            _ => false,
+        };
+
+    /// <summary>
     /// A projection or an ordering that mixes row values and aggregates does not compile (design §4.5).
     /// </summary>
     /// <remarks>

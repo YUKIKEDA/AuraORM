@@ -106,6 +106,36 @@ public abstract class JoinTests<TDialect>
         Assert.Equal([("Alice", "Bob"), ("Alice", "Carol"), ("Bob", "Carol")], ordered);
     }
 
+    /// <summary>
+    /// Three tables: a left join and then a right join run on every dialect, and the right join keeps every row of the third
+    /// table, with the first two nullable (design §5.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The people and pets of <see cref="InnerAndLeftJoin_ReturnMatchesAndNulls"/>.
+    ///
+    /// Steps:
+    /// - People left join pets on the owner, then right join people as <c>o</c> on the same person; select (o's name, the
+    ///   person's name, the pet's name), ordered by o's id and the pet's id.
+    ///
+    /// Expected:
+    /// - (Alice, Alice, Rex), (Alice, Alice, Tom), (Bob, Bob, null), (Carol, Carol, null).
+    /// </remarks>
+    [Fact]
+    public async Task LeftThenRightJoin_ThreeTables()
+    {
+        Database<TDialect> db = await SeedAsync();
+
+        List<(string, string?, string?)> rows = await db.From(Person.Table)
+            .LeftJoin(Pet.Table, (p, pet) => Eq(pet.OwnerId, p.Id))
+            .RightJoin(Person.Table.As("o"), (p, pet, o) => Eq(o.Id, p.Id))
+            .Select((p, pet, o) => (o.Name, p.Name, pet.Name))
+            .OrderBy((p, pet, o) => [Asc(o.Id), Asc(pet.Id)])
+            .ToListAsync(Ct);
+
+        Assert.Equal([("Alice", "Alice", "Rex"), ("Alice", "Alice", "Tom"), ("Bob", "Bob", (string?)null), ("Carol", "Carol", null)], rows);
+    }
+
     private protected static Pet Rex { get; } = new(10, 1, "Rex");
 
     private protected static Pet Tom { get; } = new(11, 1, "Tom");
