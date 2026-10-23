@@ -68,6 +68,17 @@ public sealed class FunctionRenderingTests
                 new($"{U}.\"Name\" NOT LIKE @p0", $"{U}.\"Name\" NOT LIKE $1", $"{B}.`Name` NOT LIKE @p0", $"{S}.[Name] NOT LIKE @p0"),
                 ["A%"]
             },
+            {
+                "Like with an escape character",
+                () => And(Like(Name, "50!%%", '!'), NotLike(Nickname, "a!_b", '!')),
+                new(
+                    $"({U}.\"Name\" LIKE @p0 ESCAPE @p1 AND {U}.\"Nickname\" NOT LIKE @p2 ESCAPE @p3)",
+                    $"({U}.\"Name\" LIKE $1 ESCAPE $2 AND {U}.\"Nickname\" NOT LIKE $3 ESCAPE $4)",
+                    $"({B}.`Name` LIKE @p0 ESCAPE @p1 AND {B}.`Nickname` NOT LIKE @p2 ESCAPE @p3)",
+                    $"({S}.[Name] LIKE @p0 ESCAPE @p1 AND {S}.[Nickname] NOT LIKE @p2 ESCAPE @p3)"
+                ),
+                ["50!%%", "!", "a!_b", "!"]
+            },
             { "IsNull", () => IsNull(Age), new($"{U}.\"Age\" IS NULL", $"{U}.\"Age\" IS NULL", $"{B}.`Age` IS NULL", $"{S}.[Age] IS NULL"), [] },
             {
                 "IsNotNull",
@@ -82,10 +93,10 @@ public sealed class FunctionRenderingTests
                     $"{U}.\"Age\" IS @p0",
                     $"{U}.\"Age\" IS NOT DISTINCT FROM $1",
                     $"{B}.`Age` <=> @p0",
-                    $"({S}.[Age] = @p0 OR ({S}.[Age] IS NULL AND @p1 IS NULL))"
+                    $"(({S}.[Age] IS NULL AND @p0 IS NULL) OR ({S}.[Age] IS NOT NULL AND @p1 IS NOT NULL AND {S}.[Age] = @p2))"
                 )
                 {
-                    SqlServerParameters = [5, 5],
+                    SqlServerParameters = [5, 5, 5],
                 },
                 [5]
             },
@@ -96,7 +107,7 @@ public sealed class FunctionRenderingTests
                     $"{U}.\"Age\" IS NOT {U}.\"Score\"",
                     $"{U}.\"Age\" IS DISTINCT FROM {U}.\"Score\"",
                     $"NOT ({B}.`Age` <=> {B}.`Score`)",
-                    $"NOT ({S}.[Age] = {S}.[Score] OR ({S}.[Age] IS NULL AND {S}.[Score] IS NULL))"
+                    $"NOT (({S}.[Age] IS NULL AND {S}.[Score] IS NULL) OR ({S}.[Age] IS NOT NULL AND {S}.[Score] IS NOT NULL AND {S}.[Age] = {S}.[Score]))"
                 ),
                 []
             },
@@ -173,7 +184,7 @@ public sealed class FunctionRenderingTests
             {
                 "Length",
                 () => Length(Name),
-                new($"LENGTH({U}.\"Name\")", $"CHAR_LENGTH({U}.\"Name\")", $"CHAR_LENGTH({B}.`Name`)", $"LEN({S}.[Name])"),
+                new($"LENGTH({U}.\"Name\")", $"CHAR_LENGTH({U}.\"Name\")", $"CHAR_LENGTH({B}.`Name`)", $"CAST(LEN({S}.[Name]) AS int)"),
                 []
             },
             {
