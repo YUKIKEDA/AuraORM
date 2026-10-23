@@ -70,6 +70,12 @@
 - **Reason**: 参照型の NULL 可否は注釈だけの違いなので、クラスの型引数としては不変になる。`string?` の列と `string` の列を比べると、利用者のコードで CS8620 が出る。警告をエラーにしている利用者のビルドは通らない。試作で、クラスでは 8 件の CS8620、共変のインターフェースでは 0 件だった（Issue #5）。
 - **Rejected**: 抽象クラス `Expr<T, TLevel>` を公開の型にする案。
 
+## D1-12 方言にない機能と、方言で位置の違う句
+
+- **Decision**: 方言にない機能や、方言がその位置で受け付けない句（SQL Server の `ORDER BY` のない `Limit`、SQLite / MySQL の `Limit` のない `Offset` など）は、方言の機能のインターフェースで制約し、コンパイルエラーにする。ライブラリは句を補わない（§2.4、§5.9）。値で決まり型で表せないもの（SQL Server の `Limit(0)`）だけを実行前の検査にする（§14.3）。
+- **Reason**: 約束 2（呼び出し側が書いていない句を足さない）と約束 3（そのデータベースにない機能はコンパイルエラー）。Issue #3 の Grill の質問 8 で決めた。
+- **Rejected**: 実行時に `NotSupportedException` を投げる案（エージェントが実行まで気づかない）。SQL Server で `ORDER BY (SELECT NULL)` を補って `OFFSET … FETCH` を書く案（書いていない句が SQL に出て、行の順序も決まらない）。
+
 ## D1-13 条件の数が実行時に決まる絞り込み
 
 - **Decision**: 一覧の `And` / `Or` が `null` を飛ばし、一つもなければ「条件なし」（`OptionalCondition<TLevel>`）を返す。SELECT の `Where` は「条件なし」なら `WHERE` を出さない。UPDATE と DELETE の `Where` は `OptionalCondition` を受け取らない（§4.2）。

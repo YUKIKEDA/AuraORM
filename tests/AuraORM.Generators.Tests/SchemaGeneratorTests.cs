@@ -71,7 +71,7 @@ public sealed class SchemaGeneratorTests
     /// Preconditions:
     /// - A table and a result type whose members are named <c>id</c>, <c>reader</c>, <c>Reader</c>, <c>table</c>,
     ///   <c>items</c>, and <c>@class</c>, and a table with the defaults -1, -1.5, a negative enum value, and the int 0 on a
-    ///   long column.
+    ///   long column, 1 on a byte column, -2 on a short column, and 0 on an enum column (the constant conversions of C#).
     ///
     /// Steps:
     /// - Run the generator and compile.
@@ -98,7 +98,10 @@ public sealed class SchemaGeneratorTests
                     [Default(-1)] int minus,
                     [Default(-1.5)] double half,
                     [Default(Sign.Minus)] Sign sign,
-                    [Default(0)] long zero);
+                    [Default(0)] long zero,
+                    [Default(1)] byte tiny,
+                    [Default(-2)] short small,
+                    [Default(0)] Sign unset);
 
                 [QueryResult]
                 public sealed partial record AwkwardResult(int reader, string? items, int @class, int Reader);
@@ -318,6 +321,9 @@ public sealed class SchemaGeneratorTests
     [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default("x")] int Count);""")]
     [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(1.5)] int Count);""")]
     [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(null!)] int Count);""")]
+    [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(300)] byte Count);""")]
+    [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(40000)] short Count);""")]
+    [InlineData("AURA0113", """public enum E { A, B } [Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(1)] E State);""")]
     public void Generate_SchemaError_ReportsDiagnostic(string id, string declaration)
     {
         GeneratorHarness.Fails(Usings + declaration, id);
