@@ -849,10 +849,10 @@ SqlStatement s = db.From(User.Table).Where(u => Gt(u.Age, 20)).Select(u => u.Nam
 ```csharp
 var sql = new SqlBuilder<PostgreSqlDialect>();
 SqlStatement s = sql.From(User.Table).Where(u => Gt(u.Age, 20)).Select(u => u.Name).ToSql();
-// sql.From(User.Table).Select(u => u.Name).ToListAsync();   // CS1061: 実行のメソッドがない
+// sql.From(User.Table).Select(u => u.Name).ToListAsync();   // CS1929: 実行のメソッドは Executable の文にしかない
 ```
 
-- 段階の型は、方言のほかに「実行できるか」を型引数（`TMode`）に持つ。`Database` と `Transaction` から作った文は `Executable`、`SqlBuilder` から作った文は `SqlOnly` で、実行のメソッド（`ToListAsync` など）は `Executable` の文にだけある。実行できない文を実行するとコンパイルエラーになる。
+- 段階の型は、方言のほかに「実行できるか」を型引数（`TMode`）に持つ。`Database` と `Transaction` から作った文は `Executable`、`SqlBuilder` から作った文は `SqlOnly` で、実行のメソッド（`ToListAsync` など）は `Executable` の文にだけある拡張メソッドである。実行できない文を実行するとコンパイルエラー（CS1929）になる。
 - Drizzle ORM の `new QueryBuilder()`（`drizzle-orm/pg-core`）も、型引数 `TBuilderMode`（`'db'` / `'qb'`）で、`QueryBuilder` から作った文を実行のメソッドのない型にしている（§19）。
 
 ### 12.4 パラメータ
@@ -950,7 +950,7 @@ CREATE TABLE "users" (
 | 集合演算の演算子の混在 | 段階の型（§5.10） | CS1061 |
 | `SelectDistinct` の後の `OrderBy` に選んでいない式を書く | `OrderBy` が選んだ項目だけを受け取る（§5.7） | CS1503 / CS1061 |
 | UPDATE / DELETE の `Where` に「条件なし」になりうる条件を渡す | `Where` が `Condition<PerRow>` だけを受け取る（§4.2） | CS1503 |
-| `SqlBuilder` から作った文を実行する | 実行のメソッドがない（§12.3） | CS1061 |
+| `SqlBuilder` から作った文を実行する | 実行のメソッドは `Executable` の文にだけある（§12.3） | CS1929 |
 | 文字列の SQL を断片に入れる | 補間文字列ハンドラーだけを受け取る | CS1503 |
 | 生 SQL の穴に扱えない型の値を入れる | アナライザー | AURA0301 |
 | 文字列の関数（`Like`、`Concat` など）に文字列でない値を渡す | 型引数の制約（`IEnumerable<char>?`） | CS0313 / CS0315 |
