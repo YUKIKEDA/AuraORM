@@ -64,6 +64,11 @@ internal sealed class SqlServerRenderer : DialectRenderer
         context.Write("))");
     }
 
+    // §12.4: SqlClient infers the legacy datetime (1/300 second) for a DateTime, which rounds the value even when the column is
+    // datetime2, the type of a DateTime column (§3.3).
+    public override System.Data.DbType? ParameterDbType(ParameterNode parameter) =>
+        parameter.ValueType == typeof(DateTime) ? System.Data.DbType.DateTime2 : base.ParameterDbType(parameter);
+
     // §4.2: SUM(int) is int and overflows, so each value is cast to bigint first.
     protected override void RenderSumOfIntegers(SqlRenderContext context, SqlNode argument)
     {

@@ -13,9 +13,14 @@ internal abstract class ParameterNode : SqlNode
     public abstract object? ProviderValue { get; }
 
     /// <summary>
-    /// Gets a value indicating whether the value is a null <see cref="byte"/> array (§12.4).
+    /// Gets the CLR type of the value, without <see cref="Nullable{T}"/>.
     /// </summary>
-    public abstract bool IsNullBinary { get; }
+    public abstract Type ValueType { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the value is null.
+    /// </summary>
+    public abstract bool IsNull { get; }
 
     public override void Render(SqlRenderContext context) => context.WriteParameter(this);
 }
@@ -28,7 +33,9 @@ internal sealed class ParameterNode<T>(T value) : ParameterNode
 {
     public override object? ProviderValue => ToProviderValue(value);
 
-    public override bool IsNullBinary => typeof(T) == typeof(byte[]) && value is null;
+    public override Type ValueType => Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+
+    public override bool IsNull => value is null;
 
     private static object? ToProviderValue(T value)
     {

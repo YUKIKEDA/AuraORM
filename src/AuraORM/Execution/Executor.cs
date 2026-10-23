@@ -163,9 +163,9 @@ internal static class Executor
             }
 
             p.Value = parameter.Value ?? DBNull.Value;
-            if (parameter.IsNullBinary)
+            if (parameter.DbType is DbType type)
             {
-                p.DbType = DbType.Binary;
+                p.DbType = type;
             }
 
             command.Parameters.Add(p);

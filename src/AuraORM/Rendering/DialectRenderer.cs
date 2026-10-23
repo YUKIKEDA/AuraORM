@@ -33,6 +33,16 @@ internal abstract class DialectRenderer
     protected virtual string LengthFunction => "CHAR_LENGTH";
 
     /// <summary>
+    /// Returns the type that a parameter is sent with, or <see langword="null"/> to let the provider infer it (§12.4). A null
+    /// <see cref="byte"/> array is sent as binary on every dialect: SqlClient takes an untyped null for <c>nvarchar</c>, which
+    /// does not convert to <c>varbinary</c>.
+    /// </summary>
+    /// <param name="parameter">The parameter.</param>
+    /// <returns>The type, or <see langword="null"/>.</returns>
+    public virtual System.Data.DbType? ParameterDbType(ParameterNode parameter) =>
+        parameter.IsNull && parameter.ValueType == typeof(byte[]) ? System.Data.DbType.Binary : null;
+
+    /// <summary>
     /// Writes the length of a string in characters (§4.2).
     /// </summary>
     /// <param name="context">The rendering context.</param>

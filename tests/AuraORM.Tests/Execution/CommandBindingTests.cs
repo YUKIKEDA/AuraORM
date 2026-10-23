@@ -70,6 +70,35 @@ public sealed class CommandBindingTests
     }
 
     /// <summary>
+    /// A <see cref="DateTime"/> is sent as <see cref="DbType.DateTime2"/> on SQL Server, where SqlClient would infer the
+    /// legacy <c>datetime</c> and round it to 1/300 second; on the other dialects the provider infers the type (design §12.4).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - Fake connections on SQL Server and PostgreSQL.
+    ///
+    /// Steps:
+    /// - Run a raw command with a <see cref="DateTime"/> and a null <see cref="DateTime"/> on each.
+    ///
+    /// Expected:
+    /// - SQL Server: both parameters are <see cref="DbType.DateTime2"/>. PostgreSQL: no <c>DbType</c> set.
+    /// </remarks>
+    [Fact]
+    public async Task ExecuteAsync_DateTimeOnSqlServer_BindsDateTime2()
+    {
+        var sqlServer = new FakeConnection();
+        var postgres = new FakeConnection();
+        DateTime at = new(2024, 5, 6, 7, 8, 9, DateTimeKind.Unspecified);
+        DateTime? none = null;
+
+        await new Database<SqlServerDialect>(sqlServer).ExecuteAsync($"UPDATE t SET a = {at}, b = {none}", Ct);
+        await new Database<PostgreSqlDialect>(postgres).ExecuteAsync($"UPDATE t SET a = {at}, b = {none}", Ct);
+
+        Assert.All(sqlServer.Commands.Single().FakeParameters, p => Assert.Equal(DbType.DateTime2, p.DbType));
+        Assert.All(postgres.Commands.Single().FakeParameters, p => Assert.False(p.DbTypeSet));
+    }
+
+    /// <summary>
     /// The command timeout is set only when <see cref="DatabaseOptions.CommandTimeout"/> is given, and a statement in a
     /// transaction runs in it (design §12.1, §12.5).
     /// </summary>
