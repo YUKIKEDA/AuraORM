@@ -196,10 +196,22 @@ public sealed class SelectTypingTests
     /// <param name="id">The expected diagnostic id.</param>
     [Theory]
     [InlineData("var q = mysql.From(Account.Table).FullJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id));", "CS0311")]
-    [InlineData("SelectQuery<SqliteDialect, Executable, long> q = sqlite.From(Account.Table).LeftJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id)).Select((a, m) => m.AccountId);", "CS0029")]
-    [InlineData("SelectQuery<SqliteDialect, Executable, long> q = sqlite.From(Account.Table).RightJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id)).Select((a, m) => a.Id);", "CS0029")]
-    [InlineData("var q = sqlite.From(Account.Table).Where(a => Gt(a.Id, 1L)).InnerJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id));", "CS1061")]
-    [InlineData("var q = sqlite.From(Account.Table.As(\"t1\")).CrossJoin(Account.Table.As(\"t2\")).CrossJoin(Account.Table.As(\"t3\")).CrossJoin(Account.Table.As(\"t4\")).CrossJoin(Account.Table.As(\"t5\")).CrossJoin(Account.Table.As(\"t6\")).CrossJoin(Account.Table.As(\"t7\")).CrossJoin(Account.Table.As(\"t8\")).CrossJoin(Account.Table.As(\"t9\"));", "CS1061")]
+    [InlineData(
+        "SelectQuery<SqliteDialect, Executable, long> q = sqlite.From(Account.Table).LeftJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id)).Select((a, m) => m.AccountId);",
+        "CS0029"
+    )]
+    [InlineData(
+        "SelectQuery<SqliteDialect, Executable, long> q = sqlite.From(Account.Table).RightJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id)).Select((a, m) => a.Id);",
+        "CS0029"
+    )]
+    [InlineData(
+        "var q = sqlite.From(Account.Table).Where(a => Gt(a.Id, 1L)).InnerJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id));",
+        "CS1061"
+    )]
+    [InlineData(
+        "var q = sqlite.From(Account.Table.As(\"t1\")).CrossJoin(Account.Table.As(\"t2\")).CrossJoin(Account.Table.As(\"t3\")).CrossJoin(Account.Table.As(\"t4\")).CrossJoin(Account.Table.As(\"t5\")).CrossJoin(Account.Table.As(\"t6\")).CrossJoin(Account.Table.As(\"t7\")).CrossJoin(Account.Table.As(\"t8\")).CrossJoin(Account.Table.As(\"t9\"));",
+        "CS1061"
+    )]
     public void Join_InvalidChains_DoNotCompile(string body, string id)
     {
         CompileAssert.Fails(body, id);
@@ -222,8 +234,12 @@ public sealed class SelectTypingTests
     /// - The warning CS8619.
     /// </remarks>
     [Theory]
-    [InlineData("SelectQuery<SqliteDialect, Executable, string> q = sqlite.From(Account.Table).LeftJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id)).Select((a, m) => m.Role);")]
-    [InlineData("SelectQuery<SqliteDialect, Executable, Membership> q = sqlite.From(Account.Table).LeftJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id)).Select((a, m) => m);")]
+    [InlineData(
+        "SelectQuery<SqliteDialect, Executable, string> q = sqlite.From(Account.Table).LeftJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id)).Select((a, m) => m.Role);"
+    )]
+    [InlineData(
+        "SelectQuery<SqliteDialect, Executable, Membership> q = sqlite.From(Account.Table).LeftJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id)).Select((a, m) => m);"
+    )]
     public void Join_NullableReferenceReadAsNonNullable_Warns(string body)
     {
         CompileAssert.Warns(body, "CS8619");

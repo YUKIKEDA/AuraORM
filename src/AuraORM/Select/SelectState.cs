@@ -17,7 +17,15 @@ internal sealed record SelectState(
 )
 {
     public static SelectState From(TableAlias table) =>
-        new([new SelectSourceState(table, JoinKind.From, null)], null, false, ImmutableArray<SqlNode>.Empty, ImmutableArray<OrderKey>.Empty, null, null);
+        new(
+            [new SelectSourceState(table, JoinKind.From, null)],
+            null,
+            false,
+            ImmutableArray<SqlNode>.Empty,
+            ImmutableArray<OrderKey>.Empty,
+            null,
+            null
+        );
 
     /// <summary>
     /// Creates the occurrence of a table that a join adds. A table that the statement already has under the same name (its
@@ -35,9 +43,7 @@ internal sealed record SelectState(
             if (source.Table.Reference == alias.Reference)
             {
                 throw new InvalidOperationException(
-                    "The statement already has a table named "
-                        + alias.Reference
-                        + ". Give the second use of the table an alias with As(\"...\")."
+                    "The statement already has a table named " + alias.Reference + ". Give the second use of the table an alias with As(\"...\")."
                 );
             }
         }
@@ -45,7 +51,11 @@ internal sealed record SelectState(
         return alias;
     }
 
-    public SelectState Join(TableAlias table, JoinKind kind, SqlNode? on) => this with { Sources = Sources.Add(new SelectSourceState(table, kind, on)) };
+    public SelectState Join(TableAlias table, JoinKind kind, SqlNode? on) =>
+        this with
+        {
+            Sources = Sources.Add(new SelectSourceState(table, kind, on)),
+        };
 
     public SelectState WithProjection<T, TLevel>(IProjection<T, TLevel> projection, bool distinct)
         where TLevel : EvaluationLevel

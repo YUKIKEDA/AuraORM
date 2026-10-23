@@ -2,7 +2,7 @@
 
 作業の順序と状態だけを置く。受け入れ条件は各 Issue に書く。行の追加と削除は Grill を経る（`.cursor/rules/workflow.mdc`）。設計は [design.ja.md](./design.ja.md) にある。
 
-**今**: Q2
+**今**: Q3
 
 ## v0.1
 
@@ -17,7 +17,7 @@
 | N1 | NativeAOT のサンプルと CI の検査（§16.3） | #14 | done |
 | Q1 | SELECT: 単一テーブル、WHERE、射影、DISTINCT、ORDER BY、LIMIT / OFFSET、段階の型の生成ツールと CI の検査（§5.1〜§5.9） | #16 | done |
 | A1 | アナライザー: NULL との比較、生 SQL の穴（§4.4、§11.1） | #21 | done |
-| Q2 | SELECT: JOIN と NULL 化、別名（§5.2、§5.3） | - | planned |
+| Q2 | SELECT: JOIN と NULL 化、別名（§5.2、§5.3） | #23 | done |
 | Q3 | SELECT: GROUP BY / HAVING、集計、評価の段階（§4.5、§5.5） | - | planned |
 | Q4 | SELECT: サブクエリ、集合演算、派生テーブル、CTE、`[QueryResult]` の型の `Columns`（§3.5、§5.10、§5.11） | - | planned |
 | M1 | INSERT / UPDATE / DELETE と RETURNING、SQLite の最小版（3.39）の結合テスト（§6〜§9、§17） | - | planned |

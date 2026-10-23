@@ -193,13 +193,25 @@ void SelectFrom(StringBuilder s)
         var w = new StringBuilder();
         w.Append('\n');
         w.Append("/// <summary>\n");
-        w.Append(CultureInfo.InvariantCulture, $"/// A SELECT statement right after <c>FROM</c>, with {Tables(n)} (<c>docs/design.ja.md</c> §5.1). Joins may follow");
-        w.Append(n < MaxSources ? ", then\n/// <c>WHERE</c> once.\n" : " no more\n/// (a statement has at most " + MaxSources + " tables); <c>WHERE</c> may follow once.\n");
+        w.Append(
+            CultureInfo.InvariantCulture,
+            $"/// A SELECT statement right after <c>FROM</c>, with {Tables(n)} (<c>docs/design.ja.md</c> §5.1). Joins may follow"
+        );
+        w.Append(
+            n < MaxSources
+                ? ", then\n/// <c>WHERE</c> once.\n"
+                : " no more\n/// (a statement has at most " + MaxSources + " tables); <c>WHERE</c> may follow once.\n"
+        );
         w.Append("/// </summary>\n");
         w.Append("/// <typeparam name=\"TDialect\">The SQL dialect.</typeparam>\n");
-        w.Append("/// <typeparam name=\"TMode\">Whether the statement can be run: <see cref=\"Executable\"/> or <see cref=\"SqlOnly\"/>.</typeparam>\n");
+        w.Append(
+            "/// <typeparam name=\"TMode\">Whether the statement can be run: <see cref=\"Executable\"/> or <see cref=\"SqlOnly\"/>.</typeparam>\n"
+        );
         w.Append(PairDocs(n));
-        w.Append(CultureInfo.InvariantCulture, $"public sealed class SelectFrom<TDialect, TMode, {Pairs(n)}> : SelectSource<TDialect, TMode, {Views(n)}>\n");
+        w.Append(
+            CultureInfo.InvariantCulture,
+            $"public sealed class SelectFrom<TDialect, TMode, {Pairs(n)}> : SelectSource<TDialect, TMode, {Views(n)}>\n"
+        );
         w.Append("    where TDialect : IDialect\n");
         w.Append("    where TMode : ExecutionMode\n");
         w.Append(NullableConstraints(n, "    "));
@@ -207,11 +219,16 @@ void SelectFrom(StringBuilder s)
         w.Append(CultureInfo.InvariantCulture, $"    internal SelectFrom(IStatementRunner? session, SelectState state, {ViewParameters(n)})\n");
         w.Append(CultureInfo.InvariantCulture, $"        : base(session, state, {Lower(n)}) {{ }}\n\n");
         w.Append("    /// <summary>\n");
-        w.Append("    /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref=\"Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])\"/>.\n");
+        w.Append(
+            "    /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref=\"Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])\"/>.\n"
+        );
         w.Append("    /// </summary>\n");
         w.Append("    /// <param name=\"condition\">The condition, from the column sets.</param>\n");
         w.Append("    /// <returns>The statement.</returns>\n");
-        w.Append(CultureInfo.InvariantCulture, $"    public SelectWhere<TDialect, TMode, {Views(n)}> Where(Func<{Views(n)}, Condition<PerRow>> condition)\n");
+        w.Append(
+            CultureInfo.InvariantCulture,
+            $"    public SelectWhere<TDialect, TMode, {Views(n)}> Where(Func<{Views(n)}, Condition<PerRow>> condition)\n"
+        );
         w.Append("    {\n");
         w.Append("        ArgumentNullException.ThrowIfNull(condition);\n");
         w.Append(CultureInfo.InvariantCulture, $"        return new(Session, State with {{ Where = condition({Args(n)}).Node }}, {Args(n)});\n");
@@ -222,7 +239,10 @@ void SelectFrom(StringBuilder s)
         w.Append("    /// </summary>\n");
         w.Append("    /// <param name=\"condition\">The condition, from the column sets.</param>\n");
         w.Append("    /// <returns>The statement.</returns>\n");
-        w.Append(CultureInfo.InvariantCulture, $"    public SelectWhere<TDialect, TMode, {Views(n)}> Where(Func<{Views(n)}, OptionalCondition<PerRow>> condition)\n");
+        w.Append(
+            CultureInfo.InvariantCulture,
+            $"    public SelectWhere<TDialect, TMode, {Views(n)}> Where(Func<{Views(n)}, OptionalCondition<PerRow>> condition)\n"
+        );
         w.Append("    {\n");
         w.Append("        ArgumentNullException.ThrowIfNull(condition);\n");
         w.Append(CultureInfo.InvariantCulture, $"        return new(Session, State with {{ Where = condition({Args(n)}).Node }}, {Args(n)});\n");
@@ -375,7 +395,11 @@ string JoinMethod(int n, string kind, bool extension)
         ? string.Join(", ", Enumerable.Range(1, n).Select(i => $"TNullable{i}.Create(State.Sources[{i - 1}].Table)"))
         : Args(n);
     string joined = kind is "Left" or "Full" ? "TJoinNullable.Create(alias)" : "TJoinColumns.Create(alias)";
-    w.Append(indent).Append(CultureInfo.InvariantCulture, $"    return new(Session, State.Join(alias, JoinKind.{joinKind}, {condition}), {previous}, {joined});\n");
+    w.Append(indent)
+        .Append(
+            CultureInfo.InvariantCulture,
+            $"    return new(Session, State.Join(alias, JoinKind.{joinKind}, {condition}), {previous}, {joined});\n"
+        );
     w.Append(indent + "}\n");
     return w.ToString();
 }

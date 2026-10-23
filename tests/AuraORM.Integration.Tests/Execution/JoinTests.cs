@@ -45,10 +45,7 @@ public abstract class JoinTests<TDialect>
             .ToListAsync(Ct);
 
         Assert.Equal([("Alice", "Rex"), ("Alice", "Tom")], inner);
-        Assert.Equal(
-            [("Alice", "Rex", Rex), ("Alice", "Tom", Tom), ("Bob", (string?)null, (Pet?)null), ("Carol", null, null)],
-            left
-        );
+        Assert.Equal([("Alice", "Rex", Rex), ("Alice", "Tom", Tom), ("Bob", (string?)null, (Pet?)null), ("Carol", null, null)], left);
     }
 
     /// <summary>
