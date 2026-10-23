@@ -116,7 +116,7 @@ flowchart LR
 ### 2.3 名前空間と公開面
 
 - 公開する型は名前空間 `AuraORM` に置く。利用者は `using AuraORM;` と `using static AuraORM.Sql;` で全機能を使える。
-- 公開面は次に限る: `Database<TDialect>` と `Transaction<TDialect>`、方言の型と機能のインターフェース、ビルダーの段階の型、式の型（`Expr<T, TLevel>`、`Column<T>`、`Condition<TLevel>`、`Projection<T, TLevel>`）、関数（`Sql`）、属性、`SqlStatement`、例外。
+- 公開面は次に限る: `Database<TDialect>` と `Transaction<TDialect>`、方言の型と機能のインターフェース、ビルダーの段階の型、式の型（`IExpr<T, TLevel>`、`Column<T>`、`Condition<TLevel>`、`IProjection<T, TLevel>`）、関数（`Sql`）、属性、`SqlStatement`、例外。
 - 文の木、SQL の出力、パラメータの設定は `internal` にする。
 
 ### 2.4 方言
@@ -233,12 +233,12 @@ public sealed partial record User(
 | メンバー | 型 | 役割 |
 | --- | --- | --- |
 | `User.Table` | `Table<User, User.Columns, User.NullableColumns, User.Insert>` | テーブル参照。`db.From(User.Table)` のように使う |
-| `User.Columns` | クラス | 列の集合。ラムダの引数になる。`Projection<User, PerRow>` でもあり、`Select(u => u)` で行全体を表す |
-| `User.NullableColumns` | クラス | 外部結合で NULL になりうる側の列の集合。各列は NULL を許す型になる。`Projection<User?, PerRow>` |
+| `User.Columns` | クラス | 列の集合。ラムダの引数になる。`IProjection<User, PerRow>` でもあり、`Select(u => u)` で行全体を表す |
+| `User.NullableColumns` | クラス | 外部結合で NULL になりうる側の列の集合。各列は NULL を許す型になる。`IProjection<User?, PerRow>` |
 | `User.Insert` | クラス | INSERT のモデル（§6） |
 
 - `User.Columns` の各プロパティは `Column<T>` 型で、`T` は列の CLR の型（`long`、`string`、`int?`）である。`[AutoIncrement]` の列は `ReadOnlyColumn<T>` で、UPDATE の代入先にできない（§7）。
-- `User.NullableColumns` の各プロパティは `Expr<T?, PerRow>` 型である。`long` の列は `long?`、`string` の列は `string?` になる。列ではないので、代入先にはできない。
+- `User.NullableColumns` の各プロパティは `IExpr<T?, PerRow>` 型である。`long` の列は `long?`、`string` の列は `string?` になる。列ではないので、代入先にはできない。
 - `User.Columns` と `User.NullableColumns` は、ライブラリだけが作れる。生成されるファクトリは、ライブラリの `internal` なコンストラクターを持つ `TableAlias` を受け取るので、利用者のコードからは作れない。列を得る方法は、ビルダーが渡すラムダの引数だけである。
 - 生成コードは C# 12 でコンパイルでき、型名はすべて `global::` で修飾する。
 - 利用者の型に、生成するメンバーと同じ名前のメンバーがあればエラー AURA0104 になる。
@@ -254,7 +254,7 @@ public sealed partial record UserOrderTotal(string Name, decimal? Total);
 
 ジェネレーターは次を生成する。
 
-- `UserOrderTotal.RowProjection` と `UserOrderTotal.GroupProjection`: `required` な `init` プロパティを持つクラス。各プロパティの型は、前者が `Projection<T, PerRow>`、後者が `Projection<T, PerGroup>` で、`T` は対応するメンバーの型である（§4.5）。`Select` で `new UserOrderTotal.GroupProjection { Name = k.Item1, Total = Sum(o.Amount) }` のように使う。メンバーを書き忘れると CS9035、型や評価の段階が違うと CS0029 になる。
+- `UserOrderTotal.RowProjection` と `UserOrderTotal.GroupProjection`: `required` な `init` プロパティを持つクラス。各プロパティの型は、前者が `IProjection<T, PerRow>`、後者が `IProjection<T, PerGroup>` で、`T` は対応するメンバーの型である（§4.5）。`Select` で `new UserOrderTotal.GroupProjection { Name = k.Item1, Total = Sum(o.Amount) }` のように使う。メンバーを書き忘れると CS9035、型や評価の段階が違うと CS0029 になる。
 - `UserOrderTotal.Columns`: この型を派生テーブルと CTE（§5.11）の行として使うときの列の集合。
 - 生 SQL のクエリ（§11.3）で、列名から値を読むコード。
 
@@ -293,13 +293,15 @@ public sealed class UserIdConverter : IValueConverter<UserId, long>
 
 | 型 | 意味 |
 | --- | --- |
-| `Projection<T, TLevel>` | `SELECT` の列の並びと、その結果を `T` として読むコード。式、行全体、タプル、結果の型の射影がこれになる |
-| `Expr<T, TLevel>` | 値を持つ SQL の式。`T` は結果として読むときの CLR の型。`Projection<T, TLevel>` を継承する |
-| `Column<T>` | テーブルの列。`Expr<T, PerRow>` を継承し、UPDATE の代入先になれる |
-| `ReadOnlyColumn<T>` | 代入先になれない列（`[AutoIncrement]`）。`Expr<T, PerRow>` を継承する |
+| `IProjection<out T, TLevel>` | `SELECT` の列の並びと、その結果を `T` として読むコード。式、行全体、タプル、結果の型の射影がこれになる |
+| `IExpr<out T, TLevel>` | 値を持つ SQL の式。`T` は結果として読むときの CLR の型。`IProjection<T, TLevel>` を継承する |
+| `Column<T>` | テーブルの列。`IExpr<T, PerRow>` を実装し、UPDATE の代入先になれる |
+| `ReadOnlyColumn<T>` | 代入先になれない列（`[AutoIncrement]`）。`IExpr<T, PerRow>` を実装する |
 | `Condition<TLevel>` | 真偽を返す述語。`WHERE`、`ON`、`HAVING`、`CASE WHEN` に使う。値ではないので射影にはならない |
 
-- `T` は NULL 可否を含む。NULL を許す `int` の列は `Expr<int?, PerRow>`、NULL を許す `string` の列は `Expr<string?, PerRow>` である。
+- `T` は NULL 可否を含む。NULL を許す `int` の列は `IExpr<int?, PerRow>`、NULL を許す `string` の列は `IExpr<string?, PerRow>` である。
+- `IExpr` と `IProjection` は `T` について共変のインターフェースである。クラスにすると、`string?` の列と `string` の列を比べたときに、利用者のコードで null 許容の警告（CS8620）が出る。共変のインターフェースなら、`IExpr<string, …>` を `IExpr<string?, …>` として渡しても警告は出ない（試作で、クラスでは 8 件、インターフェースでは 0 件だった）。
+- この二つのインターフェースは `internal` のメンバーを持つので、ライブラリの外では実装できない。式を作れるのは `Sql` の関数と、ジェネレーターが作る列だけである。
 - `TLevel` は評価の段階で、`PerRow`（行ごと）か `PerGroup`（グループごと）である（§4.5）。
 - 述語と値を分けるのは、SQL Server が述語を値として扱えず、`bit` の列をそのまま述語にもできないからである。真偽値の列を条件にするときは `Eq(u.IsActive, true)` と書く。この形はすべての方言で同じ SQL（`"IsActive" = @p0`）になる。
 
@@ -307,13 +309,13 @@ public sealed class UserIdConverter : IValueConverter<UserId, long>
 
 関数はすべて静的クラス `Sql` のメソッドである。`using static AuraORM.Sql;` で、Drizzle と同じように `Eq(u.Age, 20)` と書ける。ここに載せる関数は、五つの方言すべてで使える。方言固有の関数は v0.1 には入れず、生 SQL 断片（§11）で書く（§18 の DF1）。
 
-値の引数（`T` 型）はパラメータになる。式の引数（`Expr<T, TLevel>`）は SQL として展開される。二つの引数を取る関数は、両方の `TLevel` が同じでなければならない。
+値の引数（`T` 型）はパラメータになる。式の引数（`IExpr<T, TLevel>`）は SQL として展開される。二つの引数を取る関数は、両方の `TLevel` が同じでなければならない。
 
 **比較**
 
 | 関数 | SQL | 型の規則 |
 | --- | --- | --- |
-| `Eq(a, b)` | `a = b` | `a` と `b` の `T` が同じ。片方だけが nullable な値型でもよい（`Expr<long?>` と `Expr<long>`）。`b` は値でもよい |
+| `Eq(a, b)` | `a = b` | `a` と `b` の `T` が同じ。片方だけが nullable な値型でもよい（`IExpr<long?>` と `IExpr<long>`）。`b` は値でもよい |
 | `Ne(a, b)` | `a <> b` | 同上 |
 | `Gt` / `Ge` / `Lt` / `Le` | `>` / `>=` / `<` / `<=` | 同上 |
 | `Between(a, lo, hi)` | `a BETWEEN lo AND hi` | 同上 |
@@ -332,10 +334,10 @@ public sealed class UserIdConverter : IValueConverter<UserId, long>
 | `IsNotNull(a)` | `a IS NOT NULL` | 同左 | 同左 | 同左 |
 | `IsNotDistinctFrom(a, b)` | `a IS b` | `a IS NOT DISTINCT FROM b` | `a <=> b` | `(a = b OR (a IS NULL AND b IS NULL))` |
 | `IsDistinctFrom(a, b)` | `a IS NOT b` | `a IS DISTINCT FROM b` | `NOT (a <=> b)` | `NOT (a = b OR (a IS NULL AND b IS NULL))` |
-| `Coalesce(a, b, …)` | `COALESCE(a, b, …)` | 同左 | 同左 | 同左 |
+| `Coalesce(a, b)` | `COALESCE(a, b)` | 同左 | 同左 | 同左 |
 | `NullIf(a, b)` | `NULLIF(a, b)` | 同左 | 同左 | 同左 |
 
-SQL Server 2019 には `IS [NOT] DISTINCT FROM` がないので展開する。展開では `a` と `b` が二度ずつ現れる。値の引数は、現れるたびに別のパラメータになる。`Coalesce` の結果は、最後の引数が NULL を許さなければ NULL を許さない型になる。
+SQL Server 2019 には `IS [NOT] DISTINCT FROM` がないので展開する。展開では `a` と `b` が二度ずつ現れる。値の引数は、現れるたびに別のパラメータになる。`Coalesce` は二つの引数を取り、三つ以上は入れ子にする。`b` が NULL を許さない値型なら、結果は NULL を許さない型になる。`NullIf` の結果は NULL を許す型で、`a` は値型か `string` に限る（C# の制約で、ほかの参照型を NULL を許す型として表せないため）。
 
 **論理**
 
@@ -373,8 +375,8 @@ SQL Server 2019 には `IS [NOT] DISTINCT FROM` がないので展開する。�
 
 | 関数 | SQL |
 | --- | --- |
-| `Cast<TTarget>(a)` | `CAST(a AS 型)`。型は §4.3 の表 |
-| `Case<T>().When(c, v).Else(v)` | `CASE WHEN c THEN v … ELSE v END`。`Else` がなければ結果は NULL を許す型 |
+| `Cast(a, SqlType.Int64)` | `CAST(a AS 型)`。第二引数は §4.3 の型の印 |
+| `Case(c, v).When(c, v).Else(v)` | `CASE WHEN c THEN v … ELSE v END`。`Else` は必須。NULL を既定にするときは `T` を NULL を許す型にして `Else(null)` と書く |
 | `CurrentTimestamp()` | `CURRENT_TIMESTAMP`。結果は `DateTime` |
 | `Value<T>(v)` | `@p0`。値を式として使う（射影の中の定数など） |
 
@@ -395,16 +397,16 @@ SQL Server 2019 には `IS [NOT] DISTINCT FROM` がないので展開する。�
 
 ### 4.3 `Cast` の型
 
-| `TTarget` | SQLite | PostgreSQL | MySQL / MariaDB | SQL Server |
+| 型の印 | SQLite | PostgreSQL | MySQL / MariaDB | SQL Server |
 | --- | --- | --- | --- | --- |
-| `long` | `INTEGER` | `bigint` | `SIGNED` | `bigint` |
-| `double` | `REAL` | `double precision` | `DOUBLE` | `float` |
-| `decimal` | `TEXT` | `numeric` | `DECIMAL(65,30)` | `decimal(38,18)` |
-| `string` | `TEXT` | `text` | `CHAR` | `nvarchar(max)` |
-| `DateTime` | `TEXT` | `timestamp` | `DATETIME(6)` | `datetime2` |
-| `DateOnly` | `TEXT` | `date` | `DATE` | `date` |
+| `SqlType.Int64`（`long`） | `INTEGER` | `bigint` | `SIGNED` | `bigint` |
+| `SqlType.Double`（`double`） | `REAL` | `double precision` | `DOUBLE` | `float` |
+| `SqlType.Decimal`（`decimal`） | `TEXT` | `numeric` | `DECIMAL(65,30)` | `decimal(38,18)` |
+| `SqlType.String`（`string`） | `TEXT` | `text` | `CHAR` | `nvarchar(max)` |
+| `SqlType.DateTime`（`DateTime`） | `TEXT` | `timestamp` | `DATETIME(6)` | `datetime2` |
+| `SqlType.DateOnly`（`DateOnly`） | `TEXT` | `date` | `DATE` | `date` |
 
-これ以外の型への `Cast` はない（MySQL の `CAST` が受け付ける型が限られるため）。結果の型は、引数が NULL を許せば `TTarget?`、許さなければ `TTarget` である。
+これ以外の型への `Cast` は書けない（MySQL の `CAST` が受け付ける型が限られるため）。結果は常に NULL を許す型である。変換に失敗したときの結果（NULL かエラーか）が方言によって違い、引数の NULL 可否からは決まらないためである。
 
 ### 4.4 NULL の扱い
 
@@ -633,7 +635,7 @@ await db.Update(User.Table)
 // UPDATE "users" SET "Name" = @p0, "Age" = ("users"."Age" + @p1) WHERE "users"."Id" = @p2
 ```
 
-- `Set(column, value)` の `column` は `Column<T>` に限る。`ReadOnlyColumn<T>`、NULL 化した列、式には代入できない（CS1503）。値は `T` か `Expr<T, PerRow>` である。
+- `Set(column, value)` の `column` は `Column<T>` に限る。`ReadOnlyColumn<T>`、NULL 化した列、式には代入できない（CS1503）。値は `T` か `IExpr<T, PerRow>` である。
 - `SET` の代入先の列名は修飾しない（PostgreSQL が受け付けないため）。それ以外の列の参照は §5.2 のとおり修飾する。
 - 代入の一覧が空のとき、または同じ列に二度代入したときは、文を作るときに `ArgumentException` になる（§14.3）。
 - `Set` の後は `Where(…)` か `AllRows()` のどちらかを書く。どちらもなければ `ExecuteAsync` が存在しない（CS1061）。`AllRows()` は SQL に何も足さない。
@@ -722,8 +724,8 @@ API で書けない式は、補間文字列で書く。
 | 関数 | 結果 |
 | --- | --- |
 | `Raw(sql)` | `Condition<PerRow>` |
-| `Raw<T>(sql)` | `Expr<T, PerRow>` |
-| `RawAggregate<T>(sql)` / `RawHaving(sql)` | `Expr<T, PerGroup>` / `Condition<PerGroup>` |
+| `Raw<T>(sql)` | `IExpr<T, PerRow>` |
+| `RawAggregate<T>(sql)` / `RawHaving(sql)` | `IExpr<T, PerGroup>` / `Condition<PerGroup>` |
 
 引数は `SqlInterpolatedStringHandler`（補間文字列ハンドラー）で受け取る。
 

@@ -63,3 +63,9 @@
 - **Decision**: 被演算子をかっこで囲まず、被演算子には `ORDER BY` / `LIMIT` を書けないようにする（§5.10）。
 - **Reason**: SQLite は被演算子のかっこを受け付けず、`ORDER BY` / `LIMIT` は複合 SELECT 全体の末尾にしか書けない。SQL Server も末尾にしか書けない。
 - **Rejected**: 被演算子をかっこで囲み、それぞれに `ORDER BY` / `LIMIT` を許す案。SQLite と SQL Server で動かない。
+
+## D1-11 式の型をクラスにするか、共変のインターフェースにするか
+
+- **Decision**: 式と射影の型は `T` について共変のインターフェース（`IExpr<out T, TLevel>`、`IProjection<out T, TLevel>`）にする。外部での実装は `internal` のメンバーで防ぐ（§4.1）。
+- **Reason**: 参照型の NULL 可否は注釈だけの違いなので、クラスの型引数としては不変になる。`string?` の列と `string` の列を比べると、利用者のコードで CS8620 が出る。警告をエラーにしている利用者のビルドは通らない。試作で、クラスでは 8 件の CS8620、共変のインターフェースでは 0 件だった（Issue #5）。
+- **Rejected**: 抽象クラス `Expr<T, TLevel>` を公開の型にする案。
