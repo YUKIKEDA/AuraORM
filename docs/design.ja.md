@@ -757,7 +757,7 @@ API で書けない式は、補間文字列で書く。
 List<UserOrderTotal> rows = await db.QueryAsync<UserOrderTotal>(
     $"SELECT u.Name, SUM(o.Amount) AS Total FROM users u JOIN orders o ON o.UserId = u.Id GROUP BY u.Name");
 
-long count = await db.QueryScalarAsync<long>($"SELECT COUNT(*) FROM users WHERE Age > {minAge}");
+long count = await db.QueryScalarAsync<long>($"SELECT {Count()} FROM users WHERE Age > {minAge}");
 int affected = await db.ExecuteAsync($"UPDATE users SET Name = {name} WHERE Id = {id}");
 ```
 
@@ -766,6 +766,7 @@ int affected = await db.ExecuteAsync($"UPDATE users SET Name = {name} WHERE Id =
 - `QueryScalarAsync<T>` は最初の行の最初の列を読む。行がなければ `InvalidOperationException` になる。`QueryScalarOrDefaultAsync<T>` は行がなければ `default` を返す。値型では、行がないことと値が `default` の行とを区別するには、NULL を許す型（`int?`）で読む。
 - 文は実行メソッドを呼んだときに組み立てる。そのときに見つかった誤り（§14.3 の検査）は、返す `Task` ではなく、呼び出しそのものが投げる。
 - 値の埋め込みの規則は §11.1 と同じである。
+- 生 SQL の結果の列は、読む型と同じ SQL の型でなければならない。AuraORM は型付きの取得メソッドで読み、整数を広げて読むこともしない（予測できる読み取りのため）。たとえば SQL Server の `COUNT(*)` は `int` なので `long` では読めず、`COUNT_BIG(*)` を書くか、上の例のように `Count()` を穴に書く（§4.2 の方言ごとの出力になる）。
 
 ## 12. 実行
 
@@ -990,7 +991,9 @@ CREATE TABLE "users" (
 | 結合 | 同じクエリを各データベースで実行し、結果を確かめる | SQLite はプロセス内。PostgreSQL、MySQL、MariaDB、SQL Server は CI のサービスコンテナ（ローカルは WSL コンテナ） |
 | NativeAOT | サンプルを発行して実行する | SQLite |
 
-- 結合テストは、各データベースの最小バージョン（§1.3）と最新版の両方で CI が回す。
+- 結合テストは、各サーバーの最小バージョン（§1.3）と最新版の両方で CI が回す。イメージのタグはメジャーバージョン（`postgres:18`、`2025-latest` など）で、マイナーとパッチは固定しない。最新版の変化をコードの変更なしに CI で確かめるためである。
+- SQLite は Microsoft.Data.Sqlite が組み込む版だけで確かめる。最小版（3.39）での検査は、最小版が理由になる構文（RETURNING）を足す行 M1 で足す。
+- 結合テストは、テストのプロセス（`net8.0` と `net10.0`）ごとに別のデータベース（`aura_net8`、`aura_net10`）を使う。`dotnet test` は二つのプロセスを同時に動かすためである。
 - §14.3 の各検査には、例外を確かめるテストがある。
 
 ## 18. フェーズ

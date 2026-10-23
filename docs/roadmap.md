@@ -20,7 +20,7 @@
 | Q2 | SELECT: JOIN と NULL 化、別名（§5.2、§5.3） | - | planned |
 | Q3 | SELECT: GROUP BY / HAVING、集計、評価の段階（§4.5、§5.5） | - | planned |
 | Q4 | SELECT: サブクエリ、集合演算、派生テーブル、CTE、`[QueryResult]` の型の `Columns`（§3.5、§5.10、§5.11） | - | planned |
-| M1 | INSERT / UPDATE / DELETE と RETURNING（§6〜§9） | - | planned |
+| M1 | INSERT / UPDATE / DELETE と RETURNING、SQLite の最小版（3.39）の結合テスト（§6〜§9、§17） | - | planned |
 | M2 | UPSERT（§10） | - | planned |
 | V1 | 値コンバーター（§3.6） | - | planned |
 | S1 | DDL（§13） | - | planned |

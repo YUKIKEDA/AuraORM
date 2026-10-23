@@ -208,6 +208,71 @@ public abstract class RawQueryTests<TDialect>
         Assert.Equal([Bob.Name, Alice.Name], rows.Select(r => r.Item1));
     }
 
+    /// <summary>
+    /// <c>IsDistinctFrom</c> and <c>IsNotDistinctFrom</c> are two-valued: when one side is null they are true or false, never
+    /// unknown, alone and under <c>Not</c>, on every dialect (design §4.2; SQL Server writes an expansion).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - People aged 30, null, and 5 (ids 1, 2, 3).
+    ///
+    /// Steps:
+    /// - Select the ids where the age is distinct from 30, not distinct from 30, distinct from null, not distinct from null,
+    ///   and the <c>Not</c> of the first two, each ordered by id.
+    ///
+    /// Expected:
+    /// - [2, 3], [1], [1, 3], [2], [1], [2, 3].
+    /// </remarks>
+    [Fact]
+    public async Task DistinctFrom_OneSideNull_IsTwoValued()
+    {
+        Database<TDialect> db = await Target.CreateDatabaseAsync();
+        await InsertAsync(db, Alice);
+        await InsertAsync(db, Bob);
+        await InsertAsync(db, Alice with { Id = 3, Age = 5 });
+        IExpr<int?, PerRow> age = Raw<int?>($"{Identifier("age")}");
+        int? none = null;
+
+        Assert.Equal([2L, 3L], await IdsAsync(db, IsDistinctFrom(age, 30)));
+        Assert.Equal([1L], await IdsAsync(db, IsNotDistinctFrom(age, 30)));
+        Assert.Equal([1L, 3L], await IdsAsync(db, IsDistinctFrom(age, none)));
+        Assert.Equal([2L], await IdsAsync(db, IsNotDistinctFrom(age, none)));
+        Assert.Equal([1L], await IdsAsync(db, Not(IsDistinctFrom(age, 30))));
+        Assert.Equal([2L, 3L], await IdsAsync(db, Not(IsNotDistinctFrom(age, 30))));
+    }
+
+    /// <summary>
+    /// <c>Like</c> with an escape character finds <c>%</c> as a plain character, with the escape character bound as a
+    /// parameter, on every dialect (design §4.2).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - People named <c>50%</c> and <c>500</c>.
+    ///
+    /// Steps:
+    /// - Select the ids whose name is like <c>50!%</c> with <c>!</c> as the escape character, and those not like it.
+    ///
+    /// Expected:
+    /// - Only the person named <c>50%</c>, then only the other.
+    /// </remarks>
+    [Fact]
+    public async Task Like_EscapeCharacter_MatchesWildcardAsText()
+    {
+        Database<TDialect> db = await Target.CreateDatabaseAsync();
+        await InsertAsync(db, Alice with { Id = 1, Name = "50%" });
+        await InsertAsync(db, Alice with { Id = 2, Name = "500" });
+        IExpr<string, PerRow> name = Raw<string>($"{Identifier("name")}");
+
+        Assert.Equal([1L], await IdsAsync(db, Like(name, "50!%", '!')));
+        Assert.Equal([2L], await IdsAsync(db, NotLike(name, "50!%", '!')));
+    }
+
+    private static async Task<List<long>> IdsAsync(Database<TDialect> db, Condition<PerRow> condition)
+    {
+        List<(long, int?)> rows = await db.QueryAsync<long, int?>($"SELECT id, age FROM {Person.Table} WHERE {condition} ORDER BY id", Ct);
+        return [.. rows.Select(r => r.Item1)];
+    }
+
     private static Task<int> InsertAsync(Database<TDialect> db, Person person) =>
         db.ExecuteAsync(
             $"INSERT INTO {Person.Table} (id, name, nickname, age, status, balance, birthday) VALUES ({person.Id}, {person.Name}, {person.Nickname}, {person.Age}, {person.Status}, {person.Balance}, {person.Birthday})",

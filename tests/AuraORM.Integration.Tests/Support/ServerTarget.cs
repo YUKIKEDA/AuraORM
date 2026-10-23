@@ -5,7 +5,8 @@ namespace AuraORM.Integration.Tests;
 /// <summary>
 /// A database server whose connection string comes from an environment variable (<c>tools/databases.json</c>,
 /// <c>.cursor/rules/containers.mdc</c>). Each test gets an empty <c>people</c> table; the test classes of one server share an
-/// xUnit collection, so they run one at a time.
+/// xUnit collection, so they run one at a time. The same holds for <c>typed_values</c>. The table lives in a database of this test process (<see cref="DatabaseName"/>),
+/// so the <c>net8.0</c> and <c>net10.0</c> test processes, which <c>dotnet test</c> runs at the same time, do not share it.
 /// </summary>
 /// <typeparam name="TDialect">The dialect.</typeparam>
 public abstract class ServerTarget<TDialect> : ITestTarget<TDialect>
@@ -20,15 +21,20 @@ public abstract class ServerTarget<TDialect> : ITestTarget<TDialect>
     protected abstract string Name { get; }
 
     /// <summary>
-    /// Gets the statements that drop and create the <c>people</c> table, in the server's own DDL.
+    /// Gets the statements that drop and create the <c>people</c> and <c>typed_values</c> tables, in the server's own DDL.
     /// </summary>
-    protected abstract IReadOnlyList<string> ResetPeople { get; }
+    protected abstract IReadOnlyList<string> ResetTables { get; }
+
+    /// <summary>
+    /// Gets the name of the database that this test process uses: <c>aura_net8</c> under .NET 8, <c>aura_net10</c> under .NET 10.
+    /// </summary>
+    protected static string DatabaseName { get; } = "aura_net" + Environment.Version.Major.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     public async Task<Database<TDialect>> CreateDatabaseAsync()
     {
         _dataSource ??= await CreateDataSourceAsync(ConnectionString());
         await using DbConnection connection = await _dataSource.OpenConnectionAsync();
-        foreach (string statement in ResetPeople)
+        foreach (string statement in ResetTables)
         {
             await using DbCommand command = connection.CreateCommand();
             command.CommandText = statement;
@@ -49,7 +55,7 @@ public abstract class ServerTarget<TDialect> : ITestTarget<TDialect>
     }
 
     /// <summary>
-    /// Creates the data source, after any setup the server needs (a database to create).
+    /// Creates the data source on <see cref="DatabaseName"/>, after creating that database if it does not exist.
     /// </summary>
     /// <param name="connectionString">The connection string from the environment.</param>
     /// <returns>The data source.</returns>

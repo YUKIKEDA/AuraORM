@@ -22,14 +22,25 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
+# Write-Error would throw under ErrorActionPreference=Stop before the exit, and lose the exit code.
+function Stop-Script([string] $message, [int] $code) {
+    [Console]::Error.WriteLine($message)
+    exit $code
+}
+
 # wslc.exe ships with WSL 2.9.3 or later; it is not always on PATH.
 $wslc = Join-Path $env:ProgramFiles "WSL\wslc.exe"
 if (-not (Test-Path $wslc)) {
-    Write-Error "wslc.exe was not found at $wslc. Update WSL (wsl --update) to 2.9.3 or later."
-    exit 1
+    Stop-Script "wslc.exe was not found at $wslc. Update WSL (wsl --update) to 2.9.3 or later." 1
 }
 
 $config = Get-Content tools/databases.json -Raw | ConvertFrom-Json
+$known = @($config.databases | ForEach-Object { $_.name })
+$unknown = @($Only | Where-Object { $known -notcontains $_ })
+if ($unknown.Count -gt 0) {
+    Stop-Script "Unknown database in -Only: $($unknown -join ', '). Known: $($known -join ', ')." 1
+}
+
 $selected = @($config.databases | Where-Object { $Only.Count -eq 0 -or $Only -contains $_.name })
 
 function ContainerName($database) { "aura-test-$($database.name)" }
@@ -61,8 +72,7 @@ function Start-Database($database) {
     Write-Host "==> Starting $name ($($database.image):$tag) on port $($database.localPort)"
     & $wslc @arguments | Out-Null
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "wslc run failed for $name with exit code $LASTEXITCODE."
-        exit $LASTEXITCODE
+        Stop-Script "wslc run failed for $name with exit code $LASTEXITCODE." $LASTEXITCODE
     }
 
     # Wait for the database's own health check, at most three minutes.
@@ -75,8 +85,7 @@ function Start-Database($database) {
         }
 
         if ((Get-Date) -gt $deadline) {
-            Write-Error "$name did not become healthy in three minutes. See: $wslc container logs $name"
-            exit 1
+            Stop-Script "$name did not become healthy in three minutes. See: $wslc container logs $name" 1
         }
 
         Start-Sleep -Seconds 2
@@ -108,8 +117,7 @@ switch ($Command) {
     "test" {
         $running = @($selected | Where-Object { IsRunning $_ })
         if ($running.Count -eq 0) {
-            Write-Error "No database is running. Start them with: ./tools/db.ps1 up"
-            exit 1
+            Stop-Script "No database is running. Start them with: ./tools/db.ps1 up" 1
         }
 
         foreach ($database in $running) {

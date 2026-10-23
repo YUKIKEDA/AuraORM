@@ -68,7 +68,8 @@ jobs:
           done
 
   # Each database job runs the integration tests against a service container, at the minimum and the latest version
-  # (docs/design.ja.md §17). AURA_TEST_REQUIRE makes a skipped test of that database fail the job.
+  # (docs/design.ja.md §17). AURA_TEST_REQUIRE makes a skipped test of that database fail the job. The image, environment,
+  # and health check of each service repeat tools/databases.json: change both in the same PR (.cursor/rules/containers.mdc).
   integration-postgresql:
     name: integration (postgresql ${{ matrix.version }})
     needs: plan

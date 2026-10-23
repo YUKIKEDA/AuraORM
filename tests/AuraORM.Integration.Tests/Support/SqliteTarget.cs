@@ -19,6 +19,28 @@ public sealed class SqliteTarget : ITestTarget<SqliteDialect>
         )
         """;
 
+    public const string CreateTypedValues = """
+        CREATE TABLE typed_values (
+          id INTEGER PRIMARY KEY,
+          flag_value INTEGER,
+          tiny_value INTEGER,
+          small_value INTEGER,
+          number_value INTEGER,
+          big_value INTEGER,
+          single_value REAL,
+          double_value REAL,
+          money_value TEXT,
+          text_value TEXT,
+          blob_value BLOB,
+          key_value TEXT,
+          at_value TEXT,
+          at_offset_value TEXT,
+          day_value TEXT,
+          time_value TEXT,
+          state_value INTEGER
+        )
+        """;
+
     private readonly List<SqliteConnection> _connections = [];
 
     public async Task<Database<SqliteDialect>> CreateDatabaseAsync()
@@ -26,9 +48,10 @@ public sealed class SqliteTarget : ITestTarget<SqliteDialect>
         var connection = new SqliteConnection("Data Source=:memory:");
         _connections.Add(connection);
         await connection.OpenAsync();
-        await using (SqliteCommand create = connection.CreateCommand())
+        foreach (string ddl in (string[])[CreatePeople, CreateTypedValues])
         {
-            create.CommandText = CreatePeople;
+            await using SqliteCommand create = connection.CreateCommand();
+            create.CommandText = ddl;
             await create.ExecuteNonQueryAsync();
         }
 
