@@ -8,6 +8,19 @@ internal sealed class SelectNode(SelectState state) : SqlNode
 {
     public override void Render(SqlRenderContext context)
     {
+        var tables = new TableAlias[state.Sources.Length];
+        for (int i = 0; i < tables.Length; i++)
+        {
+            tables[i] = state.Sources[i].Table;
+        }
+
+        context.EnterScope(tables);
+        RenderClauses(context);
+        context.ExitScope();
+    }
+
+    private void RenderClauses(SqlRenderContext context)
+    {
         context.Write(state.Distinct ? "SELECT DISTINCT " : "SELECT ");
         context.WriteList(state.Items);
         context.Write(" FROM ");

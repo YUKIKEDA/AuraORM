@@ -36,6 +36,9 @@ internal sealed class SqlServerRenderer : DialectRenderer
             _ => "date",
         };
 
+    // §5.9: FETCH NEXT 0 ROWS fails (message 10744), so Limit(0) is rejected before the statement is sent (§14.3).
+    public override int MinimumRowLimit => 1;
+
     // §5.9: OFFSET … FETCH, which needs ORDER BY; the builder offers a limit on SQL Server only after OrderBy.
     public override void RenderLimitOffset(SqlRenderContext context, ParameterNode? limit, ParameterNode? offset)
     {

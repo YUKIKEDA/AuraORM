@@ -11,6 +11,7 @@ internal sealed class ColumnNode(TableAlias table, string name) : SqlNode
 
     public override void Render(SqlRenderContext context)
     {
+        context.CheckInScope(Table, Name);
         if (!context.UnqualifiedColumns)
         {
             context.WriteIdentifier(Table.Reference);

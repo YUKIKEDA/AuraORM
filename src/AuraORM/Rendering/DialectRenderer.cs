@@ -139,6 +139,12 @@ internal abstract class DialectRenderer
     }
 
     /// <summary>
+    /// Gets the smallest row limit that the dialect accepts (§5.9, §14.3): 0, or 1 on SQL Server, whose
+    /// <c>FETCH NEXT n ROWS</c> needs at least one row.
+    /// </summary>
+    public virtual int MinimumRowLimit => 0;
+
+    /// <summary>
     /// Writes the row limit and the offset of a SELECT (§5.9). The default is <c>LIMIT n OFFSET m</c>; the builder lets only
     /// the dialects that accept it write an offset without a limit.
     /// </summary>

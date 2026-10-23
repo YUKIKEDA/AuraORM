@@ -10,6 +10,7 @@ public sealed class PostgreSqlDialect
         IDeleteReturningDialect,
         IUnorderedLimitDialect,
         IOffsetWithoutLimitDialect,
+        IUnorderedOffsetDialect,
         IOnConflictDialect,
         ICreateTableIfNotExistsDialect,
         ICreateIndexIfNotExistsDialect

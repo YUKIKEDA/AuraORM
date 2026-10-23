@@ -314,6 +314,100 @@ public sealed class SelectRenderingTests
         Assert.Throws<ArgumentException>(() => projected.OrderBy(a => []));
     }
 
+    /// <summary>
+    /// <c>Limit(0)</c> is rejected on SQL Server before any SQL is written, because <c>FETCH NEXT 0 ROWS</c> fails there; the
+    /// other dialects write <c>LIMIT 0</c> (design §5.9, §14.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - An ordered statement on SQL Server and on SQLite.
+    ///
+    /// Steps:
+    /// - Call <c>Limit(0)</c> on each.
+    ///
+    /// Expected:
+    /// - SQL Server: <see cref="ArgumentOutOfRangeException"/>. SQLite: <c>LIMIT @p0</c> with the parameter 0.
+    /// </remarks>
+    [Fact]
+    public void Limit_ZeroOnSqlServer_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Db<SqlServerDialect>().From(Account.Table).Select(a => a.Id).OrderBy(a => [Asc(a.Id)]).Limit(0)
+        );
+
+        SqlAssert.Compare(
+            "SQLite",
+            "SELECT \"accounts\".\"id\" FROM \"accounts\" ORDER BY \"accounts\".\"id\" ASC LIMIT @p0",
+            Db<SqliteDialect>().From(Account.Table).Select(a => a.Id).OrderBy(a => [Asc(a.Id)]).Limit(0).ToSql(),
+            0
+        );
+    }
+
+    /// <summary>
+    /// A column taken out of the lambda of one query and used in a query of another table is rejected when the statement is
+    /// built, not sent as SQL that names a table outside <c>FROM</c> (design §14.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The <c>Id</c> column of <see cref="Account"/>, kept in a variable from the lambda of a query on accounts.
+    ///
+    /// Steps:
+    /// - Use it in the projection of a query on <see cref="Membership"/>, then in its <c>WHERE</c>.
+    ///
+    /// Expected:
+    /// - <see cref="InvalidOperationException"/> from <c>ToSql()</c> in both, naming the column.
+    /// </remarks>
+    [Fact]
+    public void ToSql_ColumnOfAnotherQuery_Throws()
+    {
+        ReadOnlyColumn<long>? leaked = null;
+        _ = Db<SqliteDialect>()
+            .From(Account.Table)
+            .Select(a =>
+            {
+                leaked = a.Id;
+                return a.Id;
+            })
+            .ToSql();
+
+        var inSelect = Assert.Throws<InvalidOperationException>(() => Db<SqliteDialect>().From(Membership.Table).Select(m => leaked!).ToSql());
+        var inWhere = Assert.Throws<InvalidOperationException>(() =>
+            Db<SqliteDialect>().From(Membership.Table).Where(m => Eq(leaked!, 1L)).Select(m => m.Role).ToSql()
+        );
+
+        Assert.Contains("accounts.id", inSelect.Message, StringComparison.Ordinal);
+        Assert.Contains("accounts.id", inWhere.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// <c>FirstAsync</c> reads one row and cancels the command before it closes the reader when rows are left;
+    /// <c>ToListAsync</c> reads every row and does not cancel (design §12.2).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - A fake connection that returns three rows.
+    ///
+    /// Steps:
+    /// - Run the same statement with <c>FirstAsync</c> and with <c>ToListAsync</c>.
+    ///
+    /// Expected:
+    /// - 1 and [1, 2, 3]; <c>Cancel</c> called once for the first command, never for the second.
+    /// </remarks>
+    [Fact]
+    public async Task FirstAsync_RowsLeft_CancelsBeforeClosing()
+    {
+        var connection = new FakeConnection { Rows = [1L, 2L, 3L] };
+        SelectProjected<SqliteDialect, long, PerRow, Account.Columns> query = new Database<SqliteDialect>(connection)
+            .From(Account.Table)
+            .Select(a => a.Id);
+        CancellationToken ct = TestContext.Current.CancellationToken;
+
+        Assert.Equal(1L, await query.FirstAsync(ct));
+        Assert.Equal([1L, 2L, 3L], await query.ToListAsync(ct));
+
+        Assert.Equal([1, 0], connection.Commands.Select(c => c.CancelCount));
+    }
+
     private static Database<TDialect> Db<TDialect>()
         where TDialect : IDialect => new(new FakeConnection());
 

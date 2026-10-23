@@ -46,8 +46,9 @@ public abstract class SelectQuery<TDialect, TResult>
         Executor.StreamAsync(Session, ToSql(), Factory, cancellationToken);
 
     /// <summary>
-    /// Runs the statement and returns the first row. No <c>LIMIT</c> is added; the reader is closed after the first row
-    /// (<c>docs/design.ja.md</c> §12.2).
+    /// Runs the statement and returns the first row. No <c>LIMIT</c> is added; the reader is closed after the first row, and
+    /// the command is cancelled first when rows are left, so that the provider does not read them to the end
+    /// (<c>docs/design.ja.md</c> §12.2). Write <c>Limit(1)</c> to have the database stop after one row.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The first row.</returns>
@@ -64,6 +65,8 @@ public abstract class SelectQuery<TDialect, TResult>
 
     /// <summary>
     /// Runs the statement and returns the first row, or <see langword="default"/> when there is none. No <c>LIMIT</c> is added.
+    /// For a value type (<see cref="long"/>, a tuple), no row and a row of default values give the same result; use
+    /// <see cref="FirstAsync"/>, or read a nullable type, to tell them apart.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The first row, or <see langword="default"/>.</returns>
@@ -91,6 +94,8 @@ public abstract class SelectQuery<TDialect, TResult>
 
     /// <summary>
     /// Runs the statement and returns its only row, or <see langword="default"/> when there is none. No <c>LIMIT</c> is added.
+    /// For a value type, no row and a row of default values give the same result; use <see cref="SingleAsync"/>, or read a
+    /// nullable type, to tell them apart.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The only row, or <see langword="default"/>.</returns>

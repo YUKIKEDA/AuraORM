@@ -63,7 +63,7 @@ public sealed class SelectTypingTests
 
     /// <summary>
     /// A limit or an offset that a dialect does not accept in that place does not compile; the library never adds
-    /// <c>ORDER BY</c> or a limit for it (design §5.9, D1-8).
+    /// <c>ORDER BY</c> or a limit for it (design §5.9, D1-12).
     /// </summary>
     /// <remarks>
     /// Preconditions:

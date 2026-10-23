@@ -15,7 +15,7 @@ public abstract class SelectProjection<TDialect, TResult, TLevel> : SelectQuery<
         : base(session, state, factory) { }
 
     internal SelectLimited<TDialect, TResult> LimitCore(int count) =>
-        new(Session, State with { Limit = SelectState.RowCount(count, nameof(count)) }, Factory);
+        new(Session, State with { Limit = SelectState.RowLimit<TDialect>(count, nameof(count)) }, Factory);
 
     internal SelectOffset<TDialect, TResult> OffsetCore(int count) =>
         new(Session, State with { Offset = SelectState.RowCount(count, nameof(count)) }, Factory);

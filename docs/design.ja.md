@@ -579,6 +579,7 @@ db.From(Order.Table)
 - SQL Server の `OFFSET … FETCH` は `ORDER BY` が必要なので、`OrderBy` のない `Limit` は SQL Server では書けない（`IUnorderedLimitDialect` を持たない）。ライブラリが `ORDER BY` を補うことはしない。
 - SQLite と MySQL の `OFFSET` は `LIMIT` が必要なので、`Limit` のない `Offset` は書けない（`IOffsetWithoutLimitDialect` を持たない）。
 - `OrderBy` のない、`Limit` のない `Offset` は PostgreSQL だけが書ける（`IUnorderedOffsetDialect`）。SQL Server の `OFFSET` は `ORDER BY` の一部だからである。
+- SQL Server の `FETCH` の行数は 1 以上でなければならないので、SQL Server の `Limit(0)` は呼んだときに `ArgumentOutOfRangeException` になる（§14.3）。値で決まるので型では止められない。ほかの方言は `LIMIT 0` を出し、行を返さない。
 - SQL Server の `Limit(n).Offset(m)` では `OFFSET` が先に現れるので、`m` が `@p0`、`n` が `@p1` になる。パラメータの番号は SQL の文字列に現れる順である（§5.12）。
 
 ### 5.10 集合演算
@@ -936,6 +937,7 @@ CREATE TABLE "users" (
 | SQL Server の複数行の INSERT が 1000 行を超えた（§6.2） | `ArgumentException` |
 | 生のクエリで、結果の型のメンバーに対応する列がない、または二つ以上ある（§11.3） | `InvalidOperationException` |
 | `Limit` / `Offset` に負の値を渡した | `ArgumentOutOfRangeException` |
+| SQL Server で `Limit(0)` を書いた（§5.9。`FETCH NEXT 0 ROWS` はメッセージ 10744 で失敗する） | `ArgumentOutOfRangeException` |
 | `OrderBy` に空の配列を返した（§5.8） | `ArgumentException` |
 
 ## 15. 診断 ID

@@ -50,6 +50,21 @@ internal sealed record SelectState(
         };
     }
 
+    public static ParameterNode RowLimit<TDialect>(int value, string paramName)
+        where TDialect : IDialect
+    {
+        int minimum = DialectRenderer.For<TDialect>().MinimumRowLimit;
+        if (value < minimum)
+        {
+            ThrowHelper.ThrowArgumentOutOfRange(
+                paramName,
+                minimum == 0 ? "The number of rows cannot be negative." : "SQL Server's FETCH needs a limit of at least one row."
+            );
+        }
+
+        return new ParameterNode<int>(value);
+    }
+
     public static ParameterNode RowCount(int value, string paramName)
     {
         if (value < 0)

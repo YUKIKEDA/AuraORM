@@ -26,11 +26,10 @@ public static class SelectExtensions
     }
 
     /// <summary>
-    /// Skips rows without a limit: <c>OFFSET m</c> on PostgreSQL, <c>OFFSET m ROWS</c> on SQL Server (which needs
-    /// <c>ORDER BY</c>, so only after <c>OrderBy</c>). SQLite and MySQL need a limit for an offset, so they have no such
-    /// method.
+    /// Skips rows with neither <c>ORDER BY</c> nor a limit: <c>OFFSET m</c>. Only PostgreSQL accepts it: SQL Server's
+    /// <c>OFFSET</c> is part of <c>ORDER BY</c>, and SQLite and MySQL need a limit for an offset.
     /// </summary>
-    /// <typeparam name="TDialect">A dialect that accepts an offset without a limit.</typeparam>
+    /// <typeparam name="TDialect">A dialect that accepts an offset with neither <c>ORDER BY</c> nor a limit.</typeparam>
     /// <typeparam name="TResult">The type that each row is read as.</typeparam>
     /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
     /// <param name="query">The statement whose rows to skip.</param>
@@ -38,14 +37,23 @@ public static class SelectExtensions
     /// <returns>The statement.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is negative.</exception>
     public static SelectOffset<TDialect, TResult> Offset<TDialect, TResult, TLevel>(this SelectProjection<TDialect, TResult, TLevel> query, int count)
-        where TDialect : IOffsetWithoutLimitDialect, IUnorderedLimitDialect
+        where TDialect : IUnorderedOffsetDialect
         where TLevel : EvaluationLevel
     {
         ArgumentNullException.ThrowIfNull(query);
         return query.OffsetCore(count);
     }
 
-    /// <inheritdoc cref="Offset{TDialect, TResult, TLevel}(SelectProjection{TDialect, TResult, TLevel}, int)"/>
+    /// <summary>
+    /// Skips rows after <c>ORDER BY</c> without a limit: <c>OFFSET m</c> on PostgreSQL, <c>OFFSET m ROWS</c> on SQL Server.
+    /// SQLite and MySQL need a limit for an offset, so they have no such method.
+    /// </summary>
+    /// <typeparam name="TDialect">A dialect that accepts an offset after <c>ORDER BY</c> without a limit.</typeparam>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <param name="query">The statement whose rows to skip.</param>
+    /// <param name="count">The number of rows to skip. It is a parameter.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is negative.</exception>
     public static SelectOffset<TDialect, TResult> Offset<TDialect, TResult>(this SelectOrdered<TDialect, TResult> query, int count)
         where TDialect : IOffsetWithoutLimitDialect
     {

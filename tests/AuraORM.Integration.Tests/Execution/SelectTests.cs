@@ -148,7 +148,7 @@ public abstract class SelectTests<TDialect>
 
     /// <summary>
     /// <c>First</c> reads the first row of an unlimited result; <c>Single</c> throws for more than one row; the
-    /// <c>OrDefault</c> forms return the default for no row (design D1-10).
+    /// <c>OrDefault</c> forms return the default for no row (design §12.2, D1-7).
     /// </summary>
     /// <remarks>
     /// Preconditions:
@@ -200,6 +200,62 @@ public abstract class SelectTests<TDialect>
         }
 
         Assert.Equal(["Dave", "Carol", "Bob", "Alice"], names);
+    }
+
+    /// <summary>
+    /// <c>Limit(0)</c> returns no row where the dialect accepts <c>LIMIT 0</c>, and throws before the statement is sent on SQL
+    /// Server, whose <c>FETCH NEXT 0 ROWS</c> fails (design §5.9, §14.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The four people.
+    ///
+    /// Steps:
+    /// - Select the ids ordered by id with <c>Limit(0)</c>.
+    ///
+    /// Expected:
+    /// - An empty list, or <see cref="ArgumentOutOfRangeException"/> on SQL Server.
+    /// </remarks>
+    [Fact]
+    public async Task Limit_Zero_ReturnsNoRowOrThrowsOnSqlServer()
+    {
+        Database<TDialect> db = await SeedAsync();
+        SelectOrdered<TDialect, long> ordered = db.From(Person.Table).Select(p => p.Id).OrderBy(p => [Asc(p.Id)]);
+
+        if (typeof(TDialect) == typeof(SqlServerDialect))
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => ordered.Limit(0));
+        }
+        else
+        {
+            Assert.Empty(await ordered.Limit(0).ToListAsync(Ct));
+        }
+    }
+
+    /// <summary>
+    /// After <c>FirstAsync</c> stops reading a result with rows left (and cancels the command), the database runs the next
+    /// statement normally (design §12.2).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The four people.
+    ///
+    /// Steps:
+    /// - Read the first id of all people, then count the people, on the same database.
+    ///
+    /// Expected:
+    /// - 1, then 4.
+    /// </remarks>
+    [Fact]
+    public async Task FirstAsync_ThenAnotherStatement_Runs()
+    {
+        Database<TDialect> db = await SeedAsync();
+
+        long first = await db.From(Person.Table).Select(p => p.Id).OrderBy(p => [Asc(p.Id)]).FirstAsync(Ct);
+        long count = await db.From(Person.Table).Select(p => Count()).SingleAsync(Ct);
+
+        Assert.Equal(1L, first);
+        Assert.Equal(4L, count);
     }
 
     private async Task<Database<TDialect>> SeedAsync()

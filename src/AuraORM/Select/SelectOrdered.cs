@@ -17,9 +17,10 @@ public sealed class SelectOrdered<TDialect, TResult> : SelectQuery<TDialect, TRe
     /// </summary>
     /// <param name="count">The largest number of rows.</param>
     /// <returns>The statement.</returns>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is negative.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is negative, or 0 on SQL Server, whose
+    /// <c>FETCH</c> needs at least one row.</exception>
     public SelectLimited<TDialect, TResult> Limit(int count) =>
-        new(Session, State with { Limit = SelectState.RowCount(count, nameof(count)) }, Factory);
+        new(Session, State with { Limit = SelectState.RowLimit<TDialect>(count, nameof(count)) }, Factory);
 
     internal SelectOffset<TDialect, TResult> OffsetCore(int count) =>
         new(Session, State with { Offset = SelectState.RowCount(count, nameof(count)) }, Factory);

@@ -26,9 +26,14 @@ public interface IDeleteReturningDialect : IDialect;
 public interface IUnorderedLimitDialect : IDialect;
 
 /// <summary>
-/// A dialect that accepts <c>OFFSET</c> without a row limit.
+/// A dialect that accepts <c>OFFSET</c> after <c>ORDER BY</c> without a row limit.
 /// </summary>
 public interface IOffsetWithoutLimitDialect : IDialect;
+
+/// <summary>
+/// A dialect that accepts <c>OFFSET</c> with neither <c>ORDER BY</c> nor a row limit.
+/// </summary>
+public interface IUnorderedOffsetDialect : IDialect;
 
 /// <summary>
 /// A dialect with <c>INSERT … ON CONFLICT</c>.

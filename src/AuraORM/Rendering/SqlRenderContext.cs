@@ -6,6 +6,7 @@ namespace AuraORM;
 internal sealed class SqlRenderContext : IDisposable
 {
     private readonly List<SqlStatementParameter> _parameters = [];
+    private readonly List<IReadOnlyList<TableAlias>> _scopes = [];
 
     public SqlRenderContext(DialectRenderer dialect)
     {
@@ -34,6 +35,51 @@ internal sealed class SqlRenderContext : IDisposable
     /// <c>RETURNING</c>).
     /// </summary>
     public bool UnqualifiedColumns { get; set; }
+
+    /// <summary>
+    /// Enters the <c>FROM</c> of a statement: until <see cref="ExitScope"/>, a column must belong to one of these tables or
+    /// to a table of an enclosing statement (§14.3).
+    /// </summary>
+    /// <param name="tables">The tables of the statement.</param>
+    public void EnterScope(IReadOnlyList<TableAlias> tables) => _scopes.Add(tables);
+
+    /// <summary>
+    /// Leaves the scope that <see cref="EnterScope"/> entered last.
+    /// </summary>
+    public void ExitScope() => _scopes.RemoveAt(_scopes.Count - 1);
+
+    /// <summary>
+    /// Throws when a column of a table that no enclosing statement has in its <c>FROM</c> is written: a column taken out of
+    /// the lambda of another query (§14.3). Outside any scope (raw SQL), nothing is checked.
+    /// </summary>
+    /// <param name="table">The table of the column.</param>
+    /// <param name="column">The name of the column.</param>
+    public void CheckInScope(TableAlias table, string column)
+    {
+        if (_scopes.Count == 0)
+        {
+            return;
+        }
+
+        foreach (IReadOnlyList<TableAlias> scope in _scopes)
+        {
+            foreach (TableAlias candidate in scope)
+            {
+                if (candidate.Reference == table.Reference)
+                {
+                    return;
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            "The column "
+                + table.Reference
+                + "."
+                + column
+                + " belongs to a table that is not in this statement's FROM. A column can be used only inside the lambdas of the statement that it came from."
+        );
+    }
 
     public void Write(string sql) => Writer.Append(sql);
 
