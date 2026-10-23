@@ -16,7 +16,9 @@ AuraORM is used from NativeAOT applications. The runtime library and every line 
 
 ## The check
 
-CI publishes the NativeAOT sample (`samples/AuraORM.Samples.Sqlite`) for every PR on Linux and Windows, with `-warnaserror`, and runs it against SQLite. A row that adds public API exercises it in the sample. The job fails on any trim or AOT warning and on a failed run. A PR that changes the public surface, a dependency, or generated code reports the warning count (zero) and the executable size under `## Verification`.
+CI publishes the NativeAOT sample (`samples/AuraORM.Samples.Sqlite`) for every PR on Linux (x64), Windows (x64), and macOS (arm64), for `net8.0` and `net10.0` (a newer ILC can warn where an older one does not), with `-warnaserror`, and runs it against SQLite. A row that adds public API exercises it in the sample, every reading path included (each column type, nulls, result types). The job fails on any trim or AOT warning and on a failed run. A PR that changes the public surface, a dependency, or generated code reports the warning count (zero) and the executable size under `## Verification`; the job summary shows the size next to main's last size.
+
+`-warnaserror` also fails the publish on a warning that only the ILC or ILLink stage reports, which the build's analyzers do not see (a trim warning inside a referenced library). This was checked once with a library that calls `Type.GetType(string)`: the build passed, and the clean publish failed with IL2057.
 
 Locally:
 
@@ -25,5 +27,7 @@ $env:PATH += ';C:\Program Files (x86)\Microsoft Visual Studio\Installer'
 dotnet publish samples/<Sample> -c Release -r win-x64 -o <scratch>
 <scratch>/<Sample>.exe
 ```
+
+A second publish into the same output reuses the ILC result and does not report its warnings again, so a local check after a change starts from a clean `obj/` (CI always does).
 
 A size that grew is split by what added it before the PR says so: publish with `-p:IlcGenerateMapFile=true` and compare the map files.

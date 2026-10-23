@@ -978,7 +978,7 @@ CREATE TABLE "users" (
 ### 16.3 NativeAOT
 
 - ランタイムのライブラリは `IsAotCompatible` で、トリミングと AOT の警告はビルドのエラーになる。
-- CI は、SQLite を使うサンプル（`samples/`）を NativeAOT で発行して実行する。警告が一つでもあれば失敗する。
+- CI は、SQLite を使うサンプル（`samples/`）を `net8.0` と `net10.0` の NativeAOT で、Linux・Windows・macOS で発行して実行する。警告が一つでもあれば失敗する。ILC の段階だけが出す警告（参照するライブラリの中のトリムの警告など）でも失敗することを確かめた。
 - ほかの方言の NativeAOT の対応はプロバイダーに依存する（§12.6）。
 
 ## 17. テストの層
