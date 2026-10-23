@@ -24,6 +24,7 @@ public sealed partial record Account(
     [Default(0)] int LoginCount
 )
 {
+    [Precision(18, 2)]
     public decimal? Balance { get; init; }
 }
 

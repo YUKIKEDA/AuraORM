@@ -25,7 +25,7 @@
 | V1 | 値コンバーター（§3.6） | - | planned |
 | S1 | DDL（§13） | - | planned |
 | P1 | ベンチマークと性能の目標（§16.1） | - | planned |
-| R1 | リリースの仕組み: NuGet の Trusted Publishing、パッケージの検査、README のサンプルの検査 | - | planned |
+| R1 | リリースの仕組み: NuGet の Trusted Publishing、パッケージの検査（ジェネレーターが `analyzers/dotnet/cs` に入り、依存が空であること。NativeAOT のサンプルをパックしたパッケージで参照する）、README のサンプルの検査 | - | planned |
 
 ## v0.1 の後
 

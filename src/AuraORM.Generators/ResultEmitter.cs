@@ -28,9 +28,20 @@ internal static class ResultEmitter
         foreach (MemberModel member in result.Members)
         {
             w.Line("/// <summary>");
-            w.Line("/// Gets the projection of <see cref=\"" + type + "." + member.MemberName + "\"/>.");
+            w.Line("/// Gets the projection of <see cref=\"" + type + "." + GeneratedNames.Id(member.MemberName) + "\"/>.");
             w.Line("/// </summary>");
-            w.Line("public required " + Lib + "IProjection<" + member.TypeName + ", " + Lib + level + "> " + member.MemberName + " { get; init; }");
+            w.Line(
+                "public required "
+                    + Lib
+                    + "IProjection<"
+                    + member.TypeName
+                    + ", "
+                    + Lib
+                    + level
+                    + "> "
+                    + GeneratedNames.Id(member.MemberName)
+                    + " { get; init; }"
+            );
             w.Line();
         }
 
@@ -38,28 +49,37 @@ internal static class ResultEmitter
         w.Open("protected override void AddItems(" + Lib + "ProjectionItems<" + Lib + level + "> items)");
         foreach (MemberModel member in result.Members)
         {
-            w.Line("items.Add(" + member.MemberName + ");");
+            w.Line("items.Add(" + GeneratedNames.This(member.MemberName) + ");");
         }
 
         w.Close();
         w.Line();
         w.Line("/// <inheritdoc/>");
-        w.Open("protected override " + type + " ReadResult(ref " + Lib + "RowReader reader)");
-        foreach (MemberModel member in result.Members)
+        w.Open("protected override " + type + " ReadResult(ref " + Lib + "RowReader " + GeneratedNames.ReaderParameter + ")");
+        for (int i = 0; i < result.Members.Count; i++)
         {
-            w.Line("var @" + Camel(member.MemberName) + " = reader.Read(" + member.MemberName + ");");
+            w.Line(
+                "var "
+                    + GeneratedNames.Local(i)
+                    + " = "
+                    + GeneratedNames.ReaderParameter
+                    + ".Read("
+                    + GeneratedNames.This(result.Members[i].MemberName)
+                    + ");"
+            );
         }
 
-        string arguments = string.Join(", ", result.Members.Where(m => m.IsPositional).Select(m => "@" + Camel(m.MemberName)));
-        List<MemberModel> initialized = result.Members.Where(m => !m.IsPositional).ToList();
+        IEnumerable<int> all = Enumerable.Range(0, result.Members.Count);
+        string arguments = string.Join(", ", all.Where(i => result.Members[i].IsPositional).Select(GeneratedNames.Local));
+        List<int> initialized = all.Where(i => !result.Members[i].IsPositional).ToList();
         string initializer =
             initialized.Count == 0
                 ? string.Empty
-                : " { " + string.Join(", ", initialized.Select(m => m.MemberName + " = @" + Camel(m.MemberName))) + " }";
+                : " { "
+                    + string.Join(", ", initialized.Select(i => GeneratedNames.Id(result.Members[i].MemberName) + " = " + GeneratedNames.Local(i)))
+                    + " }";
         w.Line("return new " + type + "(" + (result.UsesConstructor ? arguments : string.Empty) + ")" + initializer + ";");
         w.Close();
         w.Close();
     }
-
-    private static string Camel(string name) => char.ToLowerInvariant(name[0]) + name.Substring(1);
 }
