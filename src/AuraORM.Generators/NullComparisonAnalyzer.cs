@@ -110,12 +110,17 @@ public sealed class NullComparisonAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    // The value as written: the conversions are skipped, both those that the call adds (to T?, to object) and a cast that
-    // the caller wrote. A cast to a nullable type does not make a value that is not null into one that may be null:
-    // (string?)name with a string name, or (int?)count with an int count, is compared as the value inside it.
+    // The value as written: a conversion to a type that allows null is skipped, both one that the call adds (to T?, to
+    // object) and a cast that the caller wrote. Such a conversion does not make a value that is not null into one that may
+    // be null: (string?)name with a string name, or (int?)count with an int count, is compared as the value inside it. A
+    // conversion to a non-nullable value type stops the walk: (int)x with an int? x throws for null, like x.Value, so the
+    // value compared is an int.
     private static IOperation Unwrap(IOperation operation)
     {
-        while (operation is IConversionOperation conversion)
+        while (
+            operation is IConversionOperation { Type: { } type } conversion
+            && (type.IsReferenceType || type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        )
         {
             operation = conversion.Operand;
         }

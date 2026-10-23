@@ -60,8 +60,8 @@ public sealed class AnalyzerTests
 
     /// <summary>
     /// Comparisons with values that cannot be null compile: a checked or unwrapped value, a non-null default, a constant, a
-    /// value that is not null cast to a nullable type, <c>IsNotDistinctFrom</c> with a nullable value, and <c>In</c> with
-    /// non-null values (design §4.4).
+    /// value that is not null cast to a nullable type, a nullable value cast to its value type (which throws for null, like
+    /// <c>.Value</c>), <c>IsNotDistinctFrom</c> with a nullable value, and <c>In</c> with non-null values (design §4.4).
     /// </summary>
     /// <remarks>
     /// Preconditions:
@@ -85,6 +85,7 @@ public sealed class AnalyzerTests
                     Eq(u.Nickname, s!),
                     Eq(u.Name, (string?)name),
                     Eq(u.Age, (int?)count),
+                    Eq(u.Age, (int)x!),
                     Gt(u.Age, 3),
                     IsNotDistinctFrom(u.Age, x),
                     IsNull(u.Age),
