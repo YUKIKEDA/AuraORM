@@ -260,7 +260,7 @@ public sealed partial record UserOrderTotal(string Name, decimal? Total);
 
 ジェネレーターは次を生成する。
 
-- `UserOrderTotal.RowProjection` と `UserOrderTotal.GroupProjection`: `required` な `init` プロパティを持つクラス。各プロパティの型は、前者が `IProjection<T, PerRow>`、後者が `IProjection<T, PerGroup>` で、`T` は対応するメンバーの型である（§4.5）。`Select` で `new UserOrderTotal.GroupProjection { Name = k.Item1, Total = Sum(o.Amount) }` のように使う。メンバーを書き忘れると CS9035、型や評価の段階が違うと CS0029 になる。
+- `UserOrderTotal.RowProjection` と `UserOrderTotal.GroupProjection`: `required` な `init` プロパティを持つクラス。各プロパティの型は、前者が `IProjection<T, PerRow>`、後者が `IProjection<T, PerGroup>` で、`T` は対応するメンバーの型である（§4.5）。`GroupBy` のキーが一つの式なら、`Select` で `new UserOrderTotal.GroupProjection { Name = k, Total = Sum(o.Amount) }` のように使う。メンバーを書き忘れると CS9035、型や評価の段階が違うと CS0029 になる。
 - `UserOrderTotal.Columns`: この型を派生テーブルと CTE（§5.11）の行として使うときの列の集合。
 - `IQueryResult<UserOrderTotal>` の実装: 生のクエリ（§11.3）で、列名から値を読むコード。列名はメンバー名（`[Column]` があればその名前）である。
 
@@ -465,7 +465,7 @@ db.From(Order.Table).Select(o => (o.Customer, Count()));
 db.From(Order.Table).GroupBy(o => o.Customer).Select((k, o) => (o.Price, Count()));
 
 // コンパイルできる
-db.From(Order.Table).GroupBy(o => o.Customer).Select((k, o) => (k.Item1, Count(), Sum(o.Price)));
+db.From(Order.Table).GroupBy(o => o.Customer).Select((k, o) => (k, Count(), Sum(o.Price)));
 ```
 
 PostgreSQL は、主キーで GROUP BY したとき、同じテーブルのほかの列を選ぶことを許す（関数従属）。AuraORM ではその列もキーに加える。これは SQL より厳しい制限であり、理由は上に書いた誤りを型で防ぐためである。
