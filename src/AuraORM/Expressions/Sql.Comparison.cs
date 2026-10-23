@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace AuraORM;
 
 /// <summary>
@@ -10,11 +8,6 @@ namespace AuraORM;
 /// A value argument (of type <c>T</c>) is bound as a parameter. An expression argument is written as SQL. The two operands of
 /// a function have the same evaluation level. Every function here works on every dialect.
 /// </remarks>
-[SuppressMessage(
-    "Naming",
-    "CA1724:Type names should not match namespaces",
-    Justification = "System.Data.Sql is reachable as Sql only from code inside the System.Data namespace; a using directive does not import it."
-)]
 public static partial class Sql
 {
     /// <summary>
@@ -249,6 +242,34 @@ public static partial class Sql
     public static Condition<TLevel> NotLike<T, TLevel>(IExpr<T, TLevel> value, IExpr<T, TLevel> pattern)
         where T : IEnumerable<char>?
         where TLevel : EvaluationLevel => new(new LikeNode(value.Node, pattern.Node, negated: true));
+
+    /// <summary>
+    /// Tests that a string matches a pattern in which <paramref name="escape"/> makes the next <c>%</c> or <c>_</c> a plain
+    /// character: <c>a LIKE @p0 ESCAPE @p1</c>.
+    /// </summary>
+    /// <typeparam name="T">The string type, <see cref="string"/> or <see cref="string"/>?.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level.</typeparam>
+    /// <param name="value">The string.</param>
+    /// <param name="pattern">The pattern, bound as a parameter.</param>
+    /// <param name="escape">The escape character, bound as a one-character string parameter.</param>
+    /// <returns>The condition.</returns>
+    public static Condition<TLevel> Like<T, TLevel>(IExpr<T, TLevel> value, string pattern, char escape)
+        where T : IEnumerable<char>?
+        where TLevel : EvaluationLevel => new(new LikeNode(value.Node, Param(pattern), negated: false, Param(escape.ToString())));
+
+    /// <summary>
+    /// Tests that a string does not match a pattern in which <paramref name="escape"/> makes the next <c>%</c> or <c>_</c> a
+    /// plain character: <c>a NOT LIKE @p0 ESCAPE @p1</c>.
+    /// </summary>
+    /// <typeparam name="T">The string type, <see cref="string"/> or <see cref="string"/>?.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level.</typeparam>
+    /// <param name="value">The string.</param>
+    /// <param name="pattern">The pattern, bound as a parameter.</param>
+    /// <param name="escape">The escape character, bound as a one-character string parameter.</param>
+    /// <returns>The condition.</returns>
+    public static Condition<TLevel> NotLike<T, TLevel>(IExpr<T, TLevel> value, string pattern, char escape)
+        where T : IEnumerable<char>?
+        where TLevel : EvaluationLevel => new(new LikeNode(value.Node, Param(pattern), negated: true, Param(escape.ToString())));
 
     private static Condition<TLevel> Compare<TLevel>(ComparisonOperator op, SqlNode left, SqlNode right)
         where TLevel : EvaluationLevel => new(new ComparisonNode(op, left, right));

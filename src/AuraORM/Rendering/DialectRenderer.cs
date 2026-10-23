@@ -30,7 +30,20 @@ internal abstract class DialectRenderer
     /// <summary>
     /// Gets the function that counts the characters of a string (§4.2).
     /// </summary>
-    public virtual string LengthFunction => "CHAR_LENGTH";
+    protected virtual string LengthFunction => "CHAR_LENGTH";
+
+    /// <summary>
+    /// Writes the length of a string in characters (§4.2).
+    /// </summary>
+    /// <param name="context">The rendering context.</param>
+    /// <param name="argument">The string.</param>
+    public virtual void RenderLength(SqlRenderContext context, SqlNode argument)
+    {
+        context.Write(LengthFunction);
+        context.Write('(');
+        argument.Render(context);
+        context.Write(')');
+    }
 
     protected abstract char IdentifierOpen { get; }
 

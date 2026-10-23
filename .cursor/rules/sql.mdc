@@ -10,7 +10,7 @@ These are the three promises of the library (`docs/design.ja.md`). Every change 
 ## Predictable SQL
 
 - One builder call produces one SQL clause. The library never adds a query, a join, a subquery, a `DISTINCT`, an `ORDER BY`, or a round trip that the caller did not write.
-- The SQL for a builder chain does not depend on the values bound, the machine, the culture, the clock, or earlier queries. Values are always parameters; they are never inlined into SQL text. Identifiers are always quoted with the dialect's quote.
+- The SQL for a builder chain does not depend on the values bound, the machine, the culture, the clock, or earlier queries. The one exception is the shape the caller passes: the number of items in a list (`In` values, `INSERT` rows) and the columns set in an `INSERT` model are part of the statement (`docs/design.ja.md` §0.1). Values are always parameters; they are never inlined into SQL text. Identifiers are always quoted with the dialect's quote.
 - Every query exposes its SQL and parameters (`ToSql()`) without a connection.
 - The SQL each API produces, per dialect, is written in `docs/design.ja.md` and checked by golden tests (`.cursor/rules/testing.mdc`). A change to generated SQL is a design change: it updates the design and the golden files in the same PR, and the PR lists the old and new SQL under `## SQL`.
 - Where the dialects differ (paging, `RETURNING` vs `OUTPUT`, identifier quotes, boolean literals, upsert), each dialect's SQL is written out. "The dialect handles it" is not a specification.

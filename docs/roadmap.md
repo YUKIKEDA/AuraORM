@@ -15,17 +15,17 @@
 | X1 | 実行: `Database` / `Transaction`、接続の扱い、行の読み取り、生 SQL の断片、生のクエリとコマンド（§11、§12） | #10 | done |
 | I1 | 結合テストの基盤: CI のサービスコンテナと WSL コンテナのスクリプト、全方言での X1 の結合テスト（§17） | #12 | done |
 | N1 | NativeAOT のサンプルと CI の検査（§16.3） | - | planned |
-| Q1 | SELECT: 単一テーブル、WHERE、射影、DISTINCT、ORDER BY、LIMIT / OFFSET（§5.1〜§5.9） | - | planned |
+| Q1 | SELECT: 単一テーブル、WHERE、射影、DISTINCT、ORDER BY、LIMIT / OFFSET、段階の型の生成ツールと CI の検査（§5.1〜§5.9） | - | planned |
 | A1 | アナライザー: NULL との比較、生 SQL の穴（§4.4、§11.1） | - | planned |
 | Q2 | SELECT: JOIN と NULL 化、別名（§5.2、§5.3） | - | planned |
 | Q3 | SELECT: GROUP BY / HAVING、集計、評価の段階（§4.5、§5.5） | - | planned |
-| Q4 | SELECT: サブクエリ、集合演算、派生テーブル、CTE（§5.10、§5.11） | - | planned |
+| Q4 | SELECT: サブクエリ、集合演算、派生テーブル、CTE、`[QueryResult]` の型の `Columns`（§3.5、§5.10、§5.11） | - | planned |
 | M1 | INSERT / UPDATE / DELETE と RETURNING（§6〜§9） | - | planned |
 | M2 | UPSERT（§10） | - | planned |
 | V1 | 値コンバーター（§3.6） | - | planned |
 | S1 | DDL（§13） | - | planned |
 | P1 | ベンチマークと性能の目標（§16.1） | - | planned |
-| R1 | リリースの仕組み: NuGet の Trusted Publishing、パッケージの検査、README のサンプルの検査 | - | planned |
+| R1 | リリースの仕組み: NuGet の Trusted Publishing、パッケージの検査（ジェネレーターが `analyzers/dotnet/cs` に入り、依存が空であること。NativeAOT のサンプルをパックしたパッケージで参照する）、README のサンプルの検査 | - | planned |
 
 ## v0.1 の後
 

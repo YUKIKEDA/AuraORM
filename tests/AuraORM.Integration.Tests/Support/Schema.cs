@@ -19,7 +19,7 @@ public sealed partial record Person(
     string? Nickname,
     int? Age,
     PersonStatus Status,
-    decimal Balance,
+    [Precision(18, 2)] decimal Balance,
     DateOnly Birthday
 );
 

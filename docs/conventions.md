@@ -37,7 +37,7 @@ docs/                        設計・判断・ロードマップ・規約（本
 ## ビルドとゲート
 
 - PR を出す前に `./build.ps1` を通す。ツールの復元、CSharpier の検査、復元、Release と Debug のビルド、全テストプロジェクトの実行を行う
-- CI は同じスクリプトを Windows・Linux・macOS で回す。データベースの結合テストと NativeAOT の検査も CI で回す。マージの条件は CI がすべて緑であること。ローカルでの実行は開発の補助であり、ゲートの代わりにならない
+- CI は同じスクリプトを Windows・Linux・macOS で回す。データベースの結合テスト（行 I1 で足す）と NativeAOT の検査（行 N1 で足す）も CI で回す。マージの条件は CI がすべて緑であること。ローカルでの実行は開発の補助であり、ゲートの代わりにならない
 - 警告は最初からすべてエラー（`TreatWarningsAsErrors`）。ビルドを通すために `NoWarn` や `#pragma warning disable` を足さない。ルールがこのリポジトリに合わない場合は、理由をコメントに書いて `.editorconfig` を変え、PR でそう明記する
 - `src/AuraORM` は `IsAotCompatible`。trim / AOT の警告もエラーになる。`BannedSymbols.txt` の API はビルドエラーになる
 - パッケージを足す前に `.cursor/rules/dependencies.mdc` を確かめる。ランタイムのライブラリには依存を足さない

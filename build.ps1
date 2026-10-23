@@ -9,8 +9,10 @@ function Invoke-Step([string] $name, [scriptblock] $command) {
     Write-Host "==> $name"
     & $command
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "$name failed with exit code $LASTEXITCODE."
-        exit $LASTEXITCODE
+        # Write-Error would throw under ErrorActionPreference=Stop and lose the exit code.
+        $code = $LASTEXITCODE
+        Write-Host "$name failed with exit code $code."
+        exit $code
     }
 }
 
