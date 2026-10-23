@@ -99,6 +99,36 @@ public abstract class RawQueryTests<TDialect>
     }
 
     /// <summary>
+    /// Two columns with the name of a member make the result ambiguous and throw; two columns with a name that no member
+    /// needs are ignored (design §11.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - Alice in <c>people</c>.
+    ///
+    /// Steps:
+    /// - Select two columns named <c>age</c> into <see cref="NameAndAge"/>; then two columns named <c>id</c> with the members'
+    ///   columns.
+    ///
+    /// Expected:
+    /// - <see cref="InvalidOperationException"/> that names <c>age</c>; then Alice's name and age.
+    /// </remarks>
+    [Fact]
+    public async Task QueryAsync_DuplicateColumnNames_ThrowOnlyWhenUsed()
+    {
+        Database<TDialect> db = await Target.CreateDatabaseAsync();
+        await InsertAsync(db, Alice);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            db.QueryAsync<NameAndAge>($"SELECT name AS person_name, age, id AS age FROM {Person.Table}", Ct)
+        );
+        List<NameAndAge> rows = await db.QueryAsync<NameAndAge>($"SELECT id, name AS person_name, age, id FROM {Person.Table}", Ct);
+
+        Assert.Contains("age", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal([new NameAndAge("Alice", 30)], rows);
+    }
+
+    /// <summary>
     /// Tuples read columns by position, nullable ones included.
     /// </summary>
     /// <remarks>

@@ -116,8 +116,8 @@ flowchart LR
 ### 2.3 名前空間と公開面
 
 - 公開する型は名前空間 `AuraORM` に置く。利用者は `using AuraORM;` と `using static AuraORM.Sql;` で全機能を使える。
-- 公開面は次に限る: `Database<TDialect>` と `Transaction<TDialect>`、方言の型と機能のインターフェース、ビルダーの段階の型、式の型（`IExpr<T, TLevel>`、`Column<T>`、`Condition<TLevel>`、`IProjection<T, TLevel>`）、関数（`Sql`）、属性、`SqlStatement`、例外。
-- 生成コードが呼ぶ型（`TableAlias` と、その `Column<T>` などのメソッド）も公開する。利用者のコードからは作れない（コンストラクターが `internal`）ので、列を得る道はラムダの引数だけのままである（§3.4）。
+- 公開面は次に限る: `Database<TDialect>` と `Transaction<TDialect>`、その共通の基底の `DatabaseSession<TDialect>`、`DatabaseOptions`、生 SQL の断片 `SqlFragment`、結果の型が実装する `IQueryResult<TSelf>`、方言の型と機能のインターフェース、ビルダーの段階の型、式の型（`IExpr<T, TLevel>`、`Column<T>`、`Condition<TLevel>`、`IProjection<T, TLevel>`）、関数（`Sql`）、属性、`SqlStatement`、例外。
+- 生成コードが呼ぶ型（`TableAlias` と、その `Column<T>` などのメソッド、`TableColumns<TRow>`、`NullableTableColumns<TRow>`、`InsertModel`、`ResultProjection<TResult, TLevel>`、`RowReader` とその `Read*` / `ReadNamed*`）も公開する。利用者のコードからは作れない（コンストラクターが `internal`）ので、列を得る道はラムダの引数だけのままである（§3.4）。
 - 文の木、SQL の出力、パラメータの設定は `internal` にする。
 
 ### 2.4 方言
@@ -761,9 +761,10 @@ long count = await db.QueryScalarAsync<long>($"SELECT COUNT(*) FROM users WHERE 
 int affected = await db.ExecuteAsync($"UPDATE users SET Name = {name} WHERE Id = {id}");
 ```
 
-- `QueryAsync<T>` の `T` は `[Table]` か `[QueryResult]` の型で、ジェネレーターが列名から読むコードを作る。列名と型のメンバー名は、大文字と小文字を区別せずに対応づける。対応は結果の読み取りを始めるときに一度だけ決め、メンバーに対応する列がなければ `InvalidOperationException` になる（§14.3）。
+- `QueryAsync<T>` の `T` は `[Table]` か `[QueryResult]` の型で、ジェネレーターが列名から読むコードを作る。結果の列と対応づける名前は、`[Table]` の型では列名（`[Column]` と `Naming` を適用したもの）、`[QueryResult]` の型ではメンバー名（`[Column]` があればその名前）である。大文字と小文字は区別しない。対応は結果の読み取りを始めるときに一度だけ決め、メンバーに対応する列がなければ `InvalidOperationException` になる。メンバーが使う名前の列が結果に二つ以上あるときも、どちらを読むか決まらないので `InvalidOperationException` になる。メンバーが使わない名前の重複は問題にしない（§14.3）。
 - 結果の型を用意しないときは、タプルを受け取る `QueryAsync<T1, T2, …>` を使う。列は位置で読む。
-- `QueryScalarAsync<T>` は最初の行の最初の列を読む。行がなければ `InvalidOperationException` になる。`QueryScalarOrDefaultAsync<T>` は行がなければ `default` を返す。
+- `QueryScalarAsync<T>` は最初の行の最初の列を読む。行がなければ `InvalidOperationException` になる。`QueryScalarOrDefaultAsync<T>` は行がなければ `default` を返す。値型では、行がないことと値が `default` の行とを区別するには、NULL を許す型（`int?`）で読む。
+- 文は実行メソッドを呼んだときに組み立てる。そのときに見つかった誤り（§14.3 の検査）は、返す `Task` ではなく、呼び出しそのものが投げる。
 - 値の埋め込みの規則は §11.1 と同じである。
 
 ## 12. 実行
@@ -781,6 +782,7 @@ var db2 = new Database<SqliteDialect>(connection);
 - `Database<TDialect>` は `DbDataSource` か `DbConnection` を受け取る。どちらも利用者のものであり、`Database` は破棄しない。
 - `DbDataSource` を受け取ったときは、コマンドごとに接続を借りて返す。この場合の `Database` はスレッドセーフである。
 - `DbConnection` を受け取ったときは、その接続を使う。接続が閉じていれば、コマンドの間だけ開いて閉じる。開いていれば開いたままにする。ADO.NET の接続はスレッドセーフではないので、この場合の `Database` も同時に使えない。
+- メモリ上の SQLite（`Data Source=:memory:`）は、接続を閉じるとデータベースごと消える。閉じた接続を渡すとコマンドごとに開き直すので、コマンドのたびに空のデータベースになる。メモリ上の SQLite は、開いた接続を渡す。
 - `DatabaseOptions` で、コマンドのタイムアウトの既定値を指定できる。
 
 ### 12.2 結果を返す実行
@@ -931,7 +933,7 @@ CREATE TABLE "users" (
 | UPDATE の代入の一覧が空、同じ列に二度代入した（§7） | `ArgumentException` |
 | パラメータの数が方言の上限を超えた（§12.4） | `ArgumentException` |
 | SQL Server の複数行の INSERT が 1000 行を超えた（§6.2） | `ArgumentException` |
-| 生のクエリで、結果の型のメンバーに対応する列がない（§11.3） | `InvalidOperationException` |
+| 生のクエリで、結果の型のメンバーに対応する列がない、または二つ以上ある（§11.3） | `InvalidOperationException` |
 | `Limit` / `Offset` に負の値を渡した | `ArgumentOutOfRangeException` |
 
 ## 15. 診断 ID

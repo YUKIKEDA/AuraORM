@@ -61,9 +61,22 @@ internal static class Executor
         {
             await using DbCommand command = CreateCommand(lease, statement, session);
             await using DbDataReader reader = await command.ExecuteReaderAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            bool readAll = false;
+            try
             {
-                yield return Read(reader, factory);
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    yield return Read(reader, factory);
+                }
+
+                readAll = true;
+            }
+            finally
+            {
+                if (!readAll)
+                {
+                    CancelUnread(command);
+                }
             }
         }
         finally
@@ -113,7 +126,13 @@ internal static class Executor
             await using DbDataReader reader = await command.ExecuteReaderAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
             if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                return ValueReader<T>.Read(reader, 0);
+                T value = ValueReader<T>.Read(reader, 0);
+                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    CancelUnread(command);
+                }
+
+                return value;
             }
 
             return orDefault ? default! : throw new InvalidOperationException("The query returned no row.");
@@ -144,10 +163,37 @@ internal static class Executor
             }
 
             p.Value = parameter.Value ?? DBNull.Value;
+            if (parameter.IsNullBinary)
+            {
+                p.DbType = DbType.Binary;
+            }
+
             command.Parameters.Add(p);
         }
 
         return command;
+    }
+
+    // §12.2: a reader closed with rows left would read them to the end first (SqlClient's Close does). Cancelling first
+    // stops that, as Dapper does. A provider that cannot cancel is left to read the rest.
+    private static void CancelUnread(DbCommand command)
+    {
+        try
+        {
+            command.Cancel();
+        }
+        catch (DbException)
+        {
+            // The rows are read to the end instead.
+        }
+        catch (InvalidOperationException)
+        {
+            // The rows are read to the end instead.
+        }
+        catch (NotSupportedException)
+        {
+            // The rows are read to the end instead.
+        }
     }
 
     private static T Read<T>(DbDataReader reader, RowFactory<T> factory)
@@ -165,10 +211,15 @@ internal static class Executor
 
     private static int[] ResolveOrdinals(DbDataReader reader, IReadOnlyList<string> names, Type type)
     {
+        // A name that two columns share maps to -1, and is an error only when a member needs it (§11.3).
         var columns = new Dictionary<string, int>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
         for (int i = 0; i < reader.FieldCount; i++)
         {
-            columns.TryAdd(reader.GetName(i), i);
+            string name = reader.GetName(i);
+            if (!columns.TryAdd(name, i))
+            {
+                columns[name] = -1;
+            }
         }
 
         int[] ordinals = new int[names.Count];
@@ -178,6 +229,18 @@ internal static class Executor
             {
                 throw new InvalidOperationException(
                     string.Format(CultureInfo.InvariantCulture, "The result has no column {0} for a member of {1}.", names[i], type.Name)
+                );
+            }
+
+            if (ordinals[i] < 0)
+            {
+                throw new InvalidOperationException(
+                    string.Format(
+                        CultureInfo.InvariantCulture,
+                        "The result has more than one column named {0} for a member of {1}; give the columns different names with AS.",
+                        names[i],
+                        type.Name
+                    )
                 );
             }
         }

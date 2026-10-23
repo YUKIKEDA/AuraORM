@@ -85,7 +85,9 @@ internal static class ResultEmitter
         string initializer =
             initialized.Count == 0
                 ? string.Empty
-                : " { " + string.Join(", ", initialized.Select(i => GeneratedNames.Id(result.Members[i].Member.MemberName) + " = " + value(i))) + " }";
+                : " { "
+                    + string.Join(", ", initialized.Select(i => GeneratedNames.Id(result.Members[i].Member.MemberName) + " = " + value(i)))
+                    + " }";
         return "new " + result.Target.Name + "(" + (result.UsesConstructor ? arguments : string.Empty) + ")" + initializer;
     }
 }

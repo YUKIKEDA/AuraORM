@@ -19,16 +19,26 @@ internal static class NamedReading
     )
     {
         w.Line(
-            "private static readonly string[] " + ColumnNames + " = new string[] { "
+            "private static readonly string[] "
+                + ColumnNames
+                + " = new string[] { "
                 + string.Join(", ", members.Select(m => SymbolDisplay.FormatLiteral(m.ColumnName, quote: true)))
                 + " };"
         );
         w.Line();
         w.Line(
-            "static global::System.Collections.Generic.IReadOnlyList<string> " + Lib + "IQueryResult<" + type + ">.ColumnNames => " + ColumnNames + ";"
+            "static global::System.Collections.Generic.IReadOnlyList<string> "
+                + Lib
+                + "IQueryResult<"
+                + type
+                + ">.ColumnNames => "
+                + ColumnNames
+                + ";"
         );
         w.Line();
-        w.Open("static " + type + " " + Lib + "IQueryResult<" + type + ">.ReadNamed(ref " + Lib + "RowReader " + GeneratedNames.ReaderParameter + ")");
+        w.Open(
+            "static " + type + " " + Lib + "IQueryResult<" + type + ">.ReadNamed(ref " + Lib + "RowReader " + GeneratedNames.ReaderParameter + ")"
+        );
         for (int i = 0; i < members.Count; i++)
         {
             MemberModel member = members[i].Member;

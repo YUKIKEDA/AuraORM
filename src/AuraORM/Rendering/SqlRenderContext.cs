@@ -49,7 +49,7 @@ internal sealed class SqlRenderContext : IDisposable
     {
         int index = _parameters.Count;
         string name = Dialect.ParameterName(index);
-        _parameters.Add(new SqlStatementParameter(name, parameter.ProviderValue));
+        _parameters.Add(new SqlStatementParameter(name, parameter.ProviderValue) { IsNullBinary = parameter.IsNullBinary });
         Writer.Append(name);
     }
 
