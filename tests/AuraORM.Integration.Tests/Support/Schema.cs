@@ -53,3 +53,9 @@ public sealed partial record TypedRow(
     TimeOnly? TimeValue,
     PersonStatus? StateValue
 );
+
+/// <summary>
+/// A pet, whose owner is a person or nobody: the table the join tests join to <see cref="Person"/>.
+/// </summary>
+[Table("pets", Naming = ColumnNaming.SnakeCase)]
+public sealed partial record Pet([PrimaryKey] long Id, long? OwnerId, [MaxLength(50)] string Name);

@@ -26,7 +26,23 @@ internal sealed class SelectNode(SelectState state) : SqlNode
         context.Write(" FROM ");
         foreach (SelectSourceState source in state.Sources)
         {
+            context.Write(
+                source.Kind switch
+                {
+                    JoinKind.From => string.Empty,
+                    JoinKind.Inner => " INNER JOIN ",
+                    JoinKind.Left => " LEFT JOIN ",
+                    JoinKind.Right => " RIGHT JOIN ",
+                    JoinKind.Full => " FULL JOIN ",
+                    _ => " CROSS JOIN ",
+                }
+            );
             source.Table.RenderSource(context);
+            if (source.On is not null)
+            {
+                context.Write(" ON ");
+                source.On.Render(context);
+            }
         }
 
         if (state.Where is not null)

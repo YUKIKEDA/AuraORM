@@ -4,7 +4,7 @@
 using System.Globalization;
 using System.Text;
 
-const int MaxSources = 1; // Row Q2 (JOIN) raises it to 8.
+const int MaxSources = 8;
 const int MaxTuple = 8;
 
 string root = FindRoot();
@@ -13,6 +13,7 @@ Directory.CreateDirectory(output);
 
 Write("SelectSource.cs", SelectSource);
 Write("SelectFrom.cs", SelectFrom);
+Write("SelectFullJoin.cs", SelectFullJoin);
 Write("SelectWhere.cs", SelectWhere);
 Write("SelectProjected.cs", SelectProjected);
 Write("TupleProjection.cs", TupleProjection);
@@ -189,57 +190,218 @@ void SelectFrom(StringBuilder s)
 {
     for (int n = 1; n <= MaxSources; n++)
     {
-        string pairs = string.Join(", ", Enumerable.Range(1, n).Select(i => $"T{i}, TNullable{i}"));
-        string pairDocs = Lines(
-            n,
-            i =>
-                $"/// <typeparam name=\"T{i}\">The column set of table {i}, as the lambdas get it now.</typeparam>\n"
-                + $"/// <typeparam name=\"TNullable{i}\">The column set of table {i} on the nullable side of an outer join.</typeparam>"
-        );
-        s.Append(
+        var w = new StringBuilder();
+        w.Append('\n');
+        w.Append("/// <summary>\n");
+        w.Append(
             CultureInfo.InvariantCulture,
-            $$"""
-
-            /// <summary>
-            /// A SELECT statement right after <c>FROM</c>, with {{Tables(n)}} (<c>docs/design.ja.md</c> §5.1). <c>WHERE</c> may follow once.
-            /// </summary>
-            /// <typeparam name="TDialect">The SQL dialect.</typeparam>
-            /// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
-            {{pairDocs}}
-            public sealed class SelectFrom<TDialect, TMode, {{pairs}}> : SelectSource<TDialect, TMode, {{Views(n)}}>
-                where TDialect : IDialect
-                where TMode : ExecutionMode
+            $"/// A SELECT statement right after <c>FROM</c>, with {Tables(n)} (<c>docs/design.ja.md</c> §5.1). Joins may follow"
+        );
+        w.Append(
+            n < MaxSources
+                ? ", then\n/// <c>WHERE</c> once.\n"
+                : " no more\n/// (a statement has at most " + MaxSources + " tables); <c>WHERE</c> may follow once.\n"
+        );
+        w.Append("/// </summary>\n");
+        w.Append("/// <typeparam name=\"TDialect\">The SQL dialect.</typeparam>\n");
+        w.Append(
+            "/// <typeparam name=\"TMode\">Whether the statement can be run: <see cref=\"Executable\"/> or <see cref=\"SqlOnly\"/>.</typeparam>\n"
+        );
+        w.Append(PairDocs(n));
+        w.Append(
+            CultureInfo.InvariantCulture,
+            $"public sealed class SelectFrom<TDialect, TMode, {Pairs(n)}> : SelectSource<TDialect, TMode, {Views(n)}>\n"
+        );
+        w.Append("    where TDialect : IDialect\n");
+        w.Append("    where TMode : ExecutionMode\n");
+        w.Append(NullableConstraints(n, "    "));
+        w.Append("{\n");
+        w.Append(CultureInfo.InvariantCulture, $"    internal SelectFrom(IStatementRunner? session, SelectState state, {ViewParameters(n)})\n");
+        w.Append(CultureInfo.InvariantCulture, $"        : base(session, state, {Lower(n)}) {{ }}\n\n");
+        w.Append("    /// <summary>\n");
+        w.Append(
+            "    /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref=\"Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])\"/>.\n"
+        );
+        w.Append("    /// </summary>\n");
+        w.Append("    /// <param name=\"condition\">The condition, from the column sets.</param>\n");
+        w.Append("    /// <returns>The statement.</returns>\n");
+        w.Append(
+            CultureInfo.InvariantCulture,
+            $"    public SelectWhere<TDialect, TMode, {Views(n)}> Where(Func<{Views(n)}, Condition<PerRow>> condition)\n"
+        );
+        w.Append("    {\n");
+        w.Append("        ArgumentNullException.ThrowIfNull(condition);\n");
+        w.Append(CultureInfo.InvariantCulture, $"        return new(Session, State with {{ Where = condition({Args(n)}).Node }}, {Args(n)});\n");
+        w.Append("    }\n\n");
+        w.Append("    /// <summary>\n");
+        w.Append("    /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form\n");
+        w.Append("    /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).\n");
+        w.Append("    /// </summary>\n");
+        w.Append("    /// <param name=\"condition\">The condition, from the column sets.</param>\n");
+        w.Append("    /// <returns>The statement.</returns>\n");
+        w.Append(
+            CultureInfo.InvariantCulture,
+            $"    public SelectWhere<TDialect, TMode, {Views(n)}> Where(Func<{Views(n)}, OptionalCondition<PerRow>> condition)\n"
+        );
+        w.Append("    {\n");
+        w.Append("        ArgumentNullException.ThrowIfNull(condition);\n");
+        w.Append(CultureInfo.InvariantCulture, $"        return new(Session, State with {{ Where = condition({Args(n)}).Node }}, {Args(n)});\n");
+        w.Append("    }\n");
+        if (n < MaxSources)
+        {
+            foreach (string kind in new[] { "Inner", "Left", "Right", "Cross" })
             {
-                internal SelectFrom(IStatementRunner? session, SelectState state, {{ViewParameters(n)}})
-                    : base(session, state, {{Lower(n)}}) { }
-
-                /// <summary>
-                /// Adds the condition: <c>WHERE condition</c>. To combine conditions, write <see cref="Sql.And{TLevel}(Condition{TLevel}, Condition{TLevel}, Condition{TLevel}[])"/>.
-                /// </summary>
-                /// <param name="condition">The condition, from the column sets.</param>
-                /// <returns>The statement.</returns>
-                public SelectWhere<TDialect, TMode, {{Views(n)}}> Where(Func<{{Views(n)}}, Condition<PerRow>> condition)
-                {
-                    ArgumentNullException.ThrowIfNull(condition);
-                    return new(Session, State with { Where = condition({{Args(n)}}).Node }, {{Args(n)}});
-                }
-
-                /// <summary>
-                /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form
-                /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).
-                /// </summary>
-                /// <param name="condition">The condition, from the column sets.</param>
-                /// <returns>The statement.</returns>
-                public SelectWhere<TDialect, TMode, {{Views(n)}}> Where(Func<{{Views(n)}}, OptionalCondition<PerRow>> condition)
-                {
-                    ArgumentNullException.ThrowIfNull(condition);
-                    return new(Session, State with { Where = condition({{Args(n)}}).Node }, {{Args(n)}});
-                }
+                w.Append('\n');
+                w.Append(JoinMethod(n, kind, extension: false));
             }
 
-            """
-        );
+            w.Append('\n');
+            w.Append(JoinMethod(n, "Full", extension: false));
+        }
+
+        w.Append("}\n");
+        s.Append(w);
     }
+}
+
+void SelectFullJoin(StringBuilder s)
+{
+    s.Append('\n');
+    s.Append("/// <summary>\n");
+    s.Append("/// <c>FULL JOIN</c>, for the dialects that have it (<see cref=\"IFullJoinDialect\"/>; MySQL and MariaDB do not), so the call\n");
+    s.Append("/// does not compile on the others (<c>docs/design.ja.md</c> §2.4, §5.3).\n");
+    s.Append("/// </summary>\n");
+    s.Append("public static class SelectFullJoin\n");
+    s.Append("{\n");
+    for (int n = 1; n < MaxSources; n++)
+    {
+        if (n > 1)
+        {
+            s.Append('\n');
+        }
+
+        s.Append(JoinMethod(n, "Full", extension: true));
+    }
+
+    s.Append("}\n");
+}
+
+// One join method of a SELECT statement with n tables. Full is an internal core method on the stage and a public extension
+// method, because only an extension method can require IFullJoinDialect of TDialect.
+string JoinMethod(int n, string kind, bool extension)
+{
+    bool hasOn = kind != "Cross";
+    string resultPairs = kind switch
+    {
+        "Inner" or "Cross" => Pairs(n) + ", TJoinColumns, TJoinNullable",
+        "Left" => Pairs(n) + ", TJoinNullable, TJoinNullable",
+        "Right" => NullablePairs(n) + ", TJoinColumns, TJoinNullable",
+        _ => NullablePairs(n) + ", TJoinNullable, TJoinNullable",
+    };
+    string sql = kind switch
+    {
+        "Inner" => "INNER JOIN t ON condition",
+        "Left" => "LEFT JOIN t ON condition",
+        "Right" => "RIGHT JOIN t ON condition",
+        "Cross" => "CROSS JOIN t",
+        _ => "FULL JOIN t ON condition",
+    };
+    string nulling = kind switch
+    {
+        "Inner" => "The lambdas that follow get the joined table's column set.",
+        "Left" => "The lambdas that follow get the joined table's nullable column set: it has no row when nothing matched.",
+        "Right" => "The lambdas that follow get the nullable column sets of the tables before it: they have no row when nothing matched.",
+        "Cross" => "The lambdas that follow get the joined table's column set.",
+        _ => "The lambdas that follow get the nullable column set of every table.",
+    };
+    string self = extension ? "from." : string.Empty;
+    var w = new StringBuilder();
+    string indent = "    ";
+    w.Append(indent + "/// <summary>\n");
+    w.Append(indent).Append(CultureInfo.InvariantCulture, $"/// Joins a table: <c>{sql}</c> (<c>docs/design.ja.md</c> §5.3). {nulling}\n");
+    w.Append(indent + "/// </summary>\n");
+    if (extension)
+    {
+        w.Append(indent + "/// <typeparam name=\"TDialect\">A dialect with <c>FULL JOIN</c>.</typeparam>\n");
+        w.Append(indent + "/// <typeparam name=\"TMode\">Whether the statement can be run.</typeparam>\n");
+        foreach (string line in PairDocs(n).Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            w.Append(indent + line + "\n");
+        }
+    }
+
+    w.Append(indent + "/// <typeparam name=\"TJoinRow\">The row type of the joined table.</typeparam>\n");
+    w.Append(indent + "/// <typeparam name=\"TJoinColumns\">The column set of the joined table.</typeparam>\n");
+    w.Append(indent + "/// <typeparam name=\"TJoinNullable\">The nullable column set of the joined table.</typeparam>\n");
+    w.Append(indent + "/// <typeparam name=\"TJoinInsert\">The <c>INSERT</c> model of the joined table.</typeparam>\n");
+    if (extension)
+    {
+        w.Append(indent + "/// <param name=\"from\">The statement to join the table to.</param>\n");
+    }
+
+    w.Append(indent + "/// <param name=\"table\">The table, such as <c>Order.Table</c> or <c>Order.Table.As(\"o\")</c>.</param>\n");
+    if (hasOn)
+    {
+        w.Append(indent + "/// <param name=\"on\">The condition, from the column sets of the tables before it and of the joined table.</param>\n");
+    }
+
+    w.Append(indent + "/// <returns>The statement with the joined table.</returns>\n");
+    w.Append(indent + "/// <exception cref=\"InvalidOperationException\">The statement already has a table under the same name; give the table\n");
+    w.Append(indent + "/// an alias with <c>As</c>.</exception>\n");
+    string typeArguments = "TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert";
+    string tableParameter = "Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table";
+    string onParameter = hasOn ? $", Func<{Views(n)}, TJoinColumns, Condition<PerRow>> on" : string.Empty;
+    string result = $"SelectFrom<TDialect, TMode, {resultPairs}>";
+    if (extension)
+    {
+        w.Append(indent).Append(CultureInfo.InvariantCulture, $"public static {result} FullJoin<TDialect, TMode, {Pairs(n)}, {typeArguments}>(\n");
+        w.Append(indent).Append(CultureInfo.InvariantCulture, $"    this SelectFrom<TDialect, TMode, {Pairs(n)}> from,\n");
+        w.Append(indent).Append(CultureInfo.InvariantCulture, $"    {tableParameter}{onParameter}\n");
+        w.Append(indent + ")\n");
+        w.Append(indent + "    where TDialect : IFullJoinDialect\n");
+        w.Append(indent + "    where TMode : ExecutionMode\n");
+        w.Append(NullableConstraints(n, indent + "    "));
+    }
+    else
+    {
+        string access = kind == "Full" ? "internal" : "public";
+        string name = kind == "Full" ? "FullJoinCore" : kind + "Join";
+        w.Append(indent).Append(CultureInfo.InvariantCulture, $"{access} {result} {name}<{typeArguments}>({tableParameter}{onParameter})\n");
+    }
+
+    w.Append(indent + "    where TJoinRow : class\n");
+    w.Append(indent + "    where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>\n");
+    w.Append(indent + "    where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>\n");
+    w.Append(indent + "    where TJoinInsert : InsertModel\n");
+    w.Append(indent + "{\n");
+    if (extension)
+    {
+        w.Append(indent + "    ArgumentNullException.ThrowIfNull(from);\n");
+        w.Append(indent + "    return from.FullJoinCore(table, on);\n");
+        w.Append(indent + "}\n");
+        return w.ToString();
+    }
+
+    w.Append(indent + "    ArgumentNullException.ThrowIfNull(table);\n");
+    if (hasOn)
+    {
+        w.Append(indent + "    ArgumentNullException.ThrowIfNull(on);\n");
+    }
+
+    w.Append(indent + "    TableAlias alias = State.NewSource(table);\n");
+    string condition = hasOn ? $"on({Args(n)}, TJoinColumns.Create(alias)).Node" : "null";
+    string joinKind = kind;
+    string previous = kind is "Right" or "Full"
+        ? string.Join(", ", Enumerable.Range(1, n).Select(i => $"TNullable{i}.Create(State.Sources[{i - 1}].Table)"))
+        : Args(n);
+    string joined = kind is "Left" or "Full" ? "TJoinNullable.Create(alias)" : "TJoinColumns.Create(alias)";
+    w.Append(indent)
+        .Append(
+            CultureInfo.InvariantCulture,
+            $"    return new(Session, State.Join(alias, JoinKind.{joinKind}, {condition}), {previous}, {joined});\n"
+        );
+    w.Append(indent + "}\n");
+    return w.ToString();
 }
 
 void SelectWhere(StringBuilder s)
@@ -351,6 +513,23 @@ void TupleProjection(StringBuilder s)
         );
     }
 }
+
+static string Pairs(int n) => string.Join(", ", Enumerable.Range(1, n).Select(i => $"T{i}, TNullable{i}"));
+
+static string NullablePairs(int n) => string.Join(", ", Enumerable.Range(1, n).Select(i => $"TNullable{i}, TNullable{i}"));
+
+static string PairDocs(int n) =>
+    string.Concat(
+        Enumerable
+            .Range(1, n)
+            .Select(i =>
+                $"/// <typeparam name=\"T{i}\">The column set of table {i}, as the lambdas get it now.</typeparam>\n"
+                + $"/// <typeparam name=\"TNullable{i}\">The column set of table {i} on the nullable side of an outer join.</typeparam>\n"
+            )
+    );
+
+static string NullableConstraints(int n, string indent) =>
+    string.Concat(Enumerable.Range(1, n).Select(i => $"{indent}where TNullable{i} : ITableColumns<TNullable{i}>\n"));
 
 static string Views(int n) => string.Join(", ", Enumerable.Range(1, n).Select(i => $"T{i}"));
 

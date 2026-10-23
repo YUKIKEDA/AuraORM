@@ -18,7 +18,7 @@ internal static class SelectStart
         where TInsert : InsertModel
     {
         ArgumentNullException.ThrowIfNull(table);
-        var alias = new TableAlias(table.Info.Schema, table.Info.Name, alias: null);
+        var alias = new TableAlias(table.Info.Schema, table.Info.Name, table.Alias);
         return new SelectFrom<TDialect, TMode, TColumns, TNullable>(session, SelectState.From(alias), TColumns.Create(alias));
     }
 }

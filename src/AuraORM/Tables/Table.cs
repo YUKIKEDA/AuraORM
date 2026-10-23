@@ -25,8 +25,35 @@ public sealed class Table<TRow, TColumns, TNullable, TInsert> : ITableReference
         Info = info;
     }
 
+    private Table(TableInfo info, string alias)
+    {
+        Info = info;
+        Alias = alias;
+    }
+
     /// <summary>
     /// Gets what the schema declares about the table.
     /// </summary>
     public TableInfo Info { get; }
+
+    /// <summary>
+    /// Gets the alias of this reference, or <see langword="null"/> when it has none.
+    /// </summary>
+    internal string? Alias { get; }
+
+    /// <inheritdoc/>
+    string? ITableReference.Alias => Alias;
+
+    /// <summary>
+    /// Gives the table an alias in a statement: <c>FROM "users" AS "u"</c>, and its columns are written <c>"u"."column"</c>
+    /// (<c>docs/design.ja.md</c> §5.2). A table used twice in one statement (a self-join) needs an alias for the second use.
+    /// </summary>
+    /// <param name="alias">The alias.</param>
+    /// <returns>The table reference with the alias.</returns>
+    /// <exception cref="ArgumentException"><paramref name="alias"/> is empty.</exception>
+    public Table<TRow, TColumns, TNullable, TInsert> As(string alias)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(alias);
+        return new Table<TRow, TColumns, TNullable, TInsert>(Info, alias);
+    }
 }

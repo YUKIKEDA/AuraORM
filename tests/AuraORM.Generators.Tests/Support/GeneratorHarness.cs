@@ -1,12 +1,13 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace AuraORM.Generators.Tests;
 
 /// <summary>
-/// Runs <see cref="SchemaGenerator"/> on a snippet the way a consumer's build does: C# 12, nullable reference types on,
-/// against the AuraORM assembly.
+/// Runs <see cref="SchemaGenerator"/> and the analyzers on a snippet the way a consumer's build does: C# 12, nullable
+/// reference types on, against the AuraORM assembly.
 /// </summary>
 internal static class GeneratorHarness
 {
@@ -34,8 +35,14 @@ internal static class GeneratorHarness
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out Compilation output, out ImmutableArray<Diagnostic> generatorDiagnostics);
         GeneratorDriverRunResult result = driver.GetRunResult();
         var sources = result.GeneratedTrees.ToDictionary(t => Path.GetFileName(t.FilePath), t => t.GetText().ToString());
+        ImmutableArray<Diagnostic> analyzerDiagnostics = output
+            .WithAnalyzers([new NullComparisonAnalyzer(), new RawSqlHoleAnalyzer()])
+            .GetAnalyzerDiagnosticsAsync()
+            .GetAwaiter()
+            .GetResult();
         ImmutableArray<Diagnostic> diagnostics = generatorDiagnostics
             .AddRange(output.GetDiagnostics())
+            .AddRange(analyzerDiagnostics)
             .Where(d => d.Severity >= DiagnosticSeverity.Warning)
             .ToImmutableArray();
         return (sources, diagnostics);

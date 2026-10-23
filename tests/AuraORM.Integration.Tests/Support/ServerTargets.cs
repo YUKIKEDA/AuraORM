@@ -48,6 +48,8 @@ public sealed class PostgreSqlTarget : ServerTarget<PostgreSqlDialect>
               state_value smallint
             )
             """,
+        "DROP TABLE IF EXISTS pets",
+        "CREATE TABLE pets (id bigint PRIMARY KEY, owner_id bigint, name varchar(50) NOT NULL)",
     ];
 
     protected override async Task<DbDataSource> CreateDataSourceAsync(string connectionString)
@@ -140,6 +142,8 @@ public sealed class SqlServerTarget : ServerTarget<SqlServerDialect>
               state_value smallint
             )
             """,
+        "DROP TABLE IF EXISTS pets",
+        "CREATE TABLE pets (id bigint PRIMARY KEY, owner_id bigint, name nvarchar(50) NOT NULL)",
     ];
 
     protected override async Task<DbDataSource> CreateDataSourceAsync(string connectionString)
@@ -212,5 +216,7 @@ internal static class MySqlFamily
               state_value SMALLINT
             )
             """,
+        "DROP TABLE IF EXISTS pets",
+        "CREATE TABLE pets (id BIGINT PRIMARY KEY, owner_id BIGINT, name VARCHAR(50) NOT NULL)",
     ];
 }

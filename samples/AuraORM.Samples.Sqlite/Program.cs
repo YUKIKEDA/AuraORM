@@ -52,6 +52,18 @@ checks.SameItems("optional conditions", [1L, 3L], filtered);
 List<Genre> genres = await db.From(Book.Table).SelectDistinct(b => b.Genre).OrderBy(g => [Desc(g)]).ToListAsync();
 checks.SameItems("distinct ordered", [Genre.Science, Genre.Fiction], genres);
 
+// Joins, with the nullable whole row of an outer join (NullableColumns.ReadRow) and an aliased self-join.
+await db.ExecuteAsync($"CREATE TABLE {Loan.Table} (id INTEGER PRIMARY KEY, book_id INTEGER NOT NULL, borrower TEXT NOT NULL)");
+await db.ExecuteAsync($"INSERT INTO {Loan.Table} (id, book_id, borrower) VALUES ({1L}, {3L}, {"Ada"})");
+List<(string, Loan?)> loans = await db.From(Book.Table)
+    .LeftJoin(Loan.Table, (b, l) => Eq(l.BookId, b.Id))
+    .Select((b, l) => (b.Title, l))
+    .OrderBy((b, l) => [Asc(b.Id)])
+    .ToListAsync();
+checks.SameItems("left join", [("Dune", (Loan?)null), ("Anonymous Tales", null), ("Cosmos", new Loan(1, 3, "Ada"))], loans);
+long later = await db.From(Book.Table).InnerJoin(Book.Table.As("later"), (b, x) => Gt(x.Id, b.Id)).Select((b, x) => Count()).SingleAsync();
+checks.Equal("self join", 3L, later);
+
 SqlStatement offline = new SqlBuilder<SqliteDialect>().From(Book.Table).Select(b => b.Title).Limit(1).ToSql();
 checks.Equal("sql builder", "SELECT \"books\".\"title\" FROM \"books\" LIMIT @p0", offline.Text);
 checks.Equal("select aggregates", (3L, (int?)412), (count, longest));
@@ -162,6 +174,12 @@ namespace AuraORM.Samples.Sqlite
             this with { Image = null } == other with { Image = null }
             && (Image is null ? other.Image is null : other.Image is not null && Image.AsSpan().SequenceEqual(other.Image));
     }
+
+    /// <summary>
+    /// A loan of a book, joined to <see cref="Book"/>.
+    /// </summary>
+    [Table("loans", Naming = ColumnNaming.SnakeCase)]
+    public sealed partial record Loan([PrimaryKey] long Id, long BookId, string Borrower);
 
     /// <summary>
     /// A result type read by column name from a raw query.
