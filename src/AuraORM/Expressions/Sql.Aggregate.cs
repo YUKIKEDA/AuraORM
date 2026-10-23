@@ -62,10 +62,10 @@ public static partial class Sql
     /// </summary>
     /// <param name="value">The summed value.</param>
     /// <returns>The expression. It is null when there are no non-null values.</returns>
-    public static IExpr<decimal?, PerGroup> Sum(IExpr<decimal, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Sum, value.Node);
+    public static IExpr<decimal?, PerGroup> Sum(IExpr<decimal, PerRow> value) => DecimalAggregate(AggregateFunction.Sum, value.Node, "SUM");
 
     /// <inheritdoc cref="Sum(IExpr{decimal, PerRow})"/>
-    public static IExpr<decimal?, PerGroup> Sum(IExpr<decimal?, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Sum, value.Node);
+    public static IExpr<decimal?, PerGroup> Sum(IExpr<decimal?, PerRow> value) => DecimalAggregate(AggregateFunction.Sum, value.Node, "SUM");
 
     /// <inheritdoc cref="Sum(IExpr{decimal, PerRow})"/>
     public static IExpr<double?, PerGroup> Sum(IExpr<double, PerRow> value) => Aggregate<double?>(AggregateFunction.Sum, value.Node);
@@ -125,10 +125,10 @@ public static partial class Sql
     /// </summary>
     /// <param name="value">The averaged value.</param>
     /// <returns>The expression. It is null when there are no non-null values.</returns>
-    public static IExpr<decimal?, PerGroup> Avg(IExpr<decimal, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Average, value.Node);
+    public static IExpr<decimal?, PerGroup> Avg(IExpr<decimal, PerRow> value) => DecimalAggregate(AggregateFunction.Average, value.Node, "AVG");
 
     /// <inheritdoc cref="Avg(IExpr{decimal, PerRow})"/>
-    public static IExpr<decimal?, PerGroup> Avg(IExpr<decimal?, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Average, value.Node);
+    public static IExpr<decimal?, PerGroup> Avg(IExpr<decimal?, PerRow> value) => DecimalAggregate(AggregateFunction.Average, value.Node, "AVG");
 
     /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
     public static IExpr<byte?, PerGroup> Min(IExpr<byte, PerRow> value) => Aggregate<byte?>(AggregateFunction.Min, value.Node);
@@ -172,10 +172,10 @@ public static partial class Sql
     public static IExpr<double?, PerGroup> Min(IExpr<double?, PerRow> value) => Aggregate<double?>(AggregateFunction.Min, value.Node);
 
     /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
-    public static IExpr<decimal?, PerGroup> Min(IExpr<decimal, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Min, value.Node);
+    public static IExpr<decimal?, PerGroup> Min(IExpr<decimal, PerRow> value) => DecimalAggregate(AggregateFunction.Min, value.Node, "MIN");
 
     /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
-    public static IExpr<decimal?, PerGroup> Min(IExpr<decimal?, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Min, value.Node);
+    public static IExpr<decimal?, PerGroup> Min(IExpr<decimal?, PerRow> value) => DecimalAggregate(AggregateFunction.Min, value.Node, "MIN");
 
     /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
     public static IExpr<DateTime?, PerGroup> Min(IExpr<DateTime, PerRow> value) => Aggregate<DateTime?>(AggregateFunction.Min, value.Node);
@@ -261,10 +261,10 @@ public static partial class Sql
     public static IExpr<double?, PerGroup> Max(IExpr<double?, PerRow> value) => Aggregate<double?>(AggregateFunction.Max, value.Node);
 
     /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
-    public static IExpr<decimal?, PerGroup> Max(IExpr<decimal, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Max, value.Node);
+    public static IExpr<decimal?, PerGroup> Max(IExpr<decimal, PerRow> value) => DecimalAggregate(AggregateFunction.Max, value.Node, "MAX");
 
     /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
-    public static IExpr<decimal?, PerGroup> Max(IExpr<decimal?, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Max, value.Node);
+    public static IExpr<decimal?, PerGroup> Max(IExpr<decimal?, PerRow> value) => DecimalAggregate(AggregateFunction.Max, value.Node, "MAX");
 
     /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
     public static IExpr<DateTime?, PerGroup> Max(IExpr<DateTime, PerRow> value) => Aggregate<DateTime?>(AggregateFunction.Max, value.Node);
@@ -309,4 +309,8 @@ public static partial class Sql
         where T : struct, Enum => Aggregate<T?>(AggregateFunction.Max, value.Node);
 
     private static SqlExpr<T, PerGroup> Aggregate<T>(AggregateFunction function, SqlNode? argument) => new(new AggregateNode(function, argument));
+
+    // MIN / MAX / SUM / AVG of decimals are rejected on SQLite (§3.3).
+    private static SqlExpr<decimal?, PerGroup> DecimalAggregate(AggregateFunction function, SqlNode argument, string name) =>
+        new(new DecimalOrderingNode(new AggregateNode(function, argument), name));
 }

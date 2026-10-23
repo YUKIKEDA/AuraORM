@@ -302,9 +302,9 @@ public sealed class FunctionRenderingTests
                 []
             },
             {
-                "Sum of decimals",
-                () => Sum(Balance),
-                new($"SUM({U}.\"Balance\")", $"SUM({U}.\"Balance\")", $"SUM({B}.`Balance`)", $"SUM({S}.[Balance])"),
+                "Sum of floating-point numbers",
+                () => Sum(Rating),
+                new($"SUM({U}.\"Rating\")", $"SUM({U}.\"Rating\")", $"SUM({B}.`Rating`)", $"SUM({S}.[Rating])"),
                 []
             },
             {
@@ -319,9 +319,14 @@ public sealed class FunctionRenderingTests
                 []
             },
             {
-                "Avg of decimals",
-                () => Avg(Balance),
-                new($"AVG({U}.\"Balance\")", $"AVG({U}.\"Balance\")", $"AVG({B}.`Balance`)", $"AVG({S}.[Balance])"),
+                "Avg of floating-point numbers",
+                () => Avg(Rating),
+                new(
+                    $"AVG({U}.\"Rating\")",
+                    $"AVG(CAST({U}.\"Rating\" AS double precision))",
+                    $"CAST(AVG({B}.`Rating`) AS DOUBLE)",
+                    $"AVG(CAST({S}.[Rating] AS float))"
+                ),
                 []
             },
             {

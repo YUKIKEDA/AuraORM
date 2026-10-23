@@ -116,7 +116,7 @@ flowchart LR
 ### 2.3 名前空間と公開面
 
 - 公開する型は名前空間 `AuraORM` に置く。利用者は `using AuraORM;` と `using static AuraORM.Sql;` で全機能を使える。
-- 公開面は次に限る: `Database<TDialect>` と `Transaction<TDialect>`、方言の型と機能のインターフェース、ビルダーの段階の型、式の型（`IExpr<T, TLevel>`、`Column<T>`、`Condition<TLevel>`、`IProjection<T, TLevel>`）、関数（`Sql`）、属性、`SqlStatement`、例外。
+- 公開面は次に限る: `Database<TDialect>` と `Transaction<TDialect>`、接続を持たない `SqlBuilder<TDialect>`、方言の型と機能のインターフェース、ビルダーの段階の型、式の型（`IExpr<T, TLevel>`、`Column<T>`、`Condition<TLevel>`、`IProjection<T, TLevel>`）、関数（`Sql`）、属性、`SqlStatement`、例外。
 - 生成コードが呼ぶ型（`TableAlias` と、その `Column<T>` などのメソッド）も公開する。利用者のコードからは作れない（コンストラクターが `internal`）ので、列を得る道はラムダの引数だけのままである（§3.4）。
 - 文の木、SQL の出力、パラメータの設定は `internal` にする。
 
@@ -224,6 +224,7 @@ public sealed partial record User(
 
 - `string` と `byte[]` は `[MaxLength(n)]` があれば長さ付きの型、なければ長さのない型になる。
 - `decimal` の列には `[Precision(p, s)]` が必須である（エラー AURA0112）。既定の精度を置くと、PostgreSQL、MySQL、SQL Server は位取りを超える桁を黙って丸め、SQLite は丸めないので、同じ値の読み書きが方言で変わるためである。SQLite の `TEXT` は値を正確に保つが、SQL の中での大小比較と算術は数値として行われない。
+- SQLite では `decimal` の大小の比較（`Gt` / `Ge` / `Lt` / `Le` / `Between`）、`ORDER BY` のキー、`Min` / `Max` / `Sum` / `Avg` は、文を組み立てるときに `InvalidOperationException` になる（§14.3）。値が `TEXT` なので、大小の比較と並べ替えは文字列の順になる（SQLite 3.40 で `'9.5' > '10.25'` が真、`MAX` が `9.5` だった）。等しいかの比較（`Eq` / `Ne` / `In`）は正しいので許す。式の型は方言を持たないので、この誤りは型で止められない。EF Core の SQLite プロバイダーも、`decimal` の比較と並べ替えをデータベースでは行わない（クライアント側の評価にする）。
 - `Guid` は Microsoft.Data.Sqlite の既定に合わせて SQLite では `TEXT`（`00000000-0000-0000-0000-000000000000` の形）で保存する。
 - `DateTimeOffset` を MySQL / MariaDB の `DATETIME(6)` に保存すると、オフセットは保存されない（`DATETIME` はタイムゾーンを持たない）。
 - 主キー、一意制約、インデックス、外部キーに使う `string` と `byte[]` の列は `[MaxLength]` が必須である（エラー AURA0110）。MySQL と SQL Server では、長さのない型にインデックスを張れないためである。
@@ -355,6 +356,23 @@ SQL Server 2019 には `IS [NOT] DISTINCT FROM` がないので展開する。�
 | `Or(c1, c2, …)` | `(c1 OR c2 OR …)`。引数は二つ以上 |
 | `Not(c)` | `NOT (c)` |
 | `Exists(subquery)` | `EXISTS (SELECT …)` |
+| `And(conditions)` / `Or(conditions)` | 条件の一覧（`IEnumerable<Condition<TLevel>?>`）を結ぶ。`null` の要素は飛ばす。残りが二つ以上なら `(c1 AND c2 …)`、一つならその条件、一つもなければ「条件なし」。結果は `OptionalCondition<TLevel>` |
+
+条件の数が実行時に決まる絞り込み（検索フォームなど）は、一覧の `And` / `Or` で書く。
+
+```csharp
+var filters = new List<Condition<PerRow>?>
+{
+    name is null ? null : Like(u.Name, name + "%"),
+    minAge is null ? null : Ge(u.Age, minAge.Value),
+};
+db.From(User.Table).Where(u => And(filters)).Select(u => u);
+// 両方あれば WHERE ("users"."Name" LIKE @p0 AND "users"."Age" >= @p1)、一つならその条件だけ、なければ WHERE を出さない
+```
+
+- `OptionalCondition<TLevel>` は、SELECT の `Where`（と行 Q3 の `Having`）だけが受け取る。「条件なし」の `Where` は `WHERE` を出さない。条件の数が値で決まることは、`In` の要素の数と同じく文の形の一部である（§0.1）。
+- UPDATE と DELETE の `Where` は `Condition<PerRow>` だけを受け取り、`OptionalCondition` は CS1503 になる（§7、§8）。条件が一つもないときに全行を更新・削除する文にならないためである。全行は `AllRows()` で明示する。
+- Drizzle ORM の `and()` も `undefined` を飛ばし、一つもなければ `undefined` を返して、`where(undefined)` は `WHERE` を出さない。Drizzle では UPDATE / DELETE でも同じなので全行が対象になる。AuraORM はそこを型で止める（§19）。
 
 **算術**（数値型。`System.Numerics.INumber<T>` を満たす `T` と、その nullable。名前は .NET の命名の指針に合わせて略さない）
 
@@ -522,6 +540,8 @@ var rows = await db.From(User.Table)
 // WHERE ("users"."Age" > @p0 AND "users"."Name" LIKE @p1)
 ```
 
+`Where` は `Condition<PerRow>` か `OptionalCondition<PerRow>`（§4.2 の一覧の `And` / `Or`）を受け取る。「条件なし」なら `WHERE` を出さない。
+
 ### 5.5 GROUP BY と HAVING
 
 ```csharp
@@ -552,6 +572,17 @@ db.From(Order.Table)
 ### 5.7 DISTINCT
 
 `SelectDistinct(...)` は `SELECT DISTINCT …` を出す。射影の書き方は `Select` と同じ。
+
+`SELECT DISTINCT` の `ORDER BY` には、選択リストにある式しか書けない（PostgreSQL は `for SELECT DISTINCT, ORDER BY expressions must appear in select list` で失敗する。PostgreSQL 18 で確かめた。SQL Server の文書も同じ制約を書いている。SQLite と MySQL は受け付ける）。AuraORM はこれを型で止める。
+
+- `SelectDistinct` の後の `OrderBy` のラムダは、テーブルの列ではなく、選んだ項目を受け取る。一つの式ならその項目、式のタプルなら各項目のタプルである。項目の型は `DistinctItem<T, TLevel>` で、式ではないので関数の引数にはできず、`Asc` / `Desc` にだけ渡せる。選んだ項目から作った式（`Lower(s.Item1)` など）は選択リストにないためである。
+
+```csharp
+db.From(User.Table).SelectDistinct(u => (u.Status, u.Age)).OrderBy(s => [Asc(s.Item1), Desc(s.Item2)])
+// SELECT DISTINCT "users"."Status", "users"."Age" FROM "users" ORDER BY "users"."Status" ASC, "users"."Age" DESC
+```
+
+- 行全体、結果の型の射影（`RowProjection`）、行全体を含むタプルの `SelectDistinct` には `OrderBy` がない（CS1061）。並べ替えのキーを選んだ項目に限れないためである。並べるときは、並べる列を式のタプルで選ぶ。これは SQL より厳しい制限であり、理由は PostgreSQL と SQL Server で失敗する文を型で防ぐためである。
 
 ### 5.8 ORDER BY
 
@@ -649,6 +680,7 @@ await db.Update(User.Table)
 - `SET` の代入先の列名は修飾しない（PostgreSQL が受け付けないため）。それ以外の列の参照は §5.2 のとおり修飾する。
 - 代入の一覧が空のとき、または同じ列に二度代入したときは、文を作るときに `ArgumentException` になる（§14.3）。
 - `Set` の後は `Where(…)` か `AllRows()` のどちらかを書く。どちらもなければ `ExecuteAsync` が存在しない（CS1061）。`AllRows()` は SQL に何も足さない。
+- `Where` は `Condition<PerRow>` だけを受け取る。一覧の `And` / `Or` の結果（`OptionalCondition`、条件なしになりうる）は CS1503 になる（§4.2）。
 
 ## 8. DELETE
 
@@ -657,7 +689,7 @@ await db.Delete(User.Table).Where(u => Eq(u.Id, 1L)).ExecuteAsync();
 // DELETE FROM "users" WHERE "users"."Id" = @p0
 ```
 
-`Where(…)` か `AllRows()` がなければ `ExecuteAsync` が存在しないのは UPDATE と同じである。
+`Where(…)` か `AllRows()` がなければ `ExecuteAsync` が存在しないのは UPDATE と同じである。`Where` が `OptionalCondition` を受け取らないのも UPDATE と同じである（§4.2）。
 
 ## 9. RETURNING
 
@@ -813,6 +845,17 @@ SqlStatement s = db.From(User.Table).Where(u => Gt(u.Age, 20)).Select(u => u.Nam
 
 `SqlStatement` は SQL の文字列と、パラメータの名前と値の一覧を持つ。実行するときに使う SQL と同じものである。
 
+接続のないところで SQL だけを作るときは `SqlBuilder<TDialect>` を使う（R9）。`Database<TDialect>` と同じ文の入口（`From`、行 M1 の `Insert` / `Update` / `Delete` など）を持ち、接続もプロバイダーも要らない。
+
+```csharp
+var sql = new SqlBuilder<PostgreSqlDialect>();
+SqlStatement s = sql.From(User.Table).Where(u => Gt(u.Age, 20)).Select(u => u.Name).ToSql();
+// sql.From(User.Table).Select(u => u.Name).ToListAsync();   // CS1061: 実行のメソッドがない
+```
+
+- 段階の型は、方言のほかに「実行できるか」を型引数（`TMode`）に持つ。`Database` と `Transaction` から作った文は `Executable`、`SqlBuilder` から作った文は `SqlOnly` で、実行のメソッド（`ToListAsync` など）は `Executable` の文にだけある。実行できない文を実行するとコンパイルエラーになる。
+- Drizzle ORM の `new QueryBuilder()`（`drizzle-orm/pg-core`）も、型引数 `TBuilderMode`（`'db'` / `'qb'`）で、`QueryBuilder` から作った文を実行のメソッドのない型にしている（§19）。
+
 ### 12.4 パラメータ
 
 - パラメータは `DbCommand.CreateParameter()` で作り、名前（PostgreSQL では名前なし）と `Value` だけを設定する。`DbType` は設定しない。型の推定はプロバイダーに任せる。
@@ -906,6 +949,9 @@ CREATE TABLE "users" (
 | SQL Server で `ORDER BY` のない `Limit` | 同上 | CS0311 |
 | SQLite、MySQL、MariaDB で `Limit` のない `Offset`、SQL Server で `ORDER BY` のない `Offset` | 同上（`IOffsetWithoutLimitDialect` / `IUnorderedOffsetDialect`） | CS0311 |
 | 集合演算の演算子の混在 | 段階の型（§5.10） | CS1061 |
+| `SelectDistinct` の後の `OrderBy` に選んでいない式を書く | `OrderBy` が選んだ項目だけを受け取る（§5.7） | CS1503 / CS1061 |
+| UPDATE / DELETE の `Where` に「条件なし」になりうる条件を渡す | `Where` が `Condition<PerRow>` だけを受け取る（§4.2） | CS1503 |
+| `SqlBuilder` から作った文を実行する | 実行のメソッドがない（§12.3） | CS1061 |
 | 文字列の SQL を断片に入れる | 補間文字列ハンドラーだけを受け取る | CS1503 |
 | 生 SQL の穴に扱えない型の値を入れる | アナライザー | AURA0301 |
 | 文字列の関数（`Like`、`Concat` など）に文字列でない値を渡す | 型引数の制約（`IEnumerable<char>?`） | CS0313 / CS0315 |
@@ -929,6 +975,7 @@ CREATE TABLE "users" (
 | UPDATE の代入の一覧が空、同じ列に二度代入した（§7） | `ArgumentException` |
 | パラメータの数が方言の上限を超えた（§12.4） | `ArgumentException` |
 | SQL Server の複数行の INSERT が 1000 行を超えた（§6.2） | `ArgumentException` |
+| SQLite で `decimal` の大小の比較、並べ替え、`Min` / `Max` / `Sum` / `Avg` を使った（§3.3） | `InvalidOperationException` |
 | 生のクエリで、結果の型のメンバーに対応する列がない（§11.3） | `InvalidOperationException` |
 | `Limit` / `Offset` に負の値を渡した | `ArgumentOutOfRangeException` |
 
@@ -1018,7 +1065,7 @@ v0.1 に入れるものと、その順序は [roadmap.md](./roadmap.md) にあ�
 - MySQL: [SELECT](https://dev.mysql.com/doc/refman/8.0/en/select.html)、[JOIN](https://dev.mysql.com/doc/refman/8.0/en/join.html)、[集合演算](https://dev.mysql.com/doc/refman/8.0/en/set-operations.html)、[INSERT … ON DUPLICATE KEY UPDATE](https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html)、[比較演算子](https://dev.mysql.com/doc/refman/8.0/en/comparison-operators.html)、[識別子](https://dev.mysql.com/doc/refman/8.0/en/identifiers.html)、[文字列関数](https://dev.mysql.com/doc/refman/8.0/en/string-functions.html)、[日付と時刻の関数（NOW）](https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html)、[DATETIME の型](https://dev.mysql.com/doc/refman/8.0/en/datetime.html)、[文字列の比較（LIKE と ESCAPE）](https://dev.mysql.com/doc/refman/8.0/en/string-comparison-functions.html)、[CREATE INDEX](https://dev.mysql.com/doc/refman/8.0/en/create-index.html)、[プレースホルダーの上限（バグ 101630）](https://bugs.mysql.com/bug.php?id=101630)。8.0 のサポート終了は [Percona の記事](https://www.percona.com/blog/mysql-8-0-end-of-life-date/) による（二次資料）
 - MariaDB: [UPDATE（RETURNING は 13.0 から）](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/changing-deleting-data/update)、[10.5.0（INSERT … RETURNING）](https://mariadb.com/docs/release-notes/community-server/old-releases/10.5/10.5.0)、[ON DUPLICATE KEY UPDATE](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/inserting-loading-data/insert-on-duplicate-key-update)、[CREATE INDEX](https://mariadb.com/docs/server/reference/sql-statements/data-definition/create/create-index)、[保守の方針](https://mariadb.org/about/#maintenance-policy)
 - SQL Server: [OUTPUT 句](https://learn.microsoft.com/en-us/sql/t-sql/queries/output-clause-transact-sql)、[UPDATE](https://learn.microsoft.com/en-us/sql/t-sql/queries/update-transact-sql)、[ORDER BY（OFFSET / FETCH）](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-order-by-clause-transact-sql)、[IS DISTINCT FROM](https://learn.microsoft.com/en-us/sql/t-sql/queries/is-distinct-from-transact-sql)、[識別子](https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers)、[CONCAT](https://learn.microsoft.com/en-us/sql/t-sql/functions/concat-transact-sql)、[CONCAT_NULL_YIELDS_NULL](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-concat-null-yields-null-transact-sql)、[比較演算子（真偽値）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/comparison-operators-transact-sql)、[検索条件](https://learn.microsoft.com/en-us/sql/t-sql/queries/search-condition-transact-sql)、[最大容量（パラメータ 2100）](https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server)、[CREATE TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-table-transact-sql)、[DROP TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/drop-table-transact-sql)、[CREATE INDEX](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-index-transact-sql)、[集合演算子](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/set-operators-except-and-intersect-transact-sql)、[MIN](https://learn.microsoft.com/en-us/sql/t-sql/functions/min-transact-sql)、[LEN（max の型で bigint）](https://learn.microsoft.com/en-us/sql/t-sql/functions/len-transact-sql)、[テーブル値コンストラクター（1000 行）](https://learn.microsoft.com/en-us/sql/t-sql/queries/table-value-constructor-transact-sql)、[CURRENT_TIMESTAMP](https://learn.microsoft.com/en-us/sql/t-sql/functions/current-timestamp-transact-sql)、[LIKE（ESCAPE）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/like-transact-sql)、[WITH](https://learn.microsoft.com/en-us/sql/t-sql/queries/with-common-table-expression-transact-sql)
-- ほかのライブラリ: [Dapper の `SqlMapper.cs`（`QueryImpl` の `finally` で `cmd?.Cancel()`、commit eb47546）](https://github.com/DapperLib/Dapper/blob/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/Dapper/SqlMapper.cs)
+- ほかのライブラリ: [Drizzle ORM の `and()`（`undefined` を飛ばし、一つもなければ `undefined`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/sql/expressions/conditions.ts)、[同・`where` が `undefined` なら WHERE を出さない（`pg-core/dialect.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/dialect.ts)、[同・`TBuilderMode`（`pg-core/query-builders/select.ts`、`select.types.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/select.types.ts)、[同・standalone query builder](https://orm.drizzle.team/docs/goodies)、[Kysely の DummyDriver](https://kysely.dev/docs/recipes/splitting-query-building-and-execution)、[EF Core の SQLite の制限（decimal の比較と並べ替え）](https://learn.microsoft.com/en-us/ef/core/providers/sqlite/limitations)、[Dapper の `SqlMapper.cs`（`QueryImpl` の `finally` で `cmd?.Cancel()`、commit eb47546）](https://github.com/DapperLib/Dapper/blob/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/Dapper/SqlMapper.cs)
 - プロバイダー: [SqlDataReader.Close（Cancel を先に呼ぶ）](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqldatareader.close)、[SqlParameter.Value（DBNull）](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqlparameter.value)、[Microsoft.Data.Sqlite のパラメータ](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/parameters)、[同・型](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/types)、[Npgsql の基本的な使い方（位置パラメータ）](https://www.npgsql.org/doc/basic-usage.html)、[Npgsql 8.0（NativeAOT）](https://www.npgsql.org/doc/release-notes/8.0.html)、[Npgsql の日付と時刻](https://www.npgsql.org/doc/types/datetime.html)、[MySqlConnector の版の履歴](https://mysqlconnector.net/overview/version-history/)、[SqlClient の CHANGELOG](https://raw.githubusercontent.com/dotnet/SqlClient/main/CHANGELOG.md)
 
 集計の結果の SQL の型（§4.2 の `Sum` と `Avg` の `CAST` の理由）は、この資料の確認に含めていない。行 Q3 の結合テストで、各方言の結果を確かめてから実装する。

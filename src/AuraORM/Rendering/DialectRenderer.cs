@@ -28,6 +28,13 @@ internal abstract class DialectRenderer
     protected virtual string LengthFunction => "CHAR_LENGTH";
 
     /// <summary>
+    /// Rejects an expression that orders or aggregates <see cref="decimal"/> values where the dialect cannot do it correctly
+    /// (§3.3, §14.3). Only SQLite does.
+    /// </summary>
+    /// <param name="operation">What the expression does, for the message.</param>
+    public virtual void CheckDecimalOrdering(string operation) { }
+
+    /// <summary>
     /// Writes the length of a string in characters (§4.2).
     /// </summary>
     /// <param name="context">The rendering context.</param>

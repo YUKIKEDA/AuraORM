@@ -70,21 +70,21 @@ public static partial class Sql
     /// <param name="right">The right operand.</param>
     /// <returns>The condition.</returns>
     public static Condition<TLevel> Gt<T, TLevel>(IExpr<T, TLevel> left, IExpr<T, TLevel> right)
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.GreaterThan, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.GreaterThan, left.Node, right.Node);
 
     /// <inheritdoc cref="Gt{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Gt<T, TLevel>(IExpr<T?, TLevel> left, IExpr<T, TLevel> right)
         where T : struct
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.GreaterThan, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.GreaterThan, left.Node, right.Node);
 
     /// <inheritdoc cref="Gt{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Gt<T, TLevel>(IExpr<T, TLevel> left, IExpr<T?, TLevel> right)
         where T : struct
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.GreaterThan, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.GreaterThan, left.Node, right.Node);
 
     /// <inheritdoc cref="Gt{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Gt<T, TLevel>(IExpr<T, TLevel> left, T right)
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.GreaterThan, left.Node, Param(right));
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.GreaterThan, left.Node, Param(right));
 
     /// <summary>
     /// Tests whether the left operand is greater or equal: <c>a &gt;= b</c>.
@@ -95,21 +95,21 @@ public static partial class Sql
     /// <param name="right">The right operand.</param>
     /// <returns>The condition.</returns>
     public static Condition<TLevel> Ge<T, TLevel>(IExpr<T, TLevel> left, IExpr<T, TLevel> right)
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.GreaterThanOrEqual, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.GreaterThanOrEqual, left.Node, right.Node);
 
     /// <inheritdoc cref="Ge{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Ge<T, TLevel>(IExpr<T?, TLevel> left, IExpr<T, TLevel> right)
         where T : struct
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.GreaterThanOrEqual, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.GreaterThanOrEqual, left.Node, right.Node);
 
     /// <inheritdoc cref="Ge{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Ge<T, TLevel>(IExpr<T, TLevel> left, IExpr<T?, TLevel> right)
         where T : struct
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.GreaterThanOrEqual, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.GreaterThanOrEqual, left.Node, right.Node);
 
     /// <inheritdoc cref="Ge{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Ge<T, TLevel>(IExpr<T, TLevel> left, T right)
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.GreaterThanOrEqual, left.Node, Param(right));
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.GreaterThanOrEqual, left.Node, Param(right));
 
     /// <summary>
     /// Tests whether the left operand is less: <c>a &lt; b</c>.
@@ -120,21 +120,21 @@ public static partial class Sql
     /// <param name="right">The right operand.</param>
     /// <returns>The condition.</returns>
     public static Condition<TLevel> Lt<T, TLevel>(IExpr<T, TLevel> left, IExpr<T, TLevel> right)
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.LessThan, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.LessThan, left.Node, right.Node);
 
     /// <inheritdoc cref="Lt{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Lt<T, TLevel>(IExpr<T?, TLevel> left, IExpr<T, TLevel> right)
         where T : struct
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.LessThan, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.LessThan, left.Node, right.Node);
 
     /// <inheritdoc cref="Lt{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Lt<T, TLevel>(IExpr<T, TLevel> left, IExpr<T?, TLevel> right)
         where T : struct
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.LessThan, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.LessThan, left.Node, right.Node);
 
     /// <inheritdoc cref="Lt{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Lt<T, TLevel>(IExpr<T, TLevel> left, T right)
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.LessThan, left.Node, Param(right));
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.LessThan, left.Node, Param(right));
 
     /// <summary>
     /// Tests whether the left operand is less or equal: <c>a &lt;= b</c>.
@@ -145,21 +145,21 @@ public static partial class Sql
     /// <param name="right">The right operand.</param>
     /// <returns>The condition.</returns>
     public static Condition<TLevel> Le<T, TLevel>(IExpr<T, TLevel> left, IExpr<T, TLevel> right)
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.LessThanOrEqual, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.LessThanOrEqual, left.Node, right.Node);
 
     /// <inheritdoc cref="Le{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Le<T, TLevel>(IExpr<T?, TLevel> left, IExpr<T, TLevel> right)
         where T : struct
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.LessThanOrEqual, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.LessThanOrEqual, left.Node, right.Node);
 
     /// <inheritdoc cref="Le{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Le<T, TLevel>(IExpr<T, TLevel> left, IExpr<T?, TLevel> right)
         where T : struct
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.LessThanOrEqual, left.Node, right.Node);
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.LessThanOrEqual, left.Node, right.Node);
 
     /// <inheritdoc cref="Le{T, TLevel}(IExpr{T, TLevel}, IExpr{T, TLevel})"/>
     public static Condition<TLevel> Le<T, TLevel>(IExpr<T, TLevel> left, T right)
-        where TLevel : EvaluationLevel => Compare<TLevel>(ComparisonOperator.LessThanOrEqual, left.Node, Param(right));
+        where TLevel : EvaluationLevel => Ordered<T, TLevel>(ComparisonOperator.LessThanOrEqual, left.Node, Param(right));
 
     /// <summary>
     /// Tests whether a value is in a range, bounds included: <c>a BETWEEN low AND high</c>.
@@ -171,11 +171,11 @@ public static partial class Sql
     /// <param name="high">The upper bound.</param>
     /// <returns>The condition.</returns>
     public static Condition<TLevel> Between<T, TLevel>(IExpr<T, TLevel> value, T low, T high)
-        where TLevel : EvaluationLevel => new(new BetweenNode(value.Node, Param(low), Param(high)));
+        where TLevel : EvaluationLevel => new(DecimalOrderingNode.For<T>(new BetweenNode(value.Node, Param(low), Param(high)), "BETWEEN"));
 
     /// <inheritdoc cref="Between{T, TLevel}(IExpr{T, TLevel}, T, T)"/>
     public static Condition<TLevel> Between<T, TLevel>(IExpr<T, TLevel> value, IExpr<T, TLevel> low, IExpr<T, TLevel> high)
-        where TLevel : EvaluationLevel => new(new BetweenNode(value.Node, low.Node, high.Node));
+        where TLevel : EvaluationLevel => new(DecimalOrderingNode.For<T>(new BetweenNode(value.Node, low.Node, high.Node), "BETWEEN"));
 
     /// <summary>
     /// Tests whether a value is one of a list of values: <c>a IN (@p0, @p1, …)</c>. An empty list is written <c>1 = 0</c>.
@@ -273,6 +273,10 @@ public static partial class Sql
 
     private static Condition<TLevel> Compare<TLevel>(ComparisonOperator op, SqlNode left, SqlNode right)
         where TLevel : EvaluationLevel => new(new ComparisonNode(op, left, right));
+
+    // A comparison by size of decimals is rejected on SQLite (§3.3).
+    private static Condition<TLevel> Ordered<T, TLevel>(ComparisonOperator op, SqlNode left, SqlNode right)
+        where TLevel : EvaluationLevel => new(DecimalOrderingNode.For<T>(new ComparisonNode(op, left, right), "a comparison by size"));
 
     private static ParameterNode<T> Param<T>(T value) => new(value);
 
