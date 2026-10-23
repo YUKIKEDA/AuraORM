@@ -37,6 +37,8 @@ Labels have the form `<axis>:<value>`. The only axis today is `type`.
 
 CI (`.github/workflows/ci.yml`) is the merge gate. Every check that CI can run is in CI: a check that runs only on a developer's machine is invisible to reviewers and can be skipped without anyone knowing, so it guarantees nothing.
 
+GitHub enforces the gate: `main` is protected, and its one required status check is the `ci` job, which needs every other job and fails when any of them did not pass. A new job is added to the `needs` of `ci` in the PR that adds it; a job left out of `needs` is not part of the gate.
+
 - `./build.ps1` on Windows, Linux, and macOS: tool restore, CSharpier check, restore, then Release and Debug builds with warnings as errors, each followed by every `tests/**/*.Tests.csproj`.
 - Database integration tests run in CI against service containers of every supported database (`.cursor/rules/containers.mdc`). Locally they run against WSL containers while developing; that run is a note in the PR, not the gate.
 - The NativeAOT publish check runs in CI (`.cursor/rules/aot.mdc`).
