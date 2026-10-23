@@ -30,7 +30,7 @@ docs/                        設計・判断・ロードマップ・規約（本
 | --- | --- |
 | `src/AuraORM` | ランタイムのライブラリ（`net8.0`、`IsAotCompatible`、パッケージ依存なし）。式と関数（`Expressions/`）、方言の型と機能のインターフェース（`Dialects/`）、文の木と方言ごとの SQL の出力（`Rendering/`）、SELECT のビルダーの段階の型（`Select/`、テーブルとタプルの数だけ違う型は `Select/Generated/`）、`SqlStatement`（`Statements/`）、生成コードが使う型（`Tables/`、`Projections/`）、行の読み取り（`Reading/`）、属性とテーブルの情報（`Schema/`） |
 | `src/AuraORM.Generators` | ソースジェネレーター（`netstandard2.0`、Roslyn 4.8）。`[Table]` と `[QueryResult]` の型を読み（`SchemaReader`）、モデル（`Model/`）から C# 12 のコードを出す（`TableEmitter`、`ResultEmitter`）。診断の ID は `Diagnostics` と `AnalyzerReleases.*.md`。`AuraORM` のパッケージの `analyzers/dotnet/cs` に入る |
-| `samples/AuraORM.Samples.Sqlite` | NativeAOT の検査に使うサンプル（`net8.0`、`PublishAot`）。SQLite で API を通し、結果を確かめて終了コードで知らせる。CI がこれを NativeAOT で発行して実行し、警告が 1 件でもあれば失敗する。行ごとに、追加した API をここで通す |
+| `samples/AuraORM.Samples.Sqlite` | NativeAOT の検査に使うサンプル（`net8.0` と `net10.0`、`PublishAot`）。SQLite で API を通し、結果を確かめて終了コードで知らせる。CI がこれを Linux（x64）・Windows（x64）・macOS（arm64）で TFM ごとに NativeAOT で発行して実行し、警告が 1 件でもあれば失敗する。ジョブのサマリーに実行ファイルの大きさと main との差が出る。行ごとに、追加した API をここで通す |
 | `tools/AuraORM.StageGenerator` | SELECT の段階の型のうち、テーブルの数とタプルの要素の数だけが違うもの（`SelectFrom`、`SelectWhere`、`SelectProjected`、`Select` の多重定義など）を `src/AuraORM/Select/Generated` に書き出すコンソールアプリ（`net10.0`、パッケージには入らない）。出力はコミットする。段階の型を変えるときは `dotnet run --project tools/AuraORM.StageGenerator` の後に `dotnet csharpier format src/AuraORM/Select/Generated` を実行する。CI は同じことをして、コミットとの差分があれば失敗する |
 | `tests/AuraORM.Generators.Tests` | ジェネレーターのテスト（`net8.0` と `net10.0`）。断片を C# 12 の利用者のコードとしてジェネレーター付きでコンパイルし、成功するか、診断の ID を確かめる（`Support/GeneratorHarness`） |
 | `tests/AuraORM.Integration.Tests` | 結合テスト（`net8.0` と `net10.0`）。同じテストを方言ごとに回すため、テストのクラスは方言を型引数に取る抽象クラスで、方言ごとに派生クラスを置く（`RawQueryTests<TDialect>` と `SqliteRawQueryTests`、`SelectTests<TDialect>` と `SqliteSelectTests`。サーバーの分は `Execution/ServerTests.cs`）。データベースは `Support/ITestTarget<TDialect>` が用意する。SQLite はプロセス内のメモリ上のデータベース。サーバーは環境変数 `AURA_TEST_{NAME}` の接続文字列を使い、未設定なら飛ばす。`AURA_TEST_REQUIRE` に名前のあるデータベースは、未設定なら失敗する。サーバーごとのテストは xUnit のコレクションで一つずつ回す |
@@ -39,7 +39,7 @@ docs/                        設計・判断・ロードマップ・規約（本
 ## ビルドとゲート
 
 - PR を出す前に `./build.ps1` を通す。ツールの復元、CSharpier の検査、復元、Release と Debug のビルド、全テストプロジェクトの実行を行う
-- CI は同じスクリプトを Windows・Linux・macOS で回す。データベースの結合テストと NativeAOT の検査も CI で回す。マージの条件は CI がすべて緑であること。ローカルでの実行は開発の補助であり、ゲートの代わりにならない
+- CI は同じスクリプトを Windows・Linux・macOS で回す。データベースの結合テスト（行 I1 で足す）と NativeAOT の検査（行 N1 で足す）も CI で回す。マージの条件は CI がすべて緑であること。ローカルでの実行は開発の補助であり、ゲートの代わりにならない
 - 警告は最初からすべてエラー（`TreatWarningsAsErrors`）。ビルドを通すために `NoWarn` や `#pragma warning disable` を足さない。ルールがこのリポジトリに合わない場合は、理由をコメントに書いて `.editorconfig` を変え、PR でそう明記する
 - `src/AuraORM` は `IsAotCompatible`。trim / AOT の警告もエラーになる。`BannedSymbols.txt` の API はビルドエラーになる
 - パッケージを足す前に `.cursor/rules/dependencies.mdc` を確かめる。ランタイムのライブラリには依存を足さない

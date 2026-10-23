@@ -12,6 +12,16 @@ internal abstract class ParameterNode : SqlNode
     /// </summary>
     public abstract object? ProviderValue { get; }
 
+    /// <summary>
+    /// Gets the CLR type of the value, without <see cref="Nullable{T}"/>.
+    /// </summary>
+    public abstract Type ValueType { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the value is null.
+    /// </summary>
+    public abstract bool IsNull { get; }
+
     public override void Render(SqlRenderContext context) => context.WriteParameter(this);
 }
 
@@ -22,6 +32,10 @@ internal abstract class ParameterNode : SqlNode
 internal sealed class ParameterNode<T>(T value) : ParameterNode
 {
     public override object? ProviderValue => ToProviderValue(value);
+
+    public override Type ValueType => Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+
+    public override bool IsNull => value is null;
 
     private static object? ToProviderValue(T value)
     {

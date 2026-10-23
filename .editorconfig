@@ -137,3 +137,8 @@ generated_code = true
 # Tools: code generators pass their templates as multi-line raw strings, which SA1118 rejects.
 [tools/**/*.cs]
 dotnet_diagnostic.SA1118.severity = none
+
+# CA1724: the design names the function class Sql (docs/design.ja.md §4.2), and System.Data.Sql has the same name. That
+# namespace is reachable as Sql only from code inside System.Data; a using directive does not import it. Only these files.
+[src/AuraORM/Expressions/Sql.*.cs]
+dotnet_diagnostic.CA1724.severity = none

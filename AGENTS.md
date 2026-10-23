@@ -52,7 +52,7 @@ Read the rules that match the work before changing anything. `alwaysApply` rules
 
 ## Skills
 
-Skills live in `.agents/skills/` (copied to `.claude/skills/`). `skills-lock.json` pins the ones that come from outside. Git tracks `.claude/skills/` as a copy, not as a link: a change to a skill changes both copies in the same commit.
+Skills live in `.agents/skills/` (copied to `.claude/skills/`). `skills-lock.json` pins the ones that come from outside, and each of those keeps its upstream `LICENSE` in its folder (both copies). Git tracks `.claude/skills/` as a copy, not as a link: a change to a skill changes both copies in the same commit.
 
 - `grilling`: when the design branches, before an Issue.
 - `github-closing`: before `gh pr create`, to check that the PR closes only what it finishes.

@@ -19,7 +19,7 @@ public sealed partial record Person(
     string? Nickname,
     int? Age,
     PersonStatus Status,
-    decimal Balance,
+    [Precision(18, 2)] decimal Balance,
     DateOnly Birthday
 );
 
@@ -28,3 +28,28 @@ public sealed partial record Person(
 /// </summary>
 [QueryResult]
 public sealed partial record NameAndAge([Column("person_name")] string Name, int? Age);
+
+/// <summary>
+/// A row with one nullable column of each column type of design §3.3, to check that each type and its null are written and
+/// read back on every database.
+/// </summary>
+[Table("typed_values", Naming = ColumnNaming.SnakeCase)]
+public sealed partial record TypedRow(
+    [PrimaryKey] long Id,
+    bool? FlagValue,
+    byte? TinyValue,
+    short? SmallValue,
+    int? NumberValue,
+    long? BigValue,
+    float? SingleValue,
+    double? DoubleValue,
+    [Precision(18, 4)] decimal? MoneyValue,
+    string? TextValue,
+    byte[]? BlobValue,
+    Guid? KeyValue,
+    DateTime? AtValue,
+    DateTimeOffset? AtOffsetValue,
+    DateOnly? DayValue,
+    TimeOnly? TimeValue,
+    PersonStatus? StateValue
+);

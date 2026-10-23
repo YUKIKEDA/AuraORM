@@ -121,6 +121,66 @@ public sealed class SqlServerTransactionTests : TransactionTests<SqlServerDialec
 }
 
 /// <summary>
+/// <see cref="TypedValueTests{TDialect}"/> on postgresql.
+/// </summary>
+[Collection("postgresql")]
+public sealed class PostgreSqlTypedValueTests : TypedValueTests<PostgreSqlDialect>, IAsyncLifetime
+{
+    private readonly PostgreSqlTarget _target = new();
+
+    private protected override ITestTarget<PostgreSqlDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="TypedValueTests{TDialect}"/> on mysql.
+/// </summary>
+[Collection("mysql")]
+public sealed class MySqlTypedValueTests : TypedValueTests<MySqlDialect>, IAsyncLifetime
+{
+    private readonly MySqlTarget _target = new();
+
+    private protected override ITestTarget<MySqlDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="TypedValueTests{TDialect}"/> on mariadb.
+/// </summary>
+[Collection("mariadb")]
+public sealed class MariaDbTypedValueTests : TypedValueTests<MariaDbDialect>, IAsyncLifetime
+{
+    private readonly MariaDbTarget _target = new();
+
+    private protected override ITestTarget<MariaDbDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="TypedValueTests{TDialect}"/> on sqlserver.
+/// </summary>
+[Collection("sqlserver")]
+public sealed class SqlServerTypedValueTests : TypedValueTests<SqlServerDialect>, IAsyncLifetime
+{
+    private readonly SqlServerTarget _target = new();
+
+    private protected override ITestTarget<SqlServerDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
 /// <see cref="SelectTests{TDialect}"/> on postgresql.
 /// </summary>
 [Collection("postgresql")]

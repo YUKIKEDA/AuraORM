@@ -42,6 +42,28 @@ checks.SameItems("select page", [("Anonymous Tales", (int?)null)], page);
 (long count, int? longest) = await db.From(Book.Table).Select(b => (Count(), Max(b.Pages))).SingleAsync();
 checks.Equal("select aggregates", (3L, (int?)412), (count, longest));
 
+// Every reading path of the generated code and of ValueReader<T> that a type of design §3.3 takes, with values and nulls.
+await db.ExecuteAsync(
+    $"CREATE TABLE {Gadget.Table} (id INTEGER PRIMARY KEY, flag INTEGER, price TEXT, key TEXT, made TEXT, opens TEXT, image BLOB, rating REAL, shade INTEGER)"
+);
+foreach (Gadget gadget in Gadget.Samples)
+{
+    await db.ExecuteAsync(
+        $"INSERT INTO {Gadget.Table} (id, flag, price, key, made, opens, image, rating, shade) VALUES ({gadget.Id}, {gadget.Flag}, {gadget.Price}, {gadget.Key}, {gadget.Made}, {gadget.Opens}, {gadget.Image}, {gadget.Rating}, {gadget.Shade})"
+    );
+}
+
+List<Gadget> gadgets = await db.QueryAsync<Gadget>($"SELECT id, flag, price, key, made, opens, image, rating, shade FROM {Gadget.Table} ORDER BY id");
+checks.Equal("every column type", true, gadgets.Count == 2 && Gadget.Samples.Zip(gadgets).All(p => p.First.SameAs(p.Second)));
+
+List<TitleAndPages> results = await db.QueryAsync<TitleAndPages>(
+    $"SELECT {Identifier("title")} AS heading, pages FROM {Book.Table} WHERE {Raw($"pages > {300}")} {Unsafe("ORDER BY id")}"
+);
+checks.SameItems("result type", [new TitleAndPages("Dune", 412), new TitleAndPages("Cosmos", 365)], results);
+
+checks.Equal("raw expression", 777L, await db.QueryScalarAsync<long>($"SELECT {Raw<long>($"{700} + {77}")}"));
+checks.Equal("scalar or default", null, await db.QueryScalarOrDefaultAsync<int?>($"SELECT pages FROM {Book.Table} WHERE id = {99}"));
+
 try
 {
     await db.InTransactionAsync(async tx =>
@@ -80,6 +102,58 @@ namespace AuraORM.Samples.Sqlite
             new(3, "Cosmos", "Carl Sagan", 365, Genre.Science, new DateOnly(1980, 1, 1)),
         ];
     }
+
+    /// <summary>
+    /// The shade of a gadget, stored as its underlying byte.
+    /// </summary>
+    public enum Shade : byte
+    {
+        Dark = 1,
+        Light = 2,
+    }
+
+    /// <summary>
+    /// A table with the column types that <see cref="Book"/> does not have, each nullable.
+    /// </summary>
+    [Table("gadgets")]
+    public sealed partial record Gadget(
+        [PrimaryKey] long Id,
+        [Column("flag")] bool? Flag,
+        [Precision(10, 2), Column("price")] decimal? Price,
+        [Column("key")] Guid? Key,
+        [Column("made")] DateTimeOffset? Made,
+        [Column("opens")] TimeOnly? Opens,
+        [Column("image")] byte[]? Image,
+        [Column("rating")] double? Rating,
+        [Column("shade")] Shade? Shade
+    )
+    {
+        public static readonly IReadOnlyList<Gadget> Samples =
+        [
+            new(
+                1,
+                true,
+                19.99m,
+                new Guid("6f9619ff-8b86-d011-b42d-00c04fc964ff"),
+                new DateTimeOffset(2024, 5, 6, 7, 8, 9, TimeSpan.FromHours(9)),
+                new TimeOnly(9, 30),
+                [1, 2, 3],
+                4.5,
+                Sqlite.Shade.Light
+            ),
+            new(2, null, null, null, null, null, null, null, null),
+        ];
+
+        public bool SameAs(Gadget other) =>
+            this with { Image = null } == other with { Image = null }
+            && (Image is null ? other.Image is null : other.Image is not null && Image.AsSpan().SequenceEqual(other.Image));
+    }
+
+    /// <summary>
+    /// A result type read by column name from a raw query.
+    /// </summary>
+    [QueryResult]
+    public sealed partial record TitleAndPages([Column("heading")] string Title, int? Pages);
 
     /// <summary>
     /// Collects the checks of the sample and reports them.

@@ -63,17 +63,22 @@ jobs:
   # NativeAOT check (docs/design.ja.md §16.3, .cursor/rules/aot.mdc): publish the sample with NativeAOT, fail on any
   # trim or AOT warning (warnings are errors), run the executable, and report its size.
   nativeaot:
-    name: nativeaot (${{ matrix.rid }})
+    name: nativeaot (${{ matrix.rid }}, ${{ matrix.tfm }})
     strategy:
       fail-fast: false
       matrix:
+        tfm: [net8.0, net10.0]
+        rid: [linux-x64, win-x64, osx-arm64]
         include:
-          - os: ubuntu-latest
-            rid: linux-x64
+          - rid: linux-x64
+            os: ubuntu-latest
             exe: AuraORM.Samples.Sqlite
-          - os: windows-latest
-            rid: win-x64
+          - rid: win-x64
+            os: windows-latest
             exe: AuraORM.Samples.Sqlite.exe
+          - rid: osx-arm64
+            os: macos-latest
+            exe: AuraORM.Samples.Sqlite
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
@@ -87,15 +92,36 @@ jobs:
           dotnet-version: 8.0.x
       - name: Publish
         # -warnaserror turns the ILC and ILLink warnings into errors too, not only the compiler's.
-        run: dotnet publish samples/AuraORM.Samples.Sqlite -c Release -r ${{ matrix.rid }} -o artifacts/aot -warnaserror
+        run: dotnet publish samples/AuraORM.Samples.Sqlite -c Release -f ${{ matrix.tfm }} -r ${{ matrix.rid }} -o artifacts/aot -warnaserror
       - name: Run
         run: |
           & ./artifacts/aot/${{ matrix.exe }}
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      # The size of main's latest run is kept in the cache, so a PR shows its change (.cursor/rules/aot.mdc).
+      - name: Restore main's size
+        uses: actions/cache/restore@v6
+        with:
+          path: artifacts/size-main.txt
+          key: aot-size-${{ matrix.rid }}-${{ matrix.tfm }}-main-${{ github.sha }}
+          restore-keys: aot-size-${{ matrix.rid }}-${{ matrix.tfm }}-main-
       - name: Size
         run: |
           $size = (Get-Item ./artifacts/aot/${{ matrix.exe }}).Length
-          "Executable size: {0:N0} bytes ({1:N2} MB)" -f $size, ($size / 1MB) | Tee-Object -Append -FilePath $env:GITHUB_STEP_SUMMARY
+          $line = "Executable size (${{ matrix.rid }}, ${{ matrix.tfm }}): {0:N0} bytes ({1:N2} MB)" -f $size, ($size / 1MB)
+          if (Test-Path artifacts/size-main.txt) {
+            $main = [long](Get-Content artifacts/size-main.txt)
+            $line += "; main: {0:N0} bytes, change: {1:+#,0;-#,0;0} bytes" -f $main, ($size - $main)
+          } else {
+            $line += "; no size of main yet"
+          }
+          $line | Tee-Object -Append -FilePath $env:GITHUB_STEP_SUMMARY
+          if ('${{ github.ref }}' -eq 'refs/heads/main') { Set-Content artifacts/size-main.txt $size }
+      - name: Save main's size
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: artifacts/size-main.txt
+          key: aot-size-${{ matrix.rid }}-${{ matrix.tfm }}-main-${{ github.sha }}
 
   # The versions of each database come from tools/databases.json, which tools/db.ps1 reads too (.cursor/rules/containers.mdc).
   plan:
@@ -116,7 +142,8 @@ jobs:
           done
 
   # Each database job runs the integration tests against a service container, at the minimum and the latest version
-  # (docs/design.ja.md §17). AURA_TEST_REQUIRE makes a skipped test of that database fail the job.
+  # (docs/design.ja.md §17). AURA_TEST_REQUIRE makes a skipped test of that database fail the job. The image, environment,
+  # and health check of each service repeat tools/databases.json: change both in the same PR (.cursor/rules/containers.mdc).
   integration-postgresql:
     name: integration (postgresql ${{ matrix.version }})
     needs: plan
@@ -226,3 +253,16 @@ jobs:
           dotnet-version: 8.0.x
       - run: .github/scripts/integration-env.sh sqlserver
       - run: dotnet test --project tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj -c Release
+
+  # The one required status check of main's branch protection. It needs every other job, so a new job joins the gate by
+  # being added to `needs` here (.cursor/rules/workflow.mdc). Job names that carry a version (the integration matrix)
+  # change with the versions; this name does not.
+  ci:
+    name: ci
+    if: always()
+    needs: [gate, nativeaot, plan, integration-postgresql, integration-mysql, integration-mariadb, integration-sqlserver]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: exit 1

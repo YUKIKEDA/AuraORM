@@ -4,6 +4,11 @@ namespace AuraORM;
 /// The statements that a <see cref="Database{TDialect}"/> and a <see cref="Transaction{TDialect}"/> both run.
 /// </summary>
 /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <remarks>
+/// A statement is rendered when its method is called, before the returned task starts. An error found then, such as more
+/// parameters than the dialect accepts, is thrown by the call itself and not through the task (<c>docs/design.ja.md</c>
+/// §14.3).
+/// </remarks>
 public abstract partial class DatabaseSession<TDialect> : IStatementRunner
     where TDialect : IDialect
 {
@@ -49,7 +54,8 @@ public abstract partial class DatabaseSession<TDialect> : IStatementRunner
     /// <param name="sql">The query. Values in holes become parameters.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The rows.</returns>
-    /// <exception cref="InvalidOperationException">The result has no column for a member of <typeparamref name="T"/>.</exception>
+    /// <exception cref="InvalidOperationException">The result has no column for a member of <typeparamref name="T"/>, or has
+    /// two columns with the name of one member.</exception>
     public Task<List<T>> QueryAsync<T>(SqlInterpolatedStringHandler sql, CancellationToken cancellationToken = default)
         where T : IQueryResult<T> => Executor.ListNamedAsync<T>(this, Render(sql.ToNode()), cancellationToken);
 
@@ -66,6 +72,7 @@ public abstract partial class DatabaseSession<TDialect> : IStatementRunner
 
     /// <summary>
     /// Runs a raw query and returns the first column of the first row, or <see langword="default"/> when there is no row.
+    /// For a value type, read it as nullable (<c>int?</c>) to tell no row from a row whose value is the default.
     /// </summary>
     /// <typeparam name="T">The CLR type of the value.</typeparam>
     /// <param name="sql">The query. Values in holes become parameters.</param>

@@ -30,7 +30,7 @@ internal static class Diagnostics
     public static readonly DiagnosticDescriptor ReservedName = Error(
         "AURA0104",
         "A member has the name of a generated member",
-        "'{0}' has the name of a member that AuraORM generates ({1}); rename it, or map it with [Column] under another member name"
+        "'{0}' has the name of a member that AuraORM generates ({1}); rename the member ([Column] changes only the column name)"
     );
 
     public static readonly DiagnosticDescriptor DuplicateColumn = Error(
@@ -69,6 +69,18 @@ internal static class Diagnostics
         "'{0}' needs a positional record constructor or an accessible parameterless constructor to be read from rows"
     );
 
+    public static readonly DiagnosticDescriptor MissingPrecision = Error(
+        "AURA0112",
+        "A decimal column needs [Precision]",
+        "'{0}' is a decimal column without [Precision]; add [Precision(precision, scale)], because a default would round values on some databases and not on others"
+    );
+
+    public static readonly DiagnosticDescriptor DefaultTypeMismatch = Error(
+        "AURA0113",
+        "The [Default] value does not have the type of the column",
+        "The [Default] value of '{0}' is of type '{1}', which does not convert implicitly to the column type '{2}'; write a value of the column type, or use [DefaultSql]"
+    );
+
     private static readonly DiagnosticDescriptor[] All =
     [
         NotPartial,
@@ -81,6 +93,8 @@ internal static class Diagnostics
         UnknownIndexMember,
         MissingMaxLength,
         NoConstructor,
+        MissingPrecision,
+        DefaultTypeMismatch,
     ];
 
     public static DiagnosticDescriptor ById(string id) => All.First(d => d.Id == id);

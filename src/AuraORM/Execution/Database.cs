@@ -37,6 +37,10 @@ public sealed class Database<TDialect> : DatabaseSession<TDialect>
     /// Initializes a new instance of the <see cref="Database{TDialect}"/> class that runs every command on one connection.
     /// A closed connection is opened for each command and closed after it; an open connection stays open.
     /// </summary>
+    /// <remarks>
+    /// An in-memory SQLite database (<c>Data Source=:memory:</c>) disappears when its connection closes, so pass that connection
+    /// open: a closed one would be opened and closed around each command, and every command would see a new, empty database.
+    /// </remarks>
     /// <param name="connection">The connection.</param>
     /// <param name="options">The settings, or <see langword="null"/> for the defaults.</param>
     public Database(DbConnection connection, DatabaseOptions? options = null)
