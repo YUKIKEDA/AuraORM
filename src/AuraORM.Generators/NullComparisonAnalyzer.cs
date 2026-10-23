@@ -110,10 +110,12 @@ public sealed class NullComparisonAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    // The value as written: the implicit conversions that the call adds (to T?, to object) are skipped.
+    // The value as written: the conversions are skipped, both those that the call adds (to T?, to object) and a cast that
+    // the caller wrote. A cast to a nullable type does not make a value that is not null into one that may be null:
+    // (string?)name with a string name, or (int?)count with an int count, is compared as the value inside it.
     private static IOperation Unwrap(IOperation operation)
     {
-        while (operation is IConversionOperation { IsImplicit: true } conversion)
+        while (operation is IConversionOperation conversion)
         {
             operation = conversion.Operand;
         }

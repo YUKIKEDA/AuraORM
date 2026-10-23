@@ -59,8 +59,9 @@ public sealed class AnalyzerTests
     }
 
     /// <summary>
-    /// Comparisons with values that cannot be null compile: a checked or unwrapped value, a non-null default, a constant,
-    /// <c>IsNotDistinctFrom</c> with a nullable value, and <c>In</c> with non-null values (design §4.4).
+    /// Comparisons with values that cannot be null compile: a checked or unwrapped value, a non-null default, a constant, a
+    /// value that is not null cast to a nullable type, <c>IsNotDistinctFrom</c> with a nullable value, and <c>In</c> with
+    /// non-null values (design §4.4).
     /// </summary>
     /// <remarks>
     /// Preconditions:
@@ -82,6 +83,8 @@ public sealed class AnalyzerTests
                     Eq(u.Age, x!.Value),
                     Eq(u.Nickname, s ?? "none"),
                     Eq(u.Nickname, s!),
+                    Eq(u.Name, (string?)name),
+                    Eq(u.Age, (int?)count),
                     Gt(u.Age, 3),
                     IsNotDistinctFrom(u.Age, x),
                     IsNull(u.Age),
@@ -126,6 +129,35 @@ public sealed class AnalyzerTests
     }
 
     /// <summary>
+    /// A raw SQL hole whose value has a generic type is AURA0301: the type is not known to be a column type (design §11.1).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - A generic method that writes its parameter of type <c>T</c> into a hole.
+    ///
+    /// Steps:
+    /// - Compile it.
+    ///
+    /// Expected:
+    /// - AURA0301, and no other diagnostic.
+    /// </remarks>
+    [Fact]
+    public void RawHole_GenericValue_ReportsAura0301()
+    {
+        GeneratorHarness.Fails(
+            Snippet("Where(u => Eq(u.Id, 1L))")
+                + """
+
+                public static class Generic
+                {
+                    public static Condition<PerRow> Run<T>(T value) => Raw($"x = {value}");
+                }
+                """,
+            "AURA0301"
+        );
+    }
+
+    /// <summary>
     /// Raw SQL holes with column values, nullable column values, enums, expressions, conditions, fragments, and a table
     /// reference compile (design §11.1).
     /// </summary>
@@ -165,7 +197,7 @@ public sealed class AnalyzerTests
             {
                 private static string? Get() => null;
 
-                public static object Run(int? x, string? s, List<int?> ages, List<string> names, object o, char c) =>
+                public static object Run(int? x, string? s, List<int?> ages, List<string> names, object o, char c, string name = "n", int count = 0) =>
                     new SqlBuilder<SqliteDialect>().From(User.Table).{{clause}}.Select(u => u.Id);
             }
             """;
