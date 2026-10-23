@@ -75,3 +75,28 @@
 - **Decision**: 方言にない機能や、方言がその位置で受け付けない句（SQL Server の `ORDER BY` のない `Limit`、SQLite / MySQL の `Limit` のない `Offset` など）は、方言の機能のインターフェースで制約し、コンパイルエラーにする。ライブラリは句を補わない（§2.4、§5.9）。値で決まり型で表せないもの（SQL Server の `Limit(0)`）だけを実行前の検査にする（§14.3）。
 - **Reason**: 約束 2（呼び出し側が書いていない句を足さない）と約束 3（そのデータベースにない機能はコンパイルエラー）。Issue #3 の Grill の質問 8 で決めた。
 - **Rejected**: 実行時に `NotSupportedException` を投げる案（エージェントが実行まで気づかない）。SQL Server で `ORDER BY (SELECT NULL)` を補って `OFFSET … FETCH` を書く案（書いていない句が SQL に出て、行の順序も決まらない）。
+
+## D1-13 条件の数が実行時に決まる絞り込み
+
+- **Decision**: 一覧の `And` / `Or` が `null` を飛ばし、一つもなければ「条件なし」（`OptionalCondition<TLevel>`）を返す。SELECT の `Where` は「条件なし」なら `WHERE` を出さない。UPDATE と DELETE の `Where` は `OptionalCondition` を受け取らない（§4.2）。
+- **Reason**: 検索フォームのような用途は約束 1（柔軟性）の中心にある。Drizzle ORM の `and()` と同じ書き方で、Drizzle では全行の UPDATE / DELETE になる場合を型で止める。Issue #3 の設計のレビューの指摘 9 への Grill で決めた。
+- **Rejected**: 条件がなければ `WHERE 1 = 1` を出す案（書いていない条件が SQL に出る）。`Where` を何度も書けて `AND` でつなぐ案（D1-3 の「句は一度だけ」を変える）。
+
+## D1-14 接続なしで SQL を作る入口
+
+- **Decision**: `SqlBuilder<TDialect>` を足し、段階の型に「実行できるか」の型引数を持たせる。`SqlBuilder` から作った文には実行のメソッドがない（§12.3）。
+- **Reason**: R9（接続なしで SQL を返す）を、プロバイダーのインスタンスなしで満たす。実行できない文を実行するとコンパイルエラーになる（約束 3）。Drizzle ORM の `TBuilderMode` と同じ作りである。
+- **Rejected**: 接続のない `Database<TDialect>` を作れるようにし、実行すると例外にする案（実行できない文が型を通る）。Kysely の `DummyDriver` のように空の結果を返す案（黙って誤った結果になる）。開いていない `DbConnection` を渡す使い方を書くだけの案（プロバイダーのパッケージが要る）。
+
+## D1-15 SQLite の `decimal` の比較と並べ替え
+
+- **Decision**: SQLite では `decimal` の大小の比較、`ORDER BY` のキー、`Min` / `Max` / `Sum` / `Avg` を、文を組み立てるときの検査で `InvalidOperationException` にする（§3.3、§14.3）。
+- **Reason**: SQLite の `decimal` は `TEXT` なので、これらは黙って文字列の順になる。式の型は方言を持たないので型では止められず、実行前の検査が残る手段である。EF Core の SQLite プロバイダーも、これらをデータベースでは行わない。
+- **Rejected**: 方言のインターフェースでコンパイルエラーにする案（式の型が方言を知らないので書けない）。SQLite で `[Precision]` の位取りの整数として `INTEGER` に保存する案（生 SQL から見える値が倍率付きになり、乗除算で位取りの調整が要る）。保証の外と書くだけの案（黙った誤りが残る）。
+
+## D1-16 `SELECT DISTINCT` の `ORDER BY`
+
+- **Decision**: `SelectDistinct` の後の `OrderBy` は、選んだ項目（`DistinctItem<T, TLevel>`、式ではない）だけを受け取る。行全体、結果の型の射影、行全体を含むタプルの `SelectDistinct` には `OrderBy` がない（§5.7）。
+- **Reason**: PostgreSQL と SQL Server は、選択リストにない `ORDER BY` の式を拒む。型で止められるので、実行前の検査にはしない（約束 3）。
+- **Rejected**: `ToSql()` で `ORDER BY` のキーと選択リストを比べる案（型で表せる誤りを実行時に回す）。
+
