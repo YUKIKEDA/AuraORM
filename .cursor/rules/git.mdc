@@ -13,6 +13,12 @@ When asked about such an operation, answer with the current `HEAD` SHA, the targ
 
 - Finished work goes to a PR in the same turn, without waiting for an ask: commit on the Issue's branch, push it, and open the PR. The owner reviews on the PR, from wherever they are; uncommitted changes on this machine cannot be reviewed. Do not stop at "may I commit?".
 - Long work runs in an agent worktree (`git worktree add .dev/<branch> <branch>`), not in the main working tree: the owner may switch that tree to another branch to review, and edits made after the switch land on the wrong branch.
+- When the PR's branch is checked out in the owner's tree, git does not let a worktree check it out too. Work on a temporary branch in the worktree and push it to the PR's branch (`git push origin tmp/16-select:feat/16-select`). Do not switch or reset the owner's tree; say in the reply that its branch is behind until the owner pulls.
+
+```text
+# BAD — git switch feat/16-select in the owner's tree, or a commit there while the owner reviews
+# GOOD — git switch -c tmp/16-select feat/16-select in .dev/wt; commit; git push origin tmp/16-select:feat/16-select
+```
 - This covers the Issue's own branch only. Never commit to `main` or push to it, and never merge.
 - `git branch --show-current` is part of the command that commits. A chain that creates a branch can fail before it does, and the commit then lands on `main`.
 - A push that follows a local test is chained to it so that a failed test stops the push (`./build.ps1; if ($LASTEXITCODE -eq 0) { git push }`). CI is the merge gate; the local run only keeps a known failure from reaching it.
