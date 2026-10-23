@@ -23,7 +23,7 @@ internal static class TableEmitter
         w.Line();
         EmitInsert(w, table);
         w.Line();
-        NamedReading.Emit(w, row, table.Columns.Select(c => (c.Member, c.ColumnName)).ToList(), value => Construct(table, row, c => value(c.Member)));
+        NamedReading.Emit(w, row, table.Columns.Select(c => (c.Member, c.ColumnName)).ToList(), value => Construct(table, row, value));
 
         w.EndTarget(opened);
         return w.ToString();
@@ -114,11 +114,11 @@ internal static class TableEmitter
         w.Line("/// The columns of one occurrence of the table <c>" + Xml(table.TableName) + "</c> in a statement.");
         w.Line("/// </summary>");
         w.Open("public sealed class Columns : " + Lib + "TableColumns<" + row + ">, " + Lib + "ITableColumns<Columns>");
-        w.Open("private Columns(" + Lib + "TableAlias table)");
+        w.Open("private Columns(" + Lib + "TableAlias " + TableParameter + ")");
         foreach (ColumnModel column in table.Columns)
         {
             string factory = column.IsAutoIncrement ? "ReadOnlyColumn" : "Column";
-            w.Line(column.Member.MemberName + " = table." + factory + "<" + column.Member.TypeName + ">(" + Literal(column.ColumnName) + ");");
+            w.Line(This(column) + " = " + TableParameter + "." + factory + "<" + column.Member.TypeName + ">(" + Literal(column.ColumnName) + ");");
         }
 
         w.Close();
@@ -129,7 +129,7 @@ internal static class TableEmitter
             w.Line("/// <summary>");
             w.Line("/// Gets the column <c>" + Xml(column.ColumnName) + "</c>.");
             w.Line("/// </summary>");
-            w.Line("public " + Lib + type + " " + column.Member.MemberName + " { get; }");
+            w.Line("public " + Lib + type + " " + Id(column) + " { get; }");
         }
 
         w.Line();
@@ -147,19 +147,20 @@ internal static class TableEmitter
                 + "ITableColumn[] GetColumns() => new "
                 + Lib
                 + "ITableColumn[] { "
-                + string.Join(", ", table.Columns.Select(c => c.Member.MemberName))
+                + string.Join(", ", table.Columns.Select(This))
                 + " };"
         );
         w.Line();
         w.Line("/// <inheritdoc/>");
-        w.Open("protected override " + row + " ReadRow(ref " + Lib + "RowReader reader)");
-        foreach (ColumnModel column in table.Columns)
+        w.Open("protected override " + row + " ReadRow(ref " + Lib + "RowReader " + ReaderParameter + ")");
+        for (int i = 0; i < table.Columns.Count; i++)
         {
+            ColumnModel column = table.Columns[i];
             string read = column.Member.IsReferenceType && !column.Member.IsNullable ? "ReadNotNull" : "Read";
-            w.Line("var " + Local(column) + " = reader." + read + "(" + column.Member.MemberName + ");");
+            w.Line("var " + Local(i) + " = " + ReaderParameter + "." + read + "(" + This(column) + ");");
         }
 
-        w.Line("return " + Construct(table, row, column => Local(column)) + ";");
+        w.Line("return " + Construct(table, row, Local) + ";");
         w.Close();
         w.Close();
     }
@@ -170,10 +171,12 @@ internal static class TableEmitter
         w.Line("/// The columns of the table <c>" + Xml(table.TableName) + "</c> on the nullable side of an outer join.");
         w.Line("/// </summary>");
         w.Open("public sealed class NullableColumns : " + Lib + "NullableTableColumns<" + row + ">, " + Lib + "ITableColumns<NullableColumns>");
-        w.Open("private NullableColumns(" + Lib + "TableAlias table)");
+        w.Open("private NullableColumns(" + Lib + "TableAlias " + TableParameter + ")");
         foreach (ColumnModel column in table.Columns)
         {
-            w.Line(column.Member.MemberName + " = table.NullableColumn<" + column.Member.NullableTypeName + ">(" + Literal(column.ColumnName) + ");");
+            w.Line(
+                This(column) + " = " + TableParameter + ".NullableColumn<" + column.Member.NullableTypeName + ">(" + Literal(column.ColumnName) + ");"
+            );
         }
 
         w.Close();
@@ -183,7 +186,7 @@ internal static class TableEmitter
             w.Line("/// <summary>");
             w.Line("/// Gets the column <c>" + Xml(column.ColumnName) + "</c>, which is null when the join found no row.");
             w.Line("/// </summary>");
-            w.Line("public " + Lib + "NullableColumn<" + column.Member.NullableTypeName + "> " + column.Member.MemberName + " { get; }");
+            w.Line("public " + Lib + "NullableColumn<" + column.Member.NullableTypeName + "> " + Id(column) + " { get; }");
         }
 
         w.Line();
@@ -201,24 +204,24 @@ internal static class TableEmitter
                 + "ITableColumn[] GetColumns() => new "
                 + Lib
                 + "ITableColumn[] { "
-                + string.Join(", ", table.Columns.Select(c => c.Member.MemberName))
+                + string.Join(", ", table.Columns.Select(This))
                 + " };"
         );
         w.Line();
         w.Line("/// <inheritdoc/>");
-        w.Open("protected override " + row + "? ReadRow(ref " + Lib + "RowReader reader)");
-        foreach (ColumnModel column in table.Columns)
+        w.Open("protected override " + row + "? ReadRow(ref " + Lib + "RowReader " + ReaderParameter + ")");
+        for (int i = 0; i < table.Columns.Count; i++)
         {
-            w.Line("var " + Local(column) + " = reader.Read(" + column.Member.MemberName + ");");
+            w.Line("var " + Local(i) + " = " + ReaderParameter + ".Read(" + This(table.Columns[i]) + ");");
         }
 
-        List<ColumnModel> keys = table.Columns.Where(c => c.IsPrimaryKey).ToList();
-        IEnumerable<ColumnModel> tested = keys.Count > 0 ? keys : table.Columns;
-        w.Open("if (" + string.Join(" && ", tested.Select(c => Local(c) + " is null")) + ")");
+        List<int> keys = Enumerable.Range(0, table.Columns.Count).Where(i => table.Columns[i].IsPrimaryKey).ToList();
+        IEnumerable<int> tested = keys.Count > 0 ? keys : Enumerable.Range(0, table.Columns.Count);
+        w.Open("if (" + string.Join(" && ", tested.Select(i => Local(i) + " is null")) + ")");
         w.Line("return null;");
         w.Close();
         w.Line();
-        w.Line("return " + Construct(table, row, NonNull) + ";");
+        w.Line("return " + Construct(table, row, i => NonNull(table.Columns[i], i)) + ";");
         w.Close();
         w.Close();
     }
@@ -238,7 +241,7 @@ internal static class TableEmitter
                 continue;
             }
 
-            string field = "_" + Camel(column.Member.MemberName);
+            string field = Field(i);
             string required = column.IsRequiredOnInsert ? "required " : string.Empty;
             w.Line("private " + column.Member.TypeName + " " + field + " = default!;");
             w.Line("private bool " + field + "Set;");
@@ -251,7 +254,7 @@ internal static class TableEmitter
                     + required
                     + column.Member.TypeName
                     + " "
-                    + column.Member.MemberName
+                    + Id(column)
                     + " { get => "
                     + field
                     + "; init { "
@@ -273,7 +276,7 @@ internal static class TableEmitter
                 continue;
             }
 
-            string field = "_" + Camel(column.Member.MemberName);
+            string field = Field(i);
             w.Open("if (" + field + "Set)");
             w.Line("values.Add(" + i + ", " + field + ");");
             w.Close();
@@ -283,28 +286,42 @@ internal static class TableEmitter
         w.Close();
     }
 
-    private static string Construct(TableModel table, string row, Func<ColumnModel, string> value)
+    private static string Construct(TableModel table, string row, Func<int, string> value)
     {
-        string arguments = string.Join(", ", table.Columns.Where(c => c.Member.IsPositional).Select(value));
-        List<ColumnModel> initialized = table.Columns.Where(c => !c.Member.IsPositional).ToList();
+        IEnumerable<int> all = Enumerable.Range(0, table.Columns.Count);
+        string arguments = string.Join(", ", all.Where(i => table.Columns[i].Member.IsPositional).Select(value));
+        List<int> initialized = all.Where(i => !table.Columns[i].Member.IsPositional).ToList();
         string initializer =
-            initialized.Count == 0 ? string.Empty : " { " + string.Join(", ", initialized.Select(c => c.Member.MemberName + " = " + value(c))) + " }";
+            initialized.Count == 0
+                ? string.Empty
+                : " { " + string.Join(", ", initialized.Select(i => Id(table.Columns[i]) + " = " + value(i))) + " }";
         return table.UsesConstructor ? "new " + row + "(" + arguments + ")" + initializer : "new " + row + "()" + initializer;
     }
 
-    private static string NonNull(ColumnModel column)
+    private static string NonNull(ColumnModel column, int index)
     {
         if (column.Member.IsNullable)
         {
-            return Local(column);
+            return Local(index);
         }
 
-        return column.Member.IsReferenceType ? Local(column) + "!" : Local(column) + "!.Value";
+        return column.Member.IsReferenceType ? Local(index) + "!" : Local(index) + "!.Value";
     }
 
-    private static string Local(ColumnModel column) => "@" + Camel(column.Member.MemberName);
+    // A member name is always written verbatim (@name), so a member named like a keyword compiles, and is reached through
+    // this.@name, so a parameter cannot hide it. Generated locals, fields, and parameters are numbered and start with
+    // __aura, which a member name cannot (AURA0104).
+    private static string Id(ColumnModel column) => GeneratedNames.Id(column.Member.MemberName);
 
-    private static string Camel(string name) => char.ToLowerInvariant(name[0]) + name.Substring(1);
+    private static string This(ColumnModel column) => GeneratedNames.This(column.Member.MemberName);
+
+    private static string Local(int index) => GeneratedNames.Local(index);
+
+    private static string Field(int index) => GeneratedNames.Field(index);
+
+    private const string TableParameter = GeneratedNames.TableParameter;
+
+    private const string ReaderParameter = GeneratedNames.ReaderParameter;
 
     private static string Literal(string? value) => value is null ? "null" : SymbolDisplay.FormatLiteral(value, quote: true);
 

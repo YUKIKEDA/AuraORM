@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using System.Runtime.InteropServices;
+
 namespace AuraORM;
 
 /// <summary>
@@ -8,7 +11,7 @@ public sealed class SqlStatement
     internal SqlStatement(string text, SqlStatementParameter[] parameters)
     {
         Text = text;
-        Parameters = parameters;
+        Parameters = ImmutableCollectionsMarshal.AsImmutableArray(parameters);
     }
 
     /// <summary>
@@ -17,9 +20,10 @@ public sealed class SqlStatement
     public string Text { get; }
 
     /// <summary>
-    /// Gets the parameters in the order their placeholders appear in <see cref="Text"/>.
+    /// Gets the parameters in the order their placeholders appear in <see cref="Text"/>. The array cannot be changed, so the
+    /// statement that runs is the statement that was rendered.
     /// </summary>
-    public IReadOnlyList<SqlStatementParameter> Parameters { get; }
+    public ImmutableArray<SqlStatementParameter> Parameters { get; }
 
     /// <summary>
     /// Returns the SQL text.

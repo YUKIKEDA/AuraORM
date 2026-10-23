@@ -219,5 +219,10 @@ public static partial class Sql
         || typeof(T) == typeof(sbyte)
         || typeof(T) == typeof(ushort)
         || typeof(T) == typeof(uint)
-        || typeof(T) == typeof(ulong);
+        || typeof(T) == typeof(ulong)
+        || typeof(T) == typeof(Int128)
+        || typeof(T) == typeof(UInt128)
+        || typeof(T) == typeof(nint)
+        || typeof(T) == typeof(nuint)
+        || typeof(T) == typeof(BigInteger);
 }
