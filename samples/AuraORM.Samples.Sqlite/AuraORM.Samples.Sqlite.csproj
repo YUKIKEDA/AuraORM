@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The NativeAOT check (docs/design.ja.md §16.3, .cursor/rules/aot.mdc): CI publishes this app with NativeAOT and runs it.
+       It uses only what a consumer uses: the package's library and generator, and Microsoft.Data.Sqlite. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AuraORM\AuraORM.csproj" />
+    <ProjectReference Include="..\..\src\AuraORM.Generators\AuraORM.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+</Project>

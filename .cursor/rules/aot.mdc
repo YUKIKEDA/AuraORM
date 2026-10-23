@@ -16,7 +16,7 @@ AuraORM is used from NativeAOT applications. The runtime library and every line 
 
 ## The check
 
-CI publishes the NativeAOT sample (`samples/`, from the row that adds it) for every PR and runs it against SQLite. The job fails on any trim or AOT warning and on a failed run. A PR that changes the public surface, a dependency, or generated code reports the warning count (zero) and the executable size under `## Verification`.
+CI publishes the NativeAOT sample (`samples/AuraORM.Samples.Sqlite`) for every PR on Linux and Windows, with `-warnaserror`, and runs it against SQLite. A row that adds public API exercises it in the sample. The job fails on any trim or AOT warning and on a failed run. A PR that changes the public surface, a dependency, or generated code reports the warning count (zero) and the executable size under `## Verification`.
 
 Locally:
 
