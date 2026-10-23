@@ -10,9 +10,8 @@ namespace AuraORM;
 public readonly record struct SqlStatementParameter(string Name, object? Value)
 {
     /// <summary>
-    /// Gets a value indicating whether the value is a null <see cref="byte"/> array. Such a parameter is sent with
-    /// <see cref="System.Data.DbType.Binary"/>: SqlClient takes an untyped null for <c>nvarchar</c>, which does not convert to
-    /// <c>varbinary</c> (<c>docs/design.ja.md</c> §12.4).
+    /// Gets the type that the parameter is sent with, or <see langword="null"/> to let the provider infer it from the value.
+    /// The dialect sets it only where the provider would infer a wrong type (<c>docs/design.ja.md</c> §12.4).
     /// </summary>
-    internal bool IsNullBinary { get; init; }
+    internal System.Data.DbType? DbType { get; init; }
 }
