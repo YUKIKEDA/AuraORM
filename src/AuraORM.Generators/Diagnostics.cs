@@ -81,6 +81,24 @@ internal static class Diagnostics
         "The [Default] value of '{0}' is of type '{1}', which does not convert implicitly to the column type '{2}'; write a value of the column type, or use [DefaultSql]"
     );
 
+    public static readonly DiagnosticDescriptor NullLiteralComparison = Error(
+        "AURA0201",
+        "A comparison with a null constant matches no row",
+        "'{0}' compares with null, which is never true in SQL; use IsNull or IsNotNull instead"
+    );
+
+    public static readonly DiagnosticDescriptor NullableComparison = Error(
+        "AURA0202",
+        "A comparison with a value that may be null matches no row when it is null",
+        "The value of '{0}' is of type '{1}' and may be null, and a comparison with null is never true in SQL; use IsNotDistinctFrom, or check the value for null and pass it with .Value or !"
+    );
+
+    public static readonly DiagnosticDescriptor UnsupportedHole = Error(
+        "AURA0301",
+        "A raw SQL hole holds a value of a type that is not a column type",
+        "A hole of type '{0}' would become a parameter of a type that is not a column type; pass a column type of docs/design.ja.md section 3.3, an expression, a condition, or a fragment such as Identifier(...)"
+    );
+
     private static readonly DiagnosticDescriptor[] All =
     [
         NotPartial,
