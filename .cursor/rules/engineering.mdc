@@ -1,0 +1,40 @@
+---
+description: Layout, targets, analyzers, and the gate
+alwaysApply: true
+---
+
+# Engineering
+
+Details: `docs/conventions.md`. C# style: `.cursor/rules/csharp.mdc`. Tests: `.cursor/rules/testing.mdc`.
+
+## Layout
+
+- Solution: `AuraORM.slnx` only. Do not commit a `.sln`.
+- Projects: `src/AuraORM` (the runtime library), `src/AuraORM.Generators` (the source generator and analyzers, packed inside the `AuraORM` package), `tests/*.Tests`, `samples/`, `benchmarks/`, `tools/`. Do not create a project, folder, script, or skill step before the Issue that needs it.
+- The runtime library has no package dependency. It talks to databases only through `System.Data.Common` (`DbConnection`, `DbDataSource`, `DbCommand`, `DbDataReader`). ADO.NET providers (Microsoft.Data.Sqlite, Npgsql, MySqlConnector, Microsoft.Data.SqlClient) are referenced by tests, samples, and benchmarks only.
+- A project's line in `docs/conventions.md` is added in the PR that adds the project.
+
+## Targets and build
+
+- The runtime library targets `net8.0`. The generator targets `netstandard2.0` (it runs inside the compiler). C# 14 in this repository; code that the generator emits into a consumer's project compiles with C# 12, the default of `net8.0` (`docs/design.ja.md`).
+- `TreatWarningsAsErrors` is on from the first commit. Do not add `NoWarn` or `#pragma warning disable` to get a build through; fix the cause, or change `.editorconfig` with the reason in a comment when a rule is wrong for this repository, in a PR that says so.
+- The runtime library is `IsAotCompatible` (`.cursor/rules/aot.mdc`) and needs XML docs on the public API.
+- Package versions live in `Directory.Packages.props` (Central Package Management). A new package goes through `.cursor/rules/dependencies.mdc` first.
+- The runtime library builds with `BannedSymbols.txt`. Do not remove an entry to get a build through.
+
+## Format and analyzers
+
+- CSharpier is the only formatter (`.config/dotnet-tools.json`, `.csharpierrc.json`). Run `dotnet csharpier format .` before a commit.
+- StyleCop.Analyzers and the .NET analyzers at `latest-recommended` run in every build. `EnforceCodeStyleInBuild` is on. Culture-sensitive calls (CA1304, CA1305, CA1307, CA1309, CA1310, CA1311) are errors: SQL text never depends on the machine's culture.
+
+## Gate
+
+`./build.ps1` before a PR: tool restore, the CSharpier check, restore, then for Release and for Debug a build and every test project. CI runs the same script on Windows, Linux, and macOS, plus the jobs that need services (`.cursor/rules/containers.mdc`) and the NativeAOT check. CI is the merge gate (`.cursor/rules/workflow.mdc`).
+
+A commit and a push follow the build only through its exit code. Piping the build's output into `grep` and chaining `git commit ... && git push` after it runs the commit even when the build failed. Write `if dotnet build ...; then git commit ...; fi`, or check `$LASTEXITCODE` in PowerShell.
+
+If `dotnet --list-sdks` does not show a 10.0 SDK, install it; do not stop to ask. The tests also run on the .NET 8 runtime.
+
+A NativeAOT publish on Windows needs `C:\Program Files (x86)\Microsoft Visual Studio\Installer` on `PATH` (Visual Studio's scripts call `vswhere.exe` by name). Add it for the session before `dotnet publish`.
+
+If `dotnet csharpier` says to run `dotnet tool restore` right after a successful restore, delete `%USERPROFILE%\.dotnet\toolResolverCache\1\csharpier` and restore again.

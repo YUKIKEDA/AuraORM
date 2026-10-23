@@ -1,0 +1,268 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  gate:
+    name: build.ps1 (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every job is part of the merge gate (.cursor/rules/workflow.mdc).
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      # The SDK comes from global.json. The 8.0 runtime runs the net8.0 test target.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', '.config/dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Gate
+        run: ./build.ps1
+
+      # The SELECT stages are written by a tool and committed (docs/conventions.md). Write them again and fail when they
+      # differ from the commit, so a hand edit or a stale output cannot be merged.
+      - name: Generated stages are current
+        if: runner.os == 'Linux'
+        run: |
+          dotnet run --project tools/AuraORM.StageGenerator -c Release
+          dotnet csharpier format src/AuraORM/Select/Generated
+          git status --porcelain -- src/AuraORM/Select/Generated
+          git diff --exit-code -- src/AuraORM/Select/Generated
+          if (git status --porcelain -- src/AuraORM/Select/Generated) { Write-Error 'Run the stage generator and commit its output.'; exit 1 }
+
+  # NativeAOT check (docs/design.ja.md §16.3, .cursor/rules/aot.mdc): publish the sample with NativeAOT, fail on any
+  # trim or AOT warning (warnings are errors), run the executable, and report its size.
+  nativeaot:
+    name: nativeaot (${{ matrix.rid }}, ${{ matrix.tfm }})
+    strategy:
+      fail-fast: false
+      matrix:
+        tfm: [net8.0, net10.0]
+        rid: [linux-x64, win-x64, osx-arm64]
+        include:
+          - rid: linux-x64
+            os: ubuntu-latest
+            exe: AuraORM.Samples.Sqlite
+          - rid: win-x64
+            os: windows-latest
+            exe: AuraORM.Samples.Sqlite.exe
+          - rid: osx-arm64
+            os: macos-latest
+            exe: AuraORM.Samples.Sqlite
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+      - name: Publish
+        # -warnaserror turns the ILC and ILLink warnings into errors too, not only the compiler's.
+        run: dotnet publish samples/AuraORM.Samples.Sqlite -c Release -f ${{ matrix.tfm }} -r ${{ matrix.rid }} -o artifacts/aot -warnaserror
+      - name: Run
+        run: |
+          & ./artifacts/aot/${{ matrix.exe }}
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      # The size of main's latest run is kept in the cache, so a PR shows its change (.cursor/rules/aot.mdc).
+      - name: Restore main's size
+        uses: actions/cache/restore@v6
+        with:
+          path: artifacts/size-main.txt
+          key: aot-size-${{ matrix.rid }}-${{ matrix.tfm }}-main-${{ github.sha }}
+          restore-keys: aot-size-${{ matrix.rid }}-${{ matrix.tfm }}-main-
+      - name: Size
+        run: |
+          $size = (Get-Item ./artifacts/aot/${{ matrix.exe }}).Length
+          $line = "Executable size (${{ matrix.rid }}, ${{ matrix.tfm }}): {0:N0} bytes ({1:N2} MB)" -f $size, ($size / 1MB)
+          if (Test-Path artifacts/size-main.txt) {
+            $main = [long](Get-Content artifacts/size-main.txt)
+            $line += "; main: {0:N0} bytes, change: {1:+#,0;-#,0;0} bytes" -f $main, ($size - $main)
+          } else {
+            $line += "; no size of main yet"
+          }
+          $line | Tee-Object -Append -FilePath $env:GITHUB_STEP_SUMMARY
+          if ('${{ github.ref }}' -eq 'refs/heads/main') { Set-Content artifacts/size-main.txt $size }
+      - name: Save main's size
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: artifacts/size-main.txt
+          key: aot-size-${{ matrix.rid }}-${{ matrix.tfm }}-main-${{ github.sha }}
+
+  # The versions of each database come from tools/databases.json, which tools/db.ps1 reads too (.cursor/rules/containers.mdc).
+  plan:
+    name: integration plan
+    runs-on: ubuntu-latest
+    outputs:
+      postgresql: ${{ steps.read.outputs.postgresql }}
+      mysql: ${{ steps.read.outputs.mysql }}
+      mariadb: ${{ steps.read.outputs.mariadb }}
+      sqlserver: ${{ steps.read.outputs.sqlserver }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: read
+        shell: bash
+        run: |
+          for name in postgresql mysql mariadb sqlserver; do
+            echo "$name=$(jq -c --arg name "$name" '.databases[] | select(.name == $name) | .versions' tools/databases.json)" >> "$GITHUB_OUTPUT"
+          done
+
+  # Each database job runs the integration tests against a service container, at the minimum and the latest version
+  # (docs/design.ja.md §17). AURA_TEST_REQUIRE makes a skipped test of that database fail the job. The image, environment,
+  # and health check of each service repeat tools/databases.json: change both in the same PR (.cursor/rules/containers.mdc).
+  integration-postgresql:
+    name: integration (postgresql ${{ matrix.version }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.plan.outputs.postgresql) }}
+    services:
+      db:
+        image: postgres:${{ matrix.version }}
+        env:
+          POSTGRES_PASSWORD: Aura_Test_1
+          POSTGRES_DB: aura
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+      - run: .github/scripts/integration-env.sh postgresql
+      - run: dotnet test --project tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj -c Release
+
+  integration-mysql:
+    name: integration (mysql ${{ matrix.version }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.plan.outputs.mysql) }}
+    services:
+      db:
+        image: mysql:${{ matrix.version }}
+        env:
+          MYSQL_ROOT_PASSWORD: Aura_Test_1
+          MYSQL_DATABASE: aura
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pAura_Test_1" --health-interval 5s --health-timeout 5s --health-retries 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+      - run: .github/scripts/integration-env.sh mysql
+      - run: dotnet test --project tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj -c Release
+
+  integration-mariadb:
+    name: integration (mariadb ${{ matrix.version }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.plan.outputs.mariadb) }}
+    services:
+      db:
+        image: mariadb:${{ matrix.version }}
+        env:
+          MARIADB_ROOT_PASSWORD: Aura_Test_1
+          MARIADB_DATABASE: aura
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+      - run: .github/scripts/integration-env.sh mariadb
+      - run: dotnet test --project tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj -c Release
+
+  integration-sqlserver:
+    name: integration (sqlserver ${{ matrix.version }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.plan.outputs.sqlserver) }}
+    services:
+      db:
+        image: mcr.microsoft.com/mssql/server:${{ matrix.version }}
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Aura_Test_1
+        ports: ["1433:1433"]
+        # 2019 ships sqlcmd in mssql-tools, later versions in mssql-tools18.
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Aura_Test_1 -Q 'SELECT 1' || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Aura_Test_1 -Q 'SELECT 1'"
+          --health-interval 5s --health-timeout 10s --health-retries 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+      - run: .github/scripts/integration-env.sh sqlserver
+      - run: dotnet test --project tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj -c Release
+
+  # The one required status check of main's branch protection. It needs every other job, so a new job joins the gate by
+  # being added to `needs` here (.cursor/rules/workflow.mdc). Job names that carry a version (the integration matrix)
+  # change with the versions; this name does not.
+  ci:
+    name: ci
+    if: always()
+    needs: [gate, nativeaot, plan, integration-postgresql, integration-mysql, integration-mariadb, integration-sqlserver]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: exit 1

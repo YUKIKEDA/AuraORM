@@ -1,0 +1,33 @@
+---
+description: NativeAOT and trimming - what the runtime library and the generated code may and may not do
+alwaysApply: true
+---
+
+# NativeAOT and trimming
+
+AuraORM is used from NativeAOT applications. The runtime library and every line the source generator emits must work there exactly as under the JIT.
+
+- `src/AuraORM` is `IsAotCompatible`. The trim, AOT, and single-file analyzers run in every build, and their warnings are errors.
+- No reflection that the trimmer cannot see: `Type.GetType(string)`, `Activator.CreateInstance(Type)`, `MakeGenericType`, `MakeGenericMethod`, `GetMethod` / `GetProperty` by name, `System.Reflection.Emit`, `Expression.Compile`. No expression trees at all (`System.Linq.Expressions` is banned): queries are built from typed expression objects, not from lambdas that are inspected. Mapping code that needs a per-type table is emitted by the source generator.
+- No `[DynamicallyAccessedMembers]`, `[RequiresUnreferencedCode]`, `[RequiresDynamicCode]`, or `[UnconditionalSuppressMessage]` to silence an analyzer. If one seems needed, the design is wrong for AOT; raise it on the Issue.
+- Per-type data is a `static class Cache<T>` field filled by generated code or a static constructor without reflection, never a `Dictionary<Type, ...>` filled at run time from reflection.
+- The source generator ships inside the `AuraORM` package (`analyzers/dotnet/cs`), not as a separate package.
+- Generic virtual methods and generic interfaces instantiated over many value types grow the binary. When one is added on a public type, the PR reports the size of the NativeAOT sample before and after.
+
+## The check
+
+CI publishes the NativeAOT sample (`samples/AuraORM.Samples.Sqlite`) for every PR on Linux (x64), Windows (x64), and macOS (arm64), for `net8.0` and `net10.0` (a newer ILC can warn where an older one does not), with `-warnaserror`, and runs it against SQLite. A row that adds public API exercises it in the sample, every reading path included (each column type, nulls, result types). The job fails on any trim or AOT warning and on a failed run. A PR that changes the public surface, a dependency, or generated code reports the warning count (zero) and the executable size under `## Verification`; the job summary shows the size next to main's last size.
+
+`-warnaserror` also fails the publish on a warning that only the ILC or ILLink stage reports, which the build's analyzers do not see (a trim warning inside a referenced library). This was checked once with a library that calls `Type.GetType(string)`: the build passed, and the clean publish failed with IL2057.
+
+Locally:
+
+```powershell
+$env:PATH += ';C:\Program Files (x86)\Microsoft Visual Studio\Installer'
+dotnet publish samples/<Sample> -c Release -r win-x64 -o <scratch>
+<scratch>/<Sample>.exe
+```
+
+A second publish into the same output reuses the ILC result and does not report its warnings again, so a local check after a change starts from a clean `obj/` (CI always does).
+
+A size that grew is split by what added it before the PR says so: publish with `-p:IlcGenerateMapFile=true` and compare the map files.

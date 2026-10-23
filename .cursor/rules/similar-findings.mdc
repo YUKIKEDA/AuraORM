@@ -1,0 +1,13 @@
+---
+description: When a problem is pointed out, check for the same kind of gap elsewhere too
+alwaysApply: true
+---
+
+# Fix similar findings together
+
+When a problem is pointed out, do not fix only the cited spot and stop. Before fixing, check whether the same kind of gap exists elsewhere.
+
+- Look in the same file, in callees with the same contract, and in the paired code: the other dialects, the other statement kinds (SELECT, INSERT, UPDATE, DELETE), the generated and the hand-written code, the JIT and NativeAOT builds.
+- Examples: an identifier left unquoted in the SQLite `ORDER BY` and the same in the MySQL renderer; `Update()` that requires `Where()` while `Delete()` does not; a nullable column that the generator maps to a non-nullable type for reads and for `Insert` values.
+- If you find the same kind of problem, fix it together with the cited spot.
+- If you find none, say what you checked and that nothing remains.

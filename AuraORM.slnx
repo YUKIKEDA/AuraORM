@@ -1,5 +1,17 @@
 <Solution>
-  <Project Path="AuraORM.Builder/AuraORM.Builder.csproj" />
-  <Project Path="AuraORM.Generator/AuraORM.Generator.csproj" />
-  <Project Path="AuraORM.Tests/AuraORM.Tests.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/AuraORM/AuraORM.csproj" />
+    <Project Path="src/AuraORM.Generators/AuraORM.Generators.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/AuraORM.Samples.Sqlite/AuraORM.Samples.Sqlite.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/AuraORM.StageGenerator/AuraORM.StageGenerator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AuraORM.Generators.Tests/AuraORM.Generators.Tests.csproj" />
+    <Project Path="tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj" />
+    <Project Path="tests/AuraORM.Tests/AuraORM.Tests.csproj" />
+  </Folder>
 </Solution>

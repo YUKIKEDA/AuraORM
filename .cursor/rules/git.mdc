@@ -1,0 +1,22 @@
+---
+description: Finished work goes to a PR on its branch; destructive git operations need an explicit order
+alwaysApply: true
+---
+
+# Git
+
+A question is not permission. `reset`, `rebase`, `push --force`, `push --force-with-lease`, `branch -D`, `clean`, `checkout -- <path>`, and `worktree remove --force` run only on an order that names the operation and the target SHA or ref. That holds for the agent's own uncommitted edit too: undo it with an edit. A worktree with changes is removed after its changes are undone with an edit or committed, so that `git worktree remove` needs no `--force`.
+
+This holds for a conflict that another PR's merge caused: ask how to solve it (rebase and force-push, or merge `main` into the branch) before running either.
+
+When asked about such an operation, answer with the current `HEAD` SHA, the target SHA, what would disappear, and the exact command. Then wait.
+
+- Finished work goes to a PR in the same turn, without waiting for an ask: commit on the Issue's branch, push it, and open the PR. The owner reviews on the PR, from wherever they are; uncommitted changes on this machine cannot be reviewed. Do not stop at "may I commit?".
+- Long work runs in an agent worktree (`git worktree add .dev/<branch> <branch>`), not in the main working tree: the owner may switch that tree to another branch to review, and edits made after the switch land on the wrong branch.
+- This covers the Issue's own branch only. Never commit to `main` or push to it, and never merge.
+- `git branch --show-current` is part of the command that commits. A chain that creates a branch can fail before it does, and the commit then lands on `main`.
+- A push that follows a local test is chained to it so that a failed test stops the push (`./build.ps1; if ($LASTEXITCODE -eq 0) { git push }`). CI is the merge gate; the local run only keeps a known failure from reaching it.
+- When the gate fails only on a test that an open Issue tracks and the PR does not touch, the push still stops. The gate stops at the first failing step, so run the remaining test projects by hand; then write the failed test and its Issue under Verification and ask the owner whether to push.
+- Read `gh pr view <n> --json state` before pushing to a branch that has a PR. A push to the branch of a merged PR recreates the deleted branch and reaches nothing.
+- If history was rewritten, put the SHA from before the rewrite on the first line of the reply.
+- Never skip hooks (`--no-verify`) or signing unless the owner orders it.

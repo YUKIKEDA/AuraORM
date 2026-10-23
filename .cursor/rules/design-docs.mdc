@@ -1,0 +1,45 @@
+---
+description: Where the design lives and how it changes, so code and design do not drift
+alwaysApply: true
+---
+
+# Design docs
+
+## Locations
+
+| Document | Role |
+| --- | --- |
+| `docs/design.ja.md` | Canonical design (Japanese). Concept, requirements, the SQL each API produces, type-safety guarantees, invariants, phases |
+| `docs/design-decisions.md` | Rejected alternatives and why (Decision / Reason / Rejected) |
+| `docs/roadmap.md` | Rows: ID, title, Issue, status. No acceptance text |
+| `docs/conventions.md` | Directory tree, project responsibilities, coding conventions |
+
+`.dev/` is local scratch and is gitignored. Do not put lasting decisions there.
+
+## Changing the design
+
+- Contract, public API, generated SQL, type-safety guarantee, invariant, or phase: open a `design` Issue, update `docs/design.ja.md` (and `docs/design-decisions.md` for what was rejected) in its PR, and merge it before implementation Issues.
+- Wording, typos, and examples: may ship in the same PR as code.
+- Do not implement first and update the design later. If code and design conflict, stop and fix the design through the process above.
+
+## Claims about databases and other libraries
+
+- A claim about what a database does (a syntax, a type, a version that added a feature, how NULL compares, what an identifier quote is) names the documentation page or the version where it was read, and is read there before it goes in. A claim checked only on one database is written as that database's.
+- A claim about another ORM or query builder (Drizzle ORM, EF Core, Dapper, linq2db, jOOQ, Kysely) names the file or the documentation page where it was read.
+- A sentence that says AuraORM behaves "like X" is checked item by item in X; an item X lacks is written as AuraORM's own.
+- Every type in a signature the design writes is defined in the design or the code.
+- A statement that lists dialects is a statement about each of them: the design writes the SQL for each dialect, or says which ones reject the feature and how (a compile error, never a run-time surprise).
+
+## Consistency
+
+- A design PR that changes a decision searches the whole design for the sections that restate it, and changes them in the same PR.
+- After a script edits a Markdown table, read `git diff --stat`. A diff of the whole table means its columns were padded again: restore the file and replace only the rows that change.
+
+## Judge the current optimum
+
+The design records a decision made at that time. It is not proof that the decision is still the best one.
+
+- Recommend the best solution for the problem as it stands now.
+- Do not cite an existing sentence as the reason to keep that shape.
+- Do not add public API only so an older shape can stay.
+- If the written decision is no longer the best one, say so and change the design through the process above.

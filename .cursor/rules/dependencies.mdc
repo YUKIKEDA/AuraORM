@@ -1,0 +1,29 @@
+---
+description: When an external package may be added
+alwaysApply: true
+---
+
+# Dependencies
+
+The runtime library `AuraORM` has no package dependency: only the BCL and `System.Data.Common`. That keeps it usable with any ADO.NET provider, keeps NativeAOT and trimming under our control, and keeps the package small (`docs/design.ja.md`). Adding a runtime dependency is a `design` Issue first.
+
+## Before adding a package to any project
+
+Check each point and write the result in the PR's `## Verification`:
+
+1. **Where it goes**: runtime library (needs a design Issue), generator (Roslyn packages only, `PrivateAssets="all"`), or a test, sample, benchmark, or tool project.
+2. **AOT**: a package that a sample's NativeAOT publish includes declares `IsAotCompatible` or `IsTrimmable`, and the publish has zero trim / AOT warnings.
+3. **License and upkeep**: MIT-compatible, maintained, a version pinned in `Directory.Packages.props`.
+4. **Roslyn version** (generator): the `Microsoft.CodeAnalysis.CSharp` version sets the oldest compiler that can load the generator. It stays at the version of the oldest supported .NET 8 SDK unless the design changes that (`docs/design.ja.md`).
+
+## Already decided
+
+- Tests and samples use the ADO.NET providers of the supported databases: Microsoft.Data.Sqlite, Npgsql, MySqlConnector, Microsoft.Data.SqlClient.
+- Tests use xUnit v3 on Microsoft.Testing.Platform.
+- Benchmarks use BenchmarkDotNet and compare with Dapper, EF Core, and raw ADO.NET.
+- Docker-based packages (Testcontainers and the like) are not used (`.cursor/rules/containers.mdc`).
+
+```text
+# BAD — adds a JSON library to the runtime package for a convenience overload
+# GOOD — opens a design Issue: what it is for, what consumers pay (size, AOT), and the alternative without a dependency
+```

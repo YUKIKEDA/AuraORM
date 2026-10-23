@@ -1,0 +1,45 @@
+---
+description: Hot-path rules for building SQL, binding parameters, and reading rows
+alwaysApply: true
+---
+
+# Performance rules
+
+The hot paths are: rendering a query to SQL, creating the command and its parameters, and reading rows into results (`docs/design.ja.md`). Building the expression objects of a query may allocate; the work per row does not.
+
+A claim that a rule was followed, or that a change is faster, is a measurement (`.cursor/rules/bench.mdc`), not a reading of the code.
+
+## Reading rows
+
+- The work per row does not allocate beyond the result itself (the row object, its strings, its arrays). No boxing of column values, no `object[]` per row, no dictionary lookups by column name per row, no delegate allocated per row.
+- Columns are read by ordinal with the typed getters the generator chose. Name-to-ordinal resolution, when a raw query needs it, happens once per reader, not per row.
+- Streaming (`IAsyncEnumerable<T>`) holds one row at a time.
+
+## Rendering SQL
+
+- SQL is written into a pooled buffer (`ArrayPool<char>.Shared` or a reusable builder), not built by `string` concatenation or interpolation.
+- No LINQ, `params` arrays, or capturing lambdas inside the renderer and the binder. A `static` lambda is fine.
+- Number formatting in SQL text uses `CultureInfo.InvariantCulture` (and is rare: values are parameters).
+
+## Dispatch and generics
+
+- Per-type data is a `static class Cache<T>` field, never a `Dictionary<Type, ...>` lookup on a hot path. JIT-constant checks (`typeof(T) == typeof(int)`) choose fast paths at no cost.
+- The dialect is a type parameter where that lets the JIT and NativeAOT specialize the renderer; a virtual call per clause is acceptable, a virtual call per character is not.
+
+## Fast path and slow path
+
+- Throwing lives in a separate method marked `[DoesNotReturn]` (`ThrowHelper`), so the caller stays small enough to inline.
+- Rare work (growing a buffer) lives in a `[MethodImpl(MethodImplOptions.NoInlining)]` method.
+- `[MethodImpl(MethodImplOptions.AggressiveInlining)]` only where a measurement shows an effect, and the PR says which.
+
+## Claims
+
+Do not add caching, pooling, SIMD, or unsafe code for speed unless a measurement shows the path is the bottleneck.
+
+```csharp
+// BAD — boxes every value and looks the column up by name for every row
+var row = new User((long)reader["id"], (string)reader["name"]);
+
+// GOOD — ordinals resolved once, typed getters per row
+var row = new User(reader.GetInt64(0), reader.GetString(1));
+```

@@ -1,0 +1,31 @@
+---
+description: Databases for tests run in WSL containers locally and in service containers in CI; Docker is never used
+alwaysApply: true
+---
+
+# Containers and databases for tests
+
+The owner's order: Docker is not used in this repository or on the development machine. Do not install Docker Desktop or Docker Engine (in WSL or elsewhere), do not add Testcontainers for Docker, and do not write Docker instructions in docs.
+
+## Local: WSL containers
+
+- Local databases run in WSL containers with `wslc.exe` (WSL 2.9.3 or later; `wsl --update`). On the owner's machine it is `C:\Program Files\WSL\wslc.exe` and is not on the agent shell's `PATH`: call it by its full path.
+- The commands follow the usual container CLI: `wslc run -d --rm -p <host>:<container> -e KEY=VALUE --name <name> <image>`, `wslc exec`, `wslc container list`, `wslc container logs`, `wslc container stop`, `wslc image list`, `wslc image prune`.
+- A published port is reachable from Windows at `localhost`.
+- Sessions are separate per Windows user and per elevation, but they share the host's ports. Start and stop the databases from the same (non-elevated) shell.
+- Start and stop the test databases through the repository script for them, not with hand-typed commands, so that images, ports, and passwords match CI. Stop the containers you started in the same turn (`.cursor/rules/scratch.mdc`).
+
+## CI: service containers
+
+- Every database the design supports runs as a GitHub Actions service container in the integration job, with the same image tags as the local script. That job is part of the merge gate.
+- The integration tests read their connection strings from environment variables. A missing variable skips that database's tests with its name in the skip reason; in CI every variable is set, so a skip there is a failure of the job's setup, not a pass.
+
+## Images
+
+- Each image is pinned to a major version tag (for example `postgres:17`) in one place that both the local script and CI read. A version change is a PR that runs the whole integration job. The tag floats on minor and patch releases on purpose: CI then checks the latest release without a code change. A red integration job with no change in the PR is first checked against the image's release.
+- The service definitions in `.github/workflows/ci.yml` repeat the image names, environment, and health checks of `tools/databases.json`. A change to one is made to the other in the same PR.
+
+```text
+# BAD — "Docker が無いので PostgreSQL のテストはローカルで確認しました" (the check is invisible and the gate is skipped)
+# GOOD — the integration job runs PostgreSQL in a service container; the PR also notes the local run against wslc
+```

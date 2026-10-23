@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The runtime library. The public API is designed in docs/design.ja.md and built row by row (docs/roadmap.md). -->
+  <PropertyGroup>
+    <!-- Each project names its target frameworks. Directory.Build.props cannot give a default: it is read before the
+         project body, so a default there would also win over a project's own TargetFrameworks. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>AuraORM</RootNamespace>
+    <AssemblyName>AuraORM</AssemblyName>
+    <IsAotCompatible>true</IsAotCompatible>
+    <IsPackable>true</IsPackable>
+    <PackageId>AuraORM</PackageId>
+    <Description>A type-safe SQL query builder for .NET with predictable SQL, compatible with NativeAOT.</Description>
+    <PackageTags>orm;sql;query-builder;nativeaot;source-generator;sqlite;postgresql;mysql;sqlserver</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AuraORM.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <!-- The generator ships inside this package (docs/design.ja.md §2.1); the library itself does not run it. -->
+  <ItemGroup>
+    <ProjectReference Include="../AuraORM.Generators/AuraORM.Generators.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <None
+      Include="../AuraORM.Generators/bin/$(Configuration)/netstandard2.0/AuraORM.Generators.dll"
+      Pack="true"
+      PackagePath="analyzers/dotnet/cs"
+      Visible="false"
+    />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,33 @@
+---
+description: The generated SQL is predictable, and invalid queries do not compile
+alwaysApply: true
+---
+
+# SQL and type safety
+
+These are the three promises of the library (`docs/design.ja.md`). Every change is judged by them.
+
+## Predictable SQL
+
+- One builder call produces one SQL clause. The library never adds a query, a join, a subquery, a `DISTINCT`, an `ORDER BY`, or a round trip that the caller did not write.
+- The SQL for a builder chain does not depend on the values bound, the machine, the culture, the clock, or earlier queries. The one exception is the shape the caller passes: the number of items in a list (`In` values, `INSERT` rows) and the columns set in an `INSERT` model are part of the statement (`docs/design.ja.md` §0.1). Values are always parameters; they are never inlined into SQL text. Identifiers are always quoted with the dialect's quote.
+- Every query exposes its SQL and parameters (`ToSql()`) without a connection.
+- The SQL each API produces, per dialect, is written in `docs/design.ja.md` and checked by golden tests (`.cursor/rules/testing.mdc`). A change to generated SQL is a design change: it updates the design and the golden files in the same PR, and the PR lists the old and new SQL under `## SQL`.
+- Where the dialects differ (paging, `RETURNING` vs `OUTPUT`, identifier quotes, boolean literals, upsert), each dialect's SQL is written out. "The dialect handles it" is not a specification.
+
+## Only invalid queries are rejected
+
+- A query that is valid SQL on the chosen dialect and that the API can express must compile. A restriction the types add beyond SQL needs a reason in the design (a common bug it prevents, such as `= NULL`), and an escape hatch.
+- A query that is invalid on the chosen dialect does not compile: a column of a table that is not in the query, operands of different types, a clause in the wrong order, a missing required column in `INSERT`, an `UPDATE` or `DELETE` without `WHERE` unless the caller says all rows, a feature the dialect lacks. A run-time exception is the last resort, for what the type system cannot express, and the design names each one.
+- Raw SQL is allowed through the interpolated SQL fragment only: holes become parameters or quoted identifiers. A string reaches the SQL text unquoted only through the API whose name says it is unsafe.
+
+## Tests for the promises
+
+- Every guarantee that something does not compile has a compile-fail test that asserts the diagnostic id.
+- Every guarantee that something compiles has a test that compiles it and checks its SQL.
+- A generator or analyzer diagnostic has an id (`AURAnnnn`), a message that names the fix, and a test.
+
+```text
+# BAD — DeleteQuery.ExecuteAsync exists before Where(), so `db.Delete(User.Table).ExecuteAsync()` deletes every row
+# GOOD — ExecuteAsync exists only after Where(...) or AllRows(); the compile-fail test asserts CS1061 for the bare call
+```

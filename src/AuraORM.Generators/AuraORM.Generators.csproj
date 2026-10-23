@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The source generator and analyzers. They run inside the compiler, so they target netstandard2.0 and ship inside the
+       AuraORM package (analyzers/dotnet/cs), not as a package of their own (docs/design.ja.md §2.1). -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>AuraORM.Generators</RootNamespace>
+    <AssemblyName>AuraORM.Generators</AssemblyName>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- System.Linq and friends; netstandard2.0 has no ImplicitUsings defaults beyond System. -->
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AuraORM.Generators.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Release tracking of the diagnostic ids (RS2008). -->
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
