@@ -4,11 +4,13 @@ namespace AuraORM;
 /// A SELECT statement with a row limit.
 /// </summary>
 /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
 /// <typeparam name="TResult">The type that each row is read as.</typeparam>
-public sealed class SelectLimited<TDialect, TResult> : SelectQuery<TDialect, TResult>
+public sealed class SelectLimited<TDialect, TMode, TResult> : SelectQuery<TDialect, TMode, TResult>
     where TDialect : IDialect
+    where TMode : ExecutionMode
 {
-    internal SelectLimited(IStatementRunner session, SelectState state, RowFactory<TResult> factory)
+    internal SelectLimited(IStatementRunner? session, SelectState state, RowFactory<TResult> factory)
         : base(session, state, factory) { }
 
     /// <summary>
@@ -18,6 +20,6 @@ public sealed class SelectLimited<TDialect, TResult> : SelectQuery<TDialect, TRe
     /// <param name="count">The number of rows to skip.</param>
     /// <returns>The statement.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is negative.</exception>
-    public SelectOffset<TDialect, TResult> Offset(int count) =>
+    public SelectOffset<TDialect, TMode, TResult> Offset(int count) =>
         new(Session, State with { Offset = SelectState.RowCount(count, nameof(count)) }, Factory);
 }

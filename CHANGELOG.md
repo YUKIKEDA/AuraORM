@@ -31,3 +31,11 @@ version has been published to NuGet.
   `ToListAsync`, `AsAsyncEnumerable`, `First`, `Single`, and their `OrDefault` forms. Clauses come in SQL order, and a
   limit or an offset that a dialect does not accept in that place (such as a SQL Server limit without `ORDER BY`) does
   not compile.
+- `Where` takes the list form of `And` / `Or`, which skips null conditions and writes no `WHERE` when none is left, for
+  filters whose number is known only at run time.
+- The `OrderBy` of a `SelectDistinct` takes only the selected items, named by position (`ORDER BY 1 ASC`), because
+  PostgreSQL and SQL Server reject other keys; a distinct whole row has no `OrderBy`.
+- `SqlBuilder<TDialect>` builds statements without a connection, for `ToSql()` only; running them does not compile.
+- On SQLite, ordering, comparing by size, and `Min` / `Max` / `Sum` / `Avg` of decimals throw when the statement is
+  built, because SQLite stores decimals as text. A SQL Server `Limit(0)` and a column taken out of another query's
+  lambda throw too.

@@ -7,16 +7,18 @@ namespace AuraORM;
 /// follow once.
 /// </summary>
 /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
 /// <typeparam name="TResult">The type that each row is read as.</typeparam>
 /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
 /// <typeparam name="T1">The column set of table 1.</typeparam>
-public sealed class SelectProjected<TDialect, TResult, TLevel, T1> : SelectProjection<TDialect, TResult, TLevel>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1> : SelectProjection<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
+    where TMode : ExecutionMode
     where TLevel : EvaluationLevel
 {
     private readonly T1 _v1;
 
-    internal SelectProjected(IStatementRunner session, SelectState state, IProjection<TResult, TLevel> projection, T1 v1)
+    internal SelectProjected(IStatementRunner? session, SelectState state, IProjection<TResult, TLevel> projection, T1 v1)
         : base(session, state, FactoryOf(projection))
     {
         _v1 = v1;
@@ -29,7 +31,7 @@ public sealed class SelectProjected<TDialect, TResult, TLevel, T1> : SelectProje
     /// <param name="orderings">The keys, in order, from the column sets: <c>u =&gt; [Asc(u.Name), Desc(u.Id)]</c>.</param>
     /// <returns>The statement.</returns>
     /// <exception cref="ArgumentException">There is no key.</exception>
-    public SelectOrdered<TDialect, TResult> OrderBy(Func<T1, Ordering<TLevel>[]> orderings)
+    public SelectOrdered<TDialect, TMode, TResult> OrderBy(Func<T1, Ordering<TLevel>[]> orderings)
     {
         ArgumentNullException.ThrowIfNull(orderings);
         return new(Session, State.WithOrderBy(orderings(_v1)), Factory);

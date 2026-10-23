@@ -1,126 +1,35 @@
 namespace AuraORM;
 
 /// <summary>
-/// A SELECT statement that has its projection: it can be run, or rendered with <see cref="ToSql"/>
-/// (<c>docs/design.ja.md</c> §12.2, §12.3).
+/// A SELECT statement that has its projection: it can be rendered with <see cref="ToSql"/> and, when it is
+/// <see cref="Executable"/>, run with the methods of <see cref="SelectExecution"/> (<c>docs/design.ja.md</c> §12.2, §12.3).
 /// </summary>
 /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
 /// <typeparam name="TResult">The type that each row is read as.</typeparam>
-public abstract class SelectQuery<TDialect, TResult>
+public abstract class SelectQuery<TDialect, TMode, TResult>
     where TDialect : IDialect
+    where TMode : ExecutionMode
 {
-    private protected SelectQuery(IStatementRunner session, SelectState state, RowFactory<TResult> factory)
+    private protected SelectQuery(IStatementRunner? session, SelectState state, RowFactory<TResult> factory)
     {
         Session = session;
         State = state;
         Factory = factory;
     }
 
-    private protected IStatementRunner Session { get; }
+    /// <summary>
+    /// Gets the session that runs the statement, or <see langword="null"/> for a <see cref="SqlOnly"/> statement.
+    /// </summary>
+    internal IStatementRunner? Session { get; }
 
-    private protected SelectState State { get; }
+    internal SelectState State { get; }
 
-    private protected RowFactory<TResult> Factory { get; }
+    internal RowFactory<TResult> Factory { get; }
 
     /// <summary>
     /// Returns the SQL text and the parameters of the statement, exactly as they are sent. No connection is used.
     /// </summary>
     /// <returns>The statement.</returns>
     public SqlStatement ToSql() => SqlRenderContext.Render(DialectRenderer.For<TDialect>(), new SelectNode(State));
-
-    /// <summary>
-    /// Runs the statement and reads every row.
-    /// </summary>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The rows.</returns>
-    public Task<List<TResult>> ToListAsync(CancellationToken cancellationToken = default) =>
-        Executor.ListAsync(Session, ToSql(), Factory, cancellationToken);
-
-    /// <summary>
-    /// Runs the statement and reads the rows one at a time. The connection and the reader are held while the rows are
-    /// enumerated and released when the enumeration ends or stops.
-    /// </summary>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The rows.</returns>
-    public IAsyncEnumerable<TResult> AsAsyncEnumerable(CancellationToken cancellationToken = default) =>
-        Executor.StreamAsync(Session, ToSql(), Factory, cancellationToken);
-
-    /// <summary>
-    /// Runs the statement and returns the first row. No <c>LIMIT</c> is added; the reader is closed after the first row, and
-    /// the command is cancelled first when rows are left, so that the provider does not read them to the end
-    /// (<c>docs/design.ja.md</c> §12.2). Write <c>Limit(1)</c> to have the database stop after one row.
-    /// </summary>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The first row.</returns>
-    /// <exception cref="InvalidOperationException">The statement returned no row.</exception>
-    public async Task<TResult> FirstAsync(CancellationToken cancellationToken = default)
-    {
-        await foreach (TResult row in AsAsyncEnumerable(cancellationToken).ConfigureAwait(false))
-        {
-            return row;
-        }
-
-        throw new InvalidOperationException("The statement returned no row.");
-    }
-
-    /// <summary>
-    /// Runs the statement and returns the first row, or <see langword="default"/> when there is none. No <c>LIMIT</c> is added.
-    /// For a value type (<see cref="long"/>, a tuple), no row and a row of default values give the same result; use
-    /// <see cref="FirstAsync"/>, or read a nullable type, to tell them apart.
-    /// </summary>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The first row, or <see langword="default"/>.</returns>
-    public async Task<TResult?> FirstOrDefaultAsync(CancellationToken cancellationToken = default)
-    {
-        await foreach (TResult row in AsAsyncEnumerable(cancellationToken).ConfigureAwait(false))
-        {
-            return row;
-        }
-
-        return default;
-    }
-
-    /// <summary>
-    /// Runs the statement and returns its only row. No <c>LIMIT</c> is added; a second row is read to check that there is none.
-    /// </summary>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The only row.</returns>
-    /// <exception cref="InvalidOperationException">The statement returned no row, or more than one.</exception>
-    public async Task<TResult> SingleAsync(CancellationToken cancellationToken = default)
-    {
-        (bool found, TResult? row) = await SingleCoreAsync(cancellationToken).ConfigureAwait(false);
-        return found ? row! : throw new InvalidOperationException("The statement returned no row.");
-    }
-
-    /// <summary>
-    /// Runs the statement and returns its only row, or <see langword="default"/> when there is none. No <c>LIMIT</c> is added.
-    /// For a value type, no row and a row of default values give the same result; use <see cref="SingleAsync"/>, or read a
-    /// nullable type, to tell them apart.
-    /// </summary>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The only row, or <see langword="default"/>.</returns>
-    /// <exception cref="InvalidOperationException">The statement returned more than one row.</exception>
-    public async Task<TResult?> SingleOrDefaultAsync(CancellationToken cancellationToken = default)
-    {
-        (_, TResult? row) = await SingleCoreAsync(cancellationToken).ConfigureAwait(false);
-        return row;
-    }
-
-    private async Task<(bool Found, TResult? Row)> SingleCoreAsync(CancellationToken cancellationToken)
-    {
-        bool found = false;
-        TResult? single = default;
-        await foreach (TResult row in AsAsyncEnumerable(cancellationToken).ConfigureAwait(false))
-        {
-            if (found)
-            {
-                throw new InvalidOperationException("The statement returned more than one row.");
-            }
-
-            found = true;
-            single = row;
-        }
-
-        return (found, single);
-    }
 }

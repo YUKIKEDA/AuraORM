@@ -41,93 +41,147 @@ void SelectSource(StringBuilder s)
             /// of each table (<c>docs/design.ja.md</c> §5.1).
             /// </summary>
             /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+            /// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
             {{ViewDocs(n)}}
-            public abstract class SelectSource<TDialect, {{views}}>
+            public abstract class SelectSource<TDialect, TMode, {{views}}>
                 where TDialect : IDialect
+                where TMode : ExecutionMode
             {
-                private protected SelectSource(IStatementRunner session, SelectState state, {{ViewParameters(n)}})
+                private protected SelectSource(IStatementRunner? session, SelectState state, {{ViewParameters(n)}})
                 {
                     Session = session;
                     State = state;
             {{Lines(n, i => $"        V{i} = v{i};")}}
                 }
 
-                private protected IStatementRunner Session { get; }
+                private protected IStatementRunner? Session { get; }
 
                 private protected SelectState State { get; }
 
             {{Lines(n, i => $"    private protected T{i} V{i} {{ get; }}", "\n\n")}}
 
+                /// <summary>
+                /// Sets the projection: <c>SELECT …</c>. The projection is a column, an expression, a whole row, or a result type's
+                /// projection, all of one evaluation level (<c>docs/design.ja.md</c> §5.6). A <see cref="PerGroup"/> projection
+                /// aggregates the whole table as one group.
+                /// </summary>
+                /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+                /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+                /// <param name="projection">The projection, from the column sets.</param>
+                /// <returns>The statement.</returns>
+                public SelectProjected<TDialect, TMode, TResult, TLevel, {{views}}> Select<TResult, TLevel>(Func<{{views}}, IProjection<TResult, TLevel>> projection)
+                    where TLevel : EvaluationLevel
+                {
+                    ArgumentNullException.ThrowIfNull(projection);
+                    IProjection<TResult, TLevel> selected = projection({{Args(n)}});
+                    return new(Session, State.WithProjection(selected, distinct: false), selected, {{Args(n)}});
+                }
+
+                /// <summary>
+                /// Sets the projection of one expression: <c>SELECT DISTINCT a</c> (<c>docs/design.ja.md</c> §5.7). The
+                /// <c>OrderBy</c> that may follow gets the selected item.
+                /// </summary>
+                /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+                /// <typeparam name="TLevel">The evaluation level of the expression.</typeparam>
+                /// <param name="projection">The expression, from the column sets.</param>
+                /// <returns>The statement.</returns>
+                public SelectDistinctProjected<TDialect, TMode, TResult, TLevel, DistinctItem<TResult, TLevel>> SelectDistinct<TResult, TLevel>(Func<{{views}}, IExpr<TResult, TLevel>> projection)
+                    where TLevel : EvaluationLevel
+                {
+                    ArgumentNullException.ThrowIfNull(projection);
+                    IExpr<TResult, TLevel> selected = projection({{Args(n)}});
+                    return new(Session, State.WithProjection(selected, distinct: true), selected, new DistinctItem<TResult, TLevel>(1));
+                }
+
+                /// <summary>
+                /// Sets the projection of a whole row or a result type's projection: <c>SELECT DISTINCT …</c>
+                /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+                /// </summary>
+                /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+                /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
+                /// <param name="projection">The projection, from the column sets.</param>
+                /// <returns>The statement.</returns>
+                public SelectDistinctRows<TDialect, TMode, TResult, TLevel> SelectDistinct<TResult, TLevel>(Func<{{views}}, IProjection<TResult, TLevel>> projection)
+                    where TLevel : EvaluationLevel
+                {
+                    ArgumentNullException.ThrowIfNull(projection);
+                    IProjection<TResult, TLevel> selected = projection({{Args(n)}});
+                    return new(Session, State.WithProjection(selected, distinct: true), selected);
+                }
+
             """
         );
-        foreach (bool distinct in new[] { false, true })
+        for (int k = 2; k <= MaxTuple; k++)
         {
-            string method = distinct ? "SelectDistinct" : "Select";
-            string sql = distinct ? "SELECT DISTINCT" : "SELECT";
+            string results = string.Join(", ", Enumerable.Range(1, k).Select(i => $"TItem{i}"));
+            string projections = "(" + string.Join(", ", Enumerable.Range(1, k).Select(i => $"IProjection<TItem{i}, TLevel>")) + ")";
+            string expressions = "(" + string.Join(", ", Enumerable.Range(1, k).Select(i => $"IExpr<TItem{i}, TLevel>")) + ")";
+            string distinctItems = "(" + string.Join(", ", Enumerable.Range(1, k).Select(i => $"DistinctItem<TItem{i}, TLevel>")) + ")";
+            string tuple = $"new TupleProjection<{results}, TLevel>({string.Join(", ", Enumerable.Range(1, k).Select(i => $"items.Item{i}"))})";
+            string itemDocs = Lines(k, i => $"    /// <typeparam name=\"TItem{i}\">The type of item {i}.</typeparam>");
             s.Append(
                 CultureInfo.InvariantCulture,
                 $$"""
 
                     /// <summary>
-                    /// Sets the projection: <c>{{sql}} …</c>. The projection is a column, an expression, a whole row, or a result
-                    /// type's projection, all of one evaluation level (<c>docs/design.ja.md</c> §5.6). A <see cref="PerGroup"/>
-                    /// projection aggregates the whole table as one group.
+                    /// Sets the projection as a tuple of {{k}} items: <c>SELECT a, b, …</c>. Every item has the same evaluation level
+                    /// (<c>docs/design.ja.md</c> §5.6).
                     /// </summary>
-                    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
-                    /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
-                    /// <param name="projection">The projection, from the column sets.</param>
+                {{itemDocs}}
+                    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+                    /// <param name="projection">The items, from the column sets.</param>
                     /// <returns>The statement.</returns>
-                    public SelectProjected<TDialect, TResult, TLevel, {{views}}> {{method}}<TResult, TLevel>(Func<{{views}}, IProjection<TResult, TLevel>> projection)
+                    public SelectProjected<TDialect, TMode, ({{results}}), TLevel, {{views}}> Select<{{results}}, TLevel>(Func<{{views}}, {{projections}}> projection)
                         where TLevel : EvaluationLevel
                     {
                         ArgumentNullException.ThrowIfNull(projection);
-                        return Project(projection({{Args(n)}}), distinct: {{(distinct ? "true" : "false")}});
+                        {{projections}} items = projection({{Args(n)}});
+                        var selected = {{tuple}};
+                        return new(Session, State.WithProjection(selected, distinct: false), selected, {{Args(n)}});
+                    }
+
+                    /// <summary>
+                    /// Sets the projection as a tuple of {{k}} expressions: <c>SELECT DISTINCT a, b, …</c> (<c>docs/design.ja.md</c>
+                    /// §5.7). The <c>OrderBy</c> that may follow gets the selected items.
+                    /// </summary>
+                {{itemDocs}}
+                    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+                    /// <param name="projection">The expressions, from the column sets.</param>
+                    /// <returns>The statement.</returns>
+                    public SelectDistinctProjected<TDialect, TMode, ({{results}}), TLevel, {{distinctItems}}> SelectDistinct<{{results}}, TLevel>(Func<{{views}}, {{expressions}}> projection)
+                        where TLevel : EvaluationLevel
+                    {
+                        ArgumentNullException.ThrowIfNull(projection);
+                        {{expressions}} items = projection({{Args(n)}});
+                        var selected = {{tuple}};
+                        return new(Session, State.WithProjection(selected, distinct: true), selected, ({{string.Join(
+                    ", ",
+                    Enumerable.Range(1, k).Select(i => $"new DistinctItem<TItem{i}, TLevel>({i})")
+                )}}));
+                    }
+
+                    /// <summary>
+                    /// Sets the projection as a tuple of {{k}} items, some of them whole rows: <c>SELECT DISTINCT …</c>
+                    /// (<c>docs/design.ja.md</c> §5.7). It has no <c>OrderBy</c>; select a tuple of expressions to order the rows.
+                    /// </summary>
+                {{itemDocs}}
+                    /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
+                    /// <param name="projection">The items, from the column sets.</param>
+                    /// <returns>The statement.</returns>
+                    public SelectDistinctRows<TDialect, TMode, ({{results}}), TLevel> SelectDistinct<{{results}}, TLevel>(Func<{{views}}, {{projections}}> projection)
+                        where TLevel : EvaluationLevel
+                    {
+                        ArgumentNullException.ThrowIfNull(projection);
+                        {{projections}} items = projection({{Args(n)}});
+                        var selected = {{tuple}};
+                        return new(Session, State.WithProjection(selected, distinct: true), selected);
                     }
 
                 """
             );
-            for (int k = 2; k <= MaxTuple; k++)
-            {
-                string results = string.Join(", ", Enumerable.Range(1, k).Select(i => $"TItem{i}"));
-                string tuple = "(" + string.Join(", ", Enumerable.Range(1, k).Select(i => $"IProjection<TItem{i}, TLevel>")) + ")";
-                s.Append(
-                    CultureInfo.InvariantCulture,
-                    $$"""
-
-                    /// <summary>
-                    /// Sets the projection as a tuple of {{k}} items: <c>{{sql}} a, b, …</c>. Every item has the same evaluation level
-                    /// (<c>docs/design.ja.md</c> §5.6).
-                    /// </summary>
-                    {{Lines(k, i => $"    /// <typeparam name=\"TItem{i}\">The type of item {i}.</typeparam>")}}
-                        /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
-                        /// <param name="projection">The items, from the column sets.</param>
-                        /// <returns>The statement.</returns>
-                        public SelectProjected<TDialect, ({{results}}), TLevel, {{views}}> {{method}}<{{results}}, TLevel>(Func<{{views}}, {{tuple}}> projection)
-                            where TLevel : EvaluationLevel
-                        {
-                            ArgumentNullException.ThrowIfNull(projection);
-                            {{tuple}} items = projection({{Args(n)}});
-                            return Project(new TupleProjection<{{results}}, TLevel>({{string.Join(
-                        ", ",
-                        Enumerable.Range(1, k).Select(i => $"items.Item{i}")
-                    )}}), distinct: {{(distinct ? "true" : "false")}});
-                        }
-
-                    """
-                );
-            }
         }
 
-        s.Append(
-            CultureInfo.InvariantCulture,
-            $$"""
-
-                private SelectProjected<TDialect, TResult, TLevel, {{views}}> Project<TResult, TLevel>(IProjection<TResult, TLevel> projection, bool distinct)
-                    where TLevel : EvaluationLevel => new(Session, State.WithProjection(projection, distinct), projection, {{Args(n)}});
-            }
-
-            """
-        );
+        s.Append("}\n");
     }
 }
 
@@ -150,11 +204,13 @@ void SelectFrom(StringBuilder s)
             /// A SELECT statement right after <c>FROM</c>, with {{Tables(n)}} (<c>docs/design.ja.md</c> §5.1). <c>WHERE</c> may follow once.
             /// </summary>
             /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+            /// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
             {{pairDocs}}
-            public sealed class SelectFrom<TDialect, {{pairs}}> : SelectSource<TDialect, {{Views(n)}}>
+            public sealed class SelectFrom<TDialect, TMode, {{pairs}}> : SelectSource<TDialect, TMode, {{Views(n)}}>
                 where TDialect : IDialect
+                where TMode : ExecutionMode
             {
-                internal SelectFrom(IStatementRunner session, SelectState state, {{ViewParameters(n)}})
+                internal SelectFrom(IStatementRunner? session, SelectState state, {{ViewParameters(n)}})
                     : base(session, state, {{Lower(n)}}) { }
 
                 /// <summary>
@@ -162,7 +218,19 @@ void SelectFrom(StringBuilder s)
                 /// </summary>
                 /// <param name="condition">The condition, from the column sets.</param>
                 /// <returns>The statement.</returns>
-                public SelectWhere<TDialect, {{Views(n)}}> Where(Func<{{Views(n)}}, Condition<PerRow>> condition)
+                public SelectWhere<TDialect, TMode, {{Views(n)}}> Where(Func<{{Views(n)}}, Condition<PerRow>> condition)
+                {
+                    ArgumentNullException.ThrowIfNull(condition);
+                    return new(Session, State with { Where = condition({{Args(n)}}).Node }, {{Args(n)}});
+                }
+
+                /// <summary>
+                /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form
+                /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).
+                /// </summary>
+                /// <param name="condition">The condition, from the column sets.</param>
+                /// <returns>The statement.</returns>
+                public SelectWhere<TDialect, TMode, {{Views(n)}}> Where(Func<{{Views(n)}}, OptionalCondition<PerRow>> condition)
                 {
                     ArgumentNullException.ThrowIfNull(condition);
                     return new(Session, State with { Where = condition({{Args(n)}}).Node }, {{Args(n)}});
@@ -186,11 +254,13 @@ void SelectWhere(StringBuilder s)
             /// A SELECT statement after <c>WHERE</c>, with {{Tables(n)}} (<c>docs/design.ja.md</c> §5.1).
             /// </summary>
             /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+            /// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
             {{ViewDocs(n)}}
-            public sealed class SelectWhere<TDialect, {{Views(n)}}> : SelectSource<TDialect, {{Views(n)}}>
+            public sealed class SelectWhere<TDialect, TMode, {{Views(n)}}> : SelectSource<TDialect, TMode, {{Views(n)}}>
                 where TDialect : IDialect
+                where TMode : ExecutionMode
             {
-                internal SelectWhere(IStatementRunner session, SelectState state, {{ViewParameters(n)}})
+                internal SelectWhere(IStatementRunner? session, SelectState state, {{ViewParameters(n)}})
                     : base(session, state, {{Lower(n)}}) { }
             }
 
@@ -212,16 +282,18 @@ void SelectProjected(StringBuilder s)
             /// follow once.
             /// </summary>
             /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+            /// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
             /// <typeparam name="TResult">The type that each row is read as.</typeparam>
             /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
             {{ViewDocs(n)}}
-            public sealed class SelectProjected<TDialect, TResult, TLevel, {{Views(n)}}> : SelectProjection<TDialect, TResult, TLevel>
+            public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, {{Views(n)}}> : SelectProjection<TDialect, TMode, TResult, TLevel>
                 where TDialect : IDialect
+                where TMode : ExecutionMode
                 where TLevel : EvaluationLevel
             {
             {{Lines(n, i => $"    private readonly T{i} _v{i};", "\n")}}
 
-                internal SelectProjected(IStatementRunner session, SelectState state, IProjection<TResult, TLevel> projection, {{ViewParameters(n)}})
+                internal SelectProjected(IStatementRunner? session, SelectState state, IProjection<TResult, TLevel> projection, {{ViewParameters(n)}})
                     : base(session, state, FactoryOf(projection))
                 {
             {{Lines(n, i => $"        _v{i} = v{i};")}}
@@ -234,7 +306,7 @@ void SelectProjected(StringBuilder s)
                 /// <param name="orderings">The keys, in order, from the column sets: <c>u =&gt; [Asc(u.Name), Desc(u.Id)]</c>.</param>
                 /// <returns>The statement.</returns>
                 /// <exception cref="ArgumentException">There is no key.</exception>
-                public SelectOrdered<TDialect, TResult> OrderBy(Func<{{Views(n)}}, Ordering<TLevel>[]> orderings)
+                public SelectOrdered<TDialect, TMode, TResult> OrderBy(Func<{{Views(n)}}, Ordering<TLevel>[]> orderings)
                 {
                     ArgumentNullException.ThrowIfNull(orderings);
                     return new(Session, State.WithOrderBy(orderings({{string.Join(", ", Enumerable.Range(1, n).Select(i => $"_v{i}"))}})), Factory);

@@ -35,16 +35,13 @@ public abstract partial class DatabaseSession<TDialect> : IStatementRunner
     /// <typeparam name="TInsert">The <c>INSERT</c> model.</typeparam>
     /// <param name="table">The table reference, such as <c>User.Table</c>.</param>
     /// <returns>The statement.</returns>
-    public SelectFrom<TDialect, TColumns, TNullable> From<TRow, TColumns, TNullable, TInsert>(Table<TRow, TColumns, TNullable, TInsert> table)
+    public SelectFrom<TDialect, Executable, TColumns, TNullable> From<TRow, TColumns, TNullable, TInsert>(
+        Table<TRow, TColumns, TNullable, TInsert> table
+    )
         where TRow : class
         where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
         where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
-        where TInsert : InsertModel
-    {
-        ArgumentNullException.ThrowIfNull(table);
-        var alias = new TableAlias(table.Info.Schema, table.Info.Name, alias: null);
-        return new SelectFrom<TDialect, TColumns, TNullable>(this, SelectState.From(alias), TColumns.Create(alias));
-    }
+        where TInsert : InsertModel => SelectStart.From<TDialect, Executable, TRow, TColumns, TNullable, TInsert>(this, table);
 
     /// <summary>
     /// Runs a raw query and reads each row into a <c>[Table]</c> or <c>[QueryResult]</c> type by column name

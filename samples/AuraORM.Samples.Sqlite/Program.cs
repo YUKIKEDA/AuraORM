@@ -40,6 +40,20 @@ List<(string, int?)> page = await db.From(Book.Table).Select(b => (b.Title, b.Pa
 checks.SameItems("select page", [("Anonymous Tales", (int?)null)], page);
 
 (long count, int? longest) = await db.From(Book.Table).Select(b => (Count(), Max(b.Pages))).SingleAsync();
+
+string? author = null;
+List<long> filtered = await db.From(Book.Table)
+    .Where(b => And([author is null ? null : Eq(b.Author, author), Gt(b.Pages, 300)]))
+    .Select(b => b.Id)
+    .OrderBy(b => [Asc(b.Id)])
+    .ToListAsync();
+checks.SameItems("optional conditions", [1L, 3L], filtered);
+
+List<Genre> genres = await db.From(Book.Table).SelectDistinct(b => b.Genre).OrderBy(g => [Desc(g)]).ToListAsync();
+checks.SameItems("distinct ordered", [Genre.Science, Genre.Fiction], genres);
+
+SqlStatement offline = new SqlBuilder<SqliteDialect>().From(Book.Table).Select(b => b.Title).Limit(1).ToSql();
+checks.Equal("sql builder", "SELECT \"books\".\"title\" FROM \"books\" LIMIT @p0", offline.Text);
 checks.Equal("select aggregates", (3L, (int?)412), (count, longest));
 
 // Every reading path of the generated code and of ValueReader<T> that a type of design §3.3 takes, with values and nulls.

@@ -281,7 +281,7 @@ public sealed class SelectRenderingTests
     [Fact]
     public void From_ReusedStage_KeepsStatementsApart()
     {
-        SelectFrom<SqliteDialect, Account.Columns, Account.NullableColumns> from = Db<SqliteDialect>().From(Account.Table);
+        SelectFrom<SqliteDialect, Executable, Account.Columns, Account.NullableColumns> from = Db<SqliteDialect>().From(Account.Table);
 
         SqlStatement filtered = from.Where(a => Eq(a.Id, 1L)).Select(a => a.Id).ToSql();
         SqlStatement plain = from.Select(a => a.Id).ToSql();
@@ -307,7 +307,9 @@ public sealed class SelectRenderingTests
     [Fact]
     public void Builder_InvalidArguments_Throw()
     {
-        SelectProjected<SqliteDialect, long, PerRow, Account.Columns> projected = Db<SqliteDialect>().From(Account.Table).Select(a => a.Id);
+        SelectProjected<SqliteDialect, Executable, long, PerRow, Account.Columns> projected = Db<SqliteDialect>()
+            .From(Account.Table)
+            .Select(a => a.Id);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => projected.OrderBy(a => [Asc(a.Id)]).Limit(-1));
         Assert.Throws<ArgumentOutOfRangeException>(() => projected.Limit(1).Offset(-1));
@@ -397,7 +399,7 @@ public sealed class SelectRenderingTests
     public async Task FirstAsync_RowsLeft_CancelsBeforeClosing()
     {
         var connection = new FakeConnection { Rows = [1L, 2L, 3L] };
-        SelectProjected<SqliteDialect, long, PerRow, Account.Columns> query = new Database<SqliteDialect>(connection)
+        SelectProjected<SqliteDialect, Executable, long, PerRow, Account.Columns> query = new Database<SqliteDialect>(connection)
             .From(Account.Table)
             .Select(a => a.Id);
         CancellationToken ct = TestContext.Current.CancellationToken;
@@ -406,6 +408,134 @@ public sealed class SelectRenderingTests
         Assert.Equal([1L, 2L, 3L], await query.ToListAsync(ct));
 
         Assert.Equal([1, 0], connection.Commands.Select(c => c.CancelCount));
+    }
+
+    /// <summary>
+    /// <c>Where</c> with the list form of <c>And</c> writes the conditions that are present, and no <c>WHERE</c> when none
+    /// is (design §4.2, §5.4).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - Filters built from two optional values, as a search form would.
+    ///
+    /// Steps:
+    /// - Render the statement with both values, with one, and with none.
+    ///
+    /// Expected:
+    /// - <c>WHERE (a AND b)</c>, <c>WHERE a</c>, and no <c>WHERE</c>; only the present values are parameters.
+    /// </remarks>
+    [Fact]
+    public void Where_ListOfOptionalConditions_WritesOnlyPresentOnes()
+    {
+        static SqlStatement Search(string? email, int? minLogins) =>
+            Db<SqliteDialect>()
+                .From(Account.Table)
+                .Where(a => And([email is null ? null : Like(a.Email, email), minLogins is null ? null : Ge(a.LoginCount, minLogins.Value)]))
+                .Select(a => a.Id)
+                .ToSql();
+
+        SqlAssert.Compare(
+            "SQLite",
+            "SELECT \"accounts\".\"id\" FROM \"accounts\" WHERE (\"accounts\".\"email\" LIKE @p0 AND \"accounts\".\"login_count\" >= @p1)",
+            Search("a%", 3),
+            "a%",
+            3
+        );
+        SqlAssert.Compare("SQLite", "SELECT \"accounts\".\"id\" FROM \"accounts\" WHERE \"accounts\".\"login_count\" >= @p0", Search(null, 3), 3);
+        SqlAssert.Compare("SQLite", "SELECT \"accounts\".\"id\" FROM \"accounts\"", Search(null, null));
+    }
+
+    /// <summary>
+    /// The <c>OrderBy</c> of a <c>SelectDistinct</c> names the selected items by their position in the select list, so the keys
+    /// are items of the list on every dialect, even when an item has a parameter (design §5.7).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - A distinct expression with a parameter, and a distinct tuple of two columns.
+    ///
+    /// Steps:
+    /// - Order the first by its item, and the second by its second item descending, then its first.
+    ///
+    /// Expected:
+    /// - <c>ORDER BY 1 ASC</c> with one parameter; <c>ORDER BY 2 DESC, 1 ASC</c>.
+    /// </remarks>
+    [Fact]
+    public void SelectDistinct_OrderBy_NamesItemsByPosition()
+    {
+        SqlAssert.Compare(
+            "PostgreSQL",
+            "SELECT DISTINCT (\"accounts\".\"login_count\" + $1) FROM \"accounts\" ORDER BY 1 ASC",
+            Db<PostgreSqlDialect>().From(Account.Table).SelectDistinct(a => Add(a.LoginCount, 1)).OrderBy(s => [Asc(s)]).ToSql(),
+            1
+        );
+        SqlAssert.Compare(
+            "SQL Server",
+            "SELECT DISTINCT [accounts].[status], [accounts].[email] FROM [accounts] ORDER BY 2 DESC, 1 ASC",
+            Db<SqlServerDialect>().From(Account.Table).SelectDistinct(a => (a.Status, a.Email)).OrderBy(s => [Desc(s.Item2), Asc(s.Item1)]).ToSql()
+        );
+    }
+
+    /// <summary>
+    /// An <c>ORDER BY</c> key of decimals is rejected on SQLite, which stores decimals as text, and written on the other
+    /// dialects (design §3.3, §14.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The decimal column <c>Balance</c>.
+    ///
+    /// Steps:
+    /// - Order by it on SQLite and on PostgreSQL.
+    ///
+    /// Expected:
+    /// - SQLite: <see cref="InvalidOperationException"/> from <c>ToSql()</c>. PostgreSQL: <c>ORDER BY "accounts"."balance" ASC</c>.
+    /// </remarks>
+    [Fact]
+    public void OrderBy_DecimalOnSqlite_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            Db<SqliteDialect>().From(Account.Table).Select(a => a.Id).OrderBy(a => [Asc(a.Balance)]).ToSql()
+        );
+
+        SqlAssert.Compare(
+            "PostgreSQL",
+            "SELECT \"accounts\".\"id\" FROM \"accounts\" ORDER BY \"accounts\".\"balance\" ASC",
+            Db<PostgreSqlDialect>().From(Account.Table).Select(a => a.Id).OrderBy(a => [Asc(a.Balance)]).ToSql()
+        );
+    }
+
+    /// <summary>
+    /// A <see cref="SqlBuilder{TDialect}"/> renders the same SQL as a database, with no connection or provider (design §12.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - A builder and a database on SQL Server.
+    ///
+    /// Steps:
+    /// - Render the same paged statement from both.
+    ///
+    /// Expected:
+    /// - The same text and parameters.
+    /// </remarks>
+    [Fact]
+    public void SqlBuilder_Statement_RendersLikeDatabase()
+    {
+        SqlStatement built = new SqlBuilder<SqlServerDialect>()
+            .From(Account.Table)
+            .Where(a => Gt(a.LoginCount, 2))
+            .Select(a => a.Email)
+            .OrderBy(a => [Asc(a.Id)])
+            .Limit(5)
+            .ToSql();
+        SqlStatement run = Db<SqlServerDialect>()
+            .From(Account.Table)
+            .Where(a => Gt(a.LoginCount, 2))
+            .Select(a => a.Email)
+            .OrderBy(a => [Asc(a.Id)])
+            .Limit(5)
+            .ToSql();
+
+        Assert.Equal(run.Text, built.Text);
+        Assert.Equal(run.Parameters, built.Parameters);
     }
 
     private static Database<TDialect> Db<TDialect>()

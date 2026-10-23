@@ -88,7 +88,7 @@ public abstract class SelectTests<TDialect>
 
         List<(PersonStatus, int?)> rows = await db.From(Person.Table)
             .SelectDistinct(p => (p.Status, p.Age))
-            .OrderBy(p => [Asc(p.Status), Asc(p.Age)])
+            .OrderBy(s => [Asc(s.Item1), Asc(s.Item2)])
             .ToListAsync(Ct);
 
         Assert.Equal([(PersonStatus.Inactive, null), (PersonStatus.Active, 30), (PersonStatus.Active, (int?)41)], rows);
@@ -165,8 +165,8 @@ public abstract class SelectTests<TDialect>
     public async Task FirstAndSingle_RowCounts_FollowLinqRules()
     {
         Database<TDialect> db = await SeedAsync();
-        SelectOrdered<TDialect, long> all = db.From(Person.Table).Select(p => p.Id).OrderBy(p => [Asc(p.Id)]);
-        SelectProjected<TDialect, long, PerRow, Person.Columns> none = db.From(Person.Table).Where(p => Gt(p.Id, 100L)).Select(p => p.Id);
+        SelectOrdered<TDialect, Executable, long> all = db.From(Person.Table).Select(p => p.Id).OrderBy(p => [Asc(p.Id)]);
+        SelectProjected<TDialect, Executable, long, PerRow, Person.Columns> none = db.From(Person.Table).Where(p => Gt(p.Id, 100L)).Select(p => p.Id);
 
         Assert.Equal(1L, await all.FirstAsync(Ct));
         await Assert.ThrowsAsync<InvalidOperationException>(() => all.SingleAsync(Ct));
@@ -220,7 +220,7 @@ public abstract class SelectTests<TDialect>
     public async Task Limit_Zero_ReturnsNoRowOrThrowsOnSqlServer()
     {
         Database<TDialect> db = await SeedAsync();
-        SelectOrdered<TDialect, long> ordered = db.From(Person.Table).Select(p => p.Id).OrderBy(p => [Asc(p.Id)]);
+        SelectOrdered<TDialect, Executable, long> ordered = db.From(Person.Table).Select(p => p.Id).OrderBy(p => [Asc(p.Id)]);
 
         if (typeof(TDialect) == typeof(SqlServerDialect))
         {
@@ -256,6 +256,62 @@ public abstract class SelectTests<TDialect>
 
         Assert.Equal(1L, first);
         Assert.Equal(4L, count);
+    }
+
+    /// <summary>
+    /// <c>Where</c> with the list form of <c>And</c> filters by the conditions that are present, and returns every row when
+    /// none is, on every dialect (design §4.2).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The four people.
+    ///
+    /// Steps:
+    /// - Select the ids with filters for a name prefix and a minimum age: both, only the age, and none.
+    ///
+    /// Expected:
+    /// - [3] for a name starting with C and an age of at least 31; [1, 3, 4] for an age of at least 30; all four for none.
+    /// </remarks>
+    [Fact]
+    public async Task Where_OptionalConditions_FilterByPresentOnes()
+    {
+        Database<TDialect> db = await SeedAsync();
+
+        Task<List<long>> SearchAsync(string? prefix, int? minAge) =>
+            db.From(Person.Table)
+                .Where(p => And([prefix is null ? null : Like(p.Name, prefix + "%"), minAge is null ? null : Ge(p.Age, minAge.Value)]))
+                .Select(p => p.Id)
+                .OrderBy(p => [Asc(p.Id)])
+                .ToListAsync(Ct);
+
+        Assert.Equal([3L], await SearchAsync("C", 31));
+        Assert.Equal([1L, 3L, 4L], await SearchAsync(null, 30));
+        Assert.Equal([1L, 2L, 3L, 4L], await SearchAsync(null, null));
+    }
+
+    /// <summary>
+    /// A <c>SelectDistinct</c> ordered by its items, named by position, runs on every dialect, also with an item that has a
+    /// parameter, where PostgreSQL and SQL Server reject an <c>ORDER BY</c> expression outside the select list (design §5.7).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The four people, aged 30, null, 41, and 30.
+    ///
+    /// Steps:
+    /// - Select the distinct ages plus one, ordered by that item descending.
+    ///
+    /// Expected:
+    /// - 42, 31, and null in the order of the dialect for null in a descending order.
+    /// </remarks>
+    [Fact]
+    public async Task SelectDistinct_OrderedByItemWithParameter_Runs()
+    {
+        Database<TDialect> db = await SeedAsync();
+
+        List<int?> ages = await db.From(Person.Table).SelectDistinct(p => Add(p.Age, 1)).OrderBy(s => [Desc(s)]).ToListAsync(Ct);
+
+        Assert.Equal(3, ages.Count);
+        Assert.Equal([42, 31], ages.Where(a => a is not null).Select(a => a!.Value));
     }
 
     private async Task<Database<TDialect>> SeedAsync()

@@ -6,12 +6,14 @@ namespace AuraORM;
 /// A SELECT statement right after <c>FROM</c>, with one table (<c>docs/design.ja.md</c> §5.1). <c>WHERE</c> may follow once.
 /// </summary>
 /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+/// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
 /// <typeparam name="T1">The column set of table 1, as the lambdas get it now.</typeparam>
 /// <typeparam name="TNullable1">The column set of table 1 on the nullable side of an outer join.</typeparam>
-public sealed class SelectFrom<TDialect, T1, TNullable1> : SelectSource<TDialect, T1>
+public sealed class SelectFrom<TDialect, TMode, T1, TNullable1> : SelectSource<TDialect, TMode, T1>
     where TDialect : IDialect
+    where TMode : ExecutionMode
 {
-    internal SelectFrom(IStatementRunner session, SelectState state, T1 v1)
+    internal SelectFrom(IStatementRunner? session, SelectState state, T1 v1)
         : base(session, state, v1) { }
 
     /// <summary>
@@ -19,7 +21,19 @@ public sealed class SelectFrom<TDialect, T1, TNullable1> : SelectSource<TDialect
     /// </summary>
     /// <param name="condition">The condition, from the column sets.</param>
     /// <returns>The statement.</returns>
-    public SelectWhere<TDialect, T1> Where(Func<T1, Condition<PerRow>> condition)
+    public SelectWhere<TDialect, TMode, T1> Where(Func<T1, Condition<PerRow>> condition)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new(Session, State with { Where = condition(V1).Node }, V1);
+    }
+
+    /// <summary>
+    /// Adds a condition that may be empty: <c>WHERE condition</c>, or no <c>WHERE</c> when the list given to the list form
+    /// of <c>And</c> or <c>Or</c> had no condition (<c>docs/design.ja.md</c> §4.2).
+    /// </summary>
+    /// <param name="condition">The condition, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectWhere<TDialect, TMode, T1> Where(Func<T1, OptionalCondition<PerRow>> condition)
     {
         ArgumentNullException.ThrowIfNull(condition);
         return new(Session, State with { Where = condition(V1).Node }, V1);
