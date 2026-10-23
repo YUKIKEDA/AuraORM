@@ -59,7 +59,8 @@ public sealed class ParameterTests
     }
 
     /// <summary>
-    /// A value that is written twice gets two parameters (design §4.2, the SQL Server expansion of IsNotDistinctFrom).
+    /// A value that is written more than once gets a parameter each time (design §4.2, the SQL Server expansion of
+    /// IsNotDistinctFrom).
     /// </summary>
     /// <remarks>
     /// Preconditions:
@@ -69,15 +70,15 @@ public sealed class ParameterTests
     /// - Render it on SQL Server.
     ///
     /// Expected:
-    /// - Two parameters, @p0 and @p1, both 5.
+    /// - Three parameters, @p0 to @p2, all 5.
     /// </remarks>
     [Fact]
-    public void ParameterName_ValueWrittenTwice_GetsTwoParameters()
+    public void ParameterName_ValueWrittenThreeTimes_GetsThreeParameters()
     {
         SqlStatement statement = SqlRenderContext.Render(DialectRenderer.For<SqlServerDialect>(), IsNotDistinctFrom(Age, 5).Node);
 
-        Assert.Equal(["@p0", "@p1"], statement.Parameters.Select(p => p.Name));
-        Assert.Equal([5, 5], statement.Parameters.Select(p => p.Value));
+        Assert.Equal(["@p0", "@p1", "@p2"], statement.Parameters.Select(p => p.Name));
+        Assert.Equal([5, 5, 5], statement.Parameters.Select(p => p.Value));
     }
 
     /// <summary>
@@ -112,7 +113,7 @@ public sealed class ParameterTests
         };
 
         SqlStatement atLimit = SqlRenderContext.Render(renderer, In(Score, new int[limit]).Node);
-        Assert.Equal(limit, atLimit.Parameters.Count);
+        Assert.Equal(limit, atLimit.Parameters.Length);
 
         Assert.Throws<ArgumentException>(() => SqlRenderContext.Render(renderer, In(Score, new int[limit + 1]).Node));
     }

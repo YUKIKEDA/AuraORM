@@ -1,7 +1,6 @@
 <Project>
   <!-- Shared settings for every project. Conventions: docs/conventions.md. Dependency rules: .cursor/rules/dependencies.mdc. -->
   <PropertyGroup>
-    <TargetFramework Condition="'$(TargetFramework)' == '' And '$(TargetFrameworks)' == ''">net8.0</TargetFramework>
     <LangVersion>14</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

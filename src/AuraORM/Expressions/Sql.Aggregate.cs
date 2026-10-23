@@ -130,37 +130,183 @@ public static partial class Sql
     /// <inheritdoc cref="Avg(IExpr{decimal, PerRow})"/>
     public static IExpr<decimal?, PerGroup> Avg(IExpr<decimal?, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Average, value.Node);
 
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<byte?, PerGroup> Min(IExpr<byte, PerRow> value) => Aggregate<byte?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<byte?, PerGroup> Min(IExpr<byte?, PerRow> value) => Aggregate<byte?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<short?, PerGroup> Min(IExpr<short, PerRow> value) => Aggregate<short?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<short?, PerGroup> Min(IExpr<short?, PerRow> value) => Aggregate<short?>(AggregateFunction.Min, value.Node);
+
     /// <summary>
-    /// Returns the smallest value: <c>MIN(a)</c>.
+    /// Returns the smallest value: <c>MIN(a)</c>. The value is a number, a date or time, a string, or an enum (by its
+    /// underlying integer); <see cref="bool"/> and <see cref="Guid"/> have no order on every dialect.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The value.</param>
     /// <returns>The expression. It is null when there are no non-null values.</returns>
-    public static IExpr<T?, PerGroup> Min<T>(IExpr<T, PerRow> value)
-        where T : struct => Aggregate<T?>(AggregateFunction.Min, value.Node);
+    public static IExpr<int?, PerGroup> Min(IExpr<int, PerRow> value) => Aggregate<int?>(AggregateFunction.Min, value.Node);
 
-    /// <inheritdoc cref="Min{T}(IExpr{T, PerRow})"/>
-    public static IExpr<T?, PerGroup> Min<T>(IExpr<T?, PerRow> value)
-        where T : struct => Aggregate<T?>(AggregateFunction.Min, value.Node);
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<int?, PerGroup> Min(IExpr<int?, PerRow> value) => Aggregate<int?>(AggregateFunction.Min, value.Node);
 
-    /// <inheritdoc cref="Min{T}(IExpr{T, PerRow})"/>
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<long?, PerGroup> Min(IExpr<long, PerRow> value) => Aggregate<long?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<long?, PerGroup> Min(IExpr<long?, PerRow> value) => Aggregate<long?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<float?, PerGroup> Min(IExpr<float, PerRow> value) => Aggregate<float?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<float?, PerGroup> Min(IExpr<float?, PerRow> value) => Aggregate<float?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<double?, PerGroup> Min(IExpr<double, PerRow> value) => Aggregate<double?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<double?, PerGroup> Min(IExpr<double?, PerRow> value) => Aggregate<double?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<decimal?, PerGroup> Min(IExpr<decimal, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<decimal?, PerGroup> Min(IExpr<decimal?, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<DateTime?, PerGroup> Min(IExpr<DateTime, PerRow> value) => Aggregate<DateTime?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<DateTime?, PerGroup> Min(IExpr<DateTime?, PerRow> value) => Aggregate<DateTime?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<DateTimeOffset?, PerGroup> Min(IExpr<DateTimeOffset, PerRow> value) =>
+        Aggregate<DateTimeOffset?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<DateTimeOffset?, PerGroup> Min(IExpr<DateTimeOffset?, PerRow> value) =>
+        Aggregate<DateTimeOffset?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<DateOnly?, PerGroup> Min(IExpr<DateOnly, PerRow> value) => Aggregate<DateOnly?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<DateOnly?, PerGroup> Min(IExpr<DateOnly?, PerRow> value) => Aggregate<DateOnly?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<TimeOnly?, PerGroup> Min(IExpr<TimeOnly, PerRow> value) => Aggregate<TimeOnly?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
+    public static IExpr<TimeOnly?, PerGroup> Min(IExpr<TimeOnly?, PerRow> value) => Aggregate<TimeOnly?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min(IExpr{int, PerRow})"/>
     public static IExpr<string?, PerGroup> Min(IExpr<string?, PerRow> value) => Aggregate<string?>(AggregateFunction.Min, value.Node);
 
     /// <summary>
-    /// Returns the largest value: <c>MAX(a)</c>.
+    /// Returns the smallest enum value by its underlying integer: <c>MIN(a)</c>.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
+    /// <typeparam name="T">The enum type.</typeparam>
+    /// <param name="value">The value.</param>
+    /// <returns>The expression. It is null when there are no non-null values.</returns>
+    public static IExpr<T?, PerGroup> Min<T>(IExpr<T, PerRow> value)
+        where T : struct, Enum => Aggregate<T?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Min{T}(IExpr{T, PerRow})"/>
+    public static IExpr<T?, PerGroup> Min<T>(IExpr<T?, PerRow> value)
+        where T : struct, Enum => Aggregate<T?>(AggregateFunction.Min, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<byte?, PerGroup> Max(IExpr<byte, PerRow> value) => Aggregate<byte?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<byte?, PerGroup> Max(IExpr<byte?, PerRow> value) => Aggregate<byte?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<short?, PerGroup> Max(IExpr<short, PerRow> value) => Aggregate<short?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<short?, PerGroup> Max(IExpr<short?, PerRow> value) => Aggregate<short?>(AggregateFunction.Max, value.Node);
+
+    /// <summary>
+    /// Returns the largest value: <c>MAX(a)</c>. The value is a number, a date or time, a string, or an enum (by its
+    /// underlying integer); <see cref="bool"/> and <see cref="Guid"/> have no order on every dialect.
+    /// </summary>
+    /// <param name="value">The value.</param>
+    /// <returns>The expression. It is null when there are no non-null values.</returns>
+    public static IExpr<int?, PerGroup> Max(IExpr<int, PerRow> value) => Aggregate<int?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<int?, PerGroup> Max(IExpr<int?, PerRow> value) => Aggregate<int?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<long?, PerGroup> Max(IExpr<long, PerRow> value) => Aggregate<long?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<long?, PerGroup> Max(IExpr<long?, PerRow> value) => Aggregate<long?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<float?, PerGroup> Max(IExpr<float, PerRow> value) => Aggregate<float?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<float?, PerGroup> Max(IExpr<float?, PerRow> value) => Aggregate<float?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<double?, PerGroup> Max(IExpr<double, PerRow> value) => Aggregate<double?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<double?, PerGroup> Max(IExpr<double?, PerRow> value) => Aggregate<double?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<decimal?, PerGroup> Max(IExpr<decimal, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<decimal?, PerGroup> Max(IExpr<decimal?, PerRow> value) => Aggregate<decimal?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<DateTime?, PerGroup> Max(IExpr<DateTime, PerRow> value) => Aggregate<DateTime?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<DateTime?, PerGroup> Max(IExpr<DateTime?, PerRow> value) => Aggregate<DateTime?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<DateTimeOffset?, PerGroup> Max(IExpr<DateTimeOffset, PerRow> value) =>
+        Aggregate<DateTimeOffset?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<DateTimeOffset?, PerGroup> Max(IExpr<DateTimeOffset?, PerRow> value) =>
+        Aggregate<DateTimeOffset?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<DateOnly?, PerGroup> Max(IExpr<DateOnly, PerRow> value) => Aggregate<DateOnly?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<DateOnly?, PerGroup> Max(IExpr<DateOnly?, PerRow> value) => Aggregate<DateOnly?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<TimeOnly?, PerGroup> Max(IExpr<TimeOnly, PerRow> value) => Aggregate<TimeOnly?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<TimeOnly?, PerGroup> Max(IExpr<TimeOnly?, PerRow> value) => Aggregate<TimeOnly?>(AggregateFunction.Max, value.Node);
+
+    /// <inheritdoc cref="Max(IExpr{int, PerRow})"/>
+    public static IExpr<string?, PerGroup> Max(IExpr<string?, PerRow> value) => Aggregate<string?>(AggregateFunction.Max, value.Node);
+
+    /// <summary>
+    /// Returns the largest enum value by its underlying integer: <c>MAX(a)</c>.
+    /// </summary>
+    /// <typeparam name="T">The enum type.</typeparam>
     /// <param name="value">The value.</param>
     /// <returns>The expression. It is null when there are no non-null values.</returns>
     public static IExpr<T?, PerGroup> Max<T>(IExpr<T, PerRow> value)
-        where T : struct => Aggregate<T?>(AggregateFunction.Max, value.Node);
+        where T : struct, Enum => Aggregate<T?>(AggregateFunction.Max, value.Node);
 
     /// <inheritdoc cref="Max{T}(IExpr{T, PerRow})"/>
     public static IExpr<T?, PerGroup> Max<T>(IExpr<T?, PerRow> value)
-        where T : struct => Aggregate<T?>(AggregateFunction.Max, value.Node);
-
-    /// <inheritdoc cref="Max{T}(IExpr{T, PerRow})"/>
-    public static IExpr<string?, PerGroup> Max(IExpr<string?, PerRow> value) => Aggregate<string?>(AggregateFunction.Max, value.Node);
+        where T : struct, Enum => Aggregate<T?>(AggregateFunction.Max, value.Node);
 
     private static SqlExpr<T, PerGroup> Aggregate<T>(AggregateFunction function, SqlNode? argument) => new(new AggregateNode(function, argument));
 }

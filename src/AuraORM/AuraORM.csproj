@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- The runtime library. The public API is designed in docs/design.ja.md and built row by row (docs/roadmap.md). -->
   <PropertyGroup>
+    <!-- Each project names its target frameworks. Directory.Build.props cannot give a default: it is read before the
+         project body, so a default there would also win over a project's own TargetFrameworks. -->
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>AuraORM</RootNamespace>
     <AssemblyName>AuraORM</AssemblyName>
     <IsAotCompatible>true</IsAotCompatible>
@@ -10,10 +13,6 @@
     <PackageTags>orm;sql;query-builder;nativeaot;source-generator;sqlite;postgresql;mysql;sqlserver</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
-  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="AuraORM.Tests" />

@@ -10,7 +10,7 @@ internal sealed class SqliteRenderer : DialectRenderer
     // SQLITE_MAX_VARIABLE_NUMBER defaults to 32766 from SQLite 3.32.0 (https://www.sqlite.org/limits.html).
     public override int MaxParameters => 32766;
 
-    public override string LengthFunction => "LENGTH";
+    protected override string LengthFunction => "LENGTH";
 
     protected override char IdentifierOpen => '"';
 

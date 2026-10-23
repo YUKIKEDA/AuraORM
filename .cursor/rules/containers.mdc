@@ -22,7 +22,8 @@ The owner's order: Docker is not used in this repository or on the development m
 
 ## Images
 
-- Each image is pinned to a major version tag (for example `postgres:17`) in one place that both the local script and CI read. A version change is a PR that runs the whole integration job.
+- Each image is pinned to a major version tag (for example `postgres:17`) in one place that both the local script and CI read. A version change is a PR that runs the whole integration job. The tag floats on minor and patch releases on purpose: CI then checks the latest release without a code change. A red integration job with no change in the PR is first checked against the image's release.
+- The service definitions in `.github/workflows/ci.yml` repeat the image names, environment, and health checks of `tools/databases.json`. A change to one is made to the other in the same PR.
 
 ```text
 # BAD — "Docker が無いので PostgreSQL のテストはローカルで確認しました" (the check is invisible and the gate is skipped)

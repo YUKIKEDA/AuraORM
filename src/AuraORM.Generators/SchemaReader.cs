@@ -63,7 +63,7 @@ internal static class SchemaReader
         var columns = new List<ColumnModel>();
         foreach (Member member in members)
         {
-            ColumnModel? column = ReadColumn(member, snakeCase, diagnostics);
+            ColumnModel? column = ReadColumn(member, snakeCase, context.SemanticModel.Compilation, diagnostics);
             if (column is not null)
             {
                 columns.Add(column);
@@ -168,7 +168,7 @@ internal static class SchemaReader
         };
     }
 
-    private static ColumnModel? ReadColumn(Member member, bool snakeCase, List<DiagnosticInfo> diagnostics)
+    private static ColumnModel? ReadColumn(Member member, bool snakeCase, Compilation compilation, List<DiagnosticInfo> diagnostics)
     {
         string? columnType = ColumnTypeOf(member.Type);
         if (columnType is null)
@@ -181,6 +181,11 @@ internal static class SchemaReader
             member.Attribute(ColumnAttribute)?.ConstructorArguments[0].Value as string ?? (snakeCase ? Naming.ToSnakeCase(member.Name) : member.Name);
         int maxLength = member.Attribute(MaxLengthAttribute)?.ConstructorArguments[0].Value as int? ?? -1;
         AttributeData? precision = member.Attribute(PrecisionAttribute);
+        if (precision is null && Underlying(member.Type).SpecialType == SpecialType.System_Decimal)
+        {
+            diagnostics.Add(DiagnosticInfo.Create(Diagnostics.MissingPrecision, member.Location, member.Name));
+        }
+
         return new ColumnModel(
             member.Model,
             name,
@@ -191,12 +196,12 @@ internal static class SchemaReader
             maxLength,
             Precision: precision?.ConstructorArguments[0].Value as int? ?? -1,
             Scale: precision?.ConstructorArguments[1].Value as int? ?? -1,
-            DefaultCode: ReadDefault(member),
+            DefaultCode: ReadDefault(member, compilation, diagnostics),
             ReferenceCode: ReadReference(member, diagnostics)
         );
     }
 
-    private static string? ReadDefault(Member member)
+    private static string? ReadDefault(Member member, Compilation compilation, List<DiagnosticInfo> diagnostics)
     {
         if (member.Attribute(DefaultSqlAttribute) is { } sql)
         {
@@ -214,8 +219,28 @@ internal static class SchemaReader
             return "global::AuraORM.ColumnDefault.CurrentTimestamp";
         }
 
-        string type = value.Type?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ?? "object";
-        return "global::AuraORM.ColumnDefault.FromConstant((" + type + ")" + Literal(value.Value) + ")";
+        // The constant is converted to the column type, as C# would convert it in an assignment ([Default(0)] on a long).
+        ITypeSymbol column = Underlying(member.Type);
+        bool converts = value.Type is null
+            ? member.Type.IsReferenceType || !SymbolEqualityComparer.Default.Equals(column, member.Type)
+            : compilation.ClassifyConversion(value.Type, column).IsImplicit;
+        if (!converts)
+        {
+            diagnostics.Add(
+                DiagnosticInfo.Create(
+                    Diagnostics.DefaultTypeMismatch,
+                    member.Location,
+                    member.Name,
+                    value.Type?.ToDisplayString() ?? "null",
+                    member.Type.ToDisplayString()
+                )
+            );
+            return null;
+        }
+
+        // The literal is in parentheses: (T)-1 is read as a subtraction from a value named T, not as a cast (CS0075).
+        string type = column.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        return "global::AuraORM.ColumnDefault.FromConstant((" + type + ")(" + Literal(value.Value) + "))";
     }
 
     private static string? ReadReference(Member member, List<DiagnosticInfo> diagnostics)
@@ -400,6 +425,18 @@ internal static class SchemaReader
         {
             diagnostics.Add(DiagnosticInfo.Create(Diagnostics.ReservedName, member.Location, member.Name, "a member of the generated classes"));
         }
+
+        foreach (Member member in members.Where(m => m.Name.StartsWith(GeneratedNames.ReservedPrefix, StringComparison.Ordinal)))
+        {
+            diagnostics.Add(
+                DiagnosticInfo.Create(
+                    Diagnostics.ReservedName,
+                    member.Location,
+                    member.Name,
+                    "the names that start with " + GeneratedNames.ReservedPrefix + ", which generated code uses for its locals"
+                )
+            );
+        }
     }
 
     private static bool CheckConstructor(INamedTypeSymbol type, List<Member> members, List<DiagnosticInfo> diagnostics)
@@ -548,6 +585,9 @@ internal static class SchemaReader
             char c => SymbolDisplay.FormatLiteral(c, quote: true),
             _ => SymbolDisplay.FormatPrimitive(value, quoteStrings: true, useHexadecimalNumbers: false),
         };
+
+    private static ITypeSymbol Underlying(ITypeSymbol type) =>
+        type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable ? nullable.TypeArguments[0] : type;
 
     private static EquatableArray<T> Equatable<T>(List<T> items)
         where T : IEquatable<T> => new(ImmutableArray.CreateRange(items));

@@ -64,6 +64,49 @@ public sealed class SchemaGeneratorTests
     }
 
     /// <summary>
+    /// Member names that are lowercase, that equal the names of generated parameters and locals, or that are keywords, and
+    /// negative default constants, compile in the generated code.
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - A table and a result type whose members are named <c>id</c>, <c>reader</c>, <c>Reader</c>, <c>table</c>,
+    ///   <c>items</c>, and <c>@class</c>, and a table with the defaults -1, -1.5, a negative enum value, and the int 0 on a
+    ///   long column.
+    ///
+    /// Steps:
+    /// - Run the generator and compile.
+    ///
+    /// Expected:
+    /// - No diagnostic (the generated locals, fields, and parameters cannot collide with members: CS0841, CS0136, CS0075).
+    /// </remarks>
+    [Fact]
+    public void Generate_AwkwardNamesAndNegativeDefaults_Compile()
+    {
+        GeneratorHarness.Compiles(
+            Usings
+                + """
+                public enum Sign { Minus = -1, Plus = 1 }
+
+                [Table("awkward")]
+                public sealed partial record Awkward(
+                    [PrimaryKey] long id,
+                    int reader,
+                    [Column("reader_2")] int Reader,
+                    string table,
+                    string? items,
+                    int @class,
+                    [Default(-1)] int minus,
+                    [Default(-1.5)] double half,
+                    [Default(Sign.Minus)] Sign sign,
+                    [Default(0)] long zero);
+
+                [QueryResult]
+                public sealed partial record AwkwardResult(int reader, string? items, int @class, int Reader);
+                """
+        );
+    }
+
+    /// <summary>
     /// A class with settable properties is a table too, read with its parameterless constructor.
     /// </summary>
     /// <remarks>
@@ -248,6 +291,8 @@ public sealed class SchemaGeneratorTests
     [InlineData("AURA0103", """public enum Big : uint { A } [Table("t")] public sealed partial record T([PrimaryKey] long Id, Big Size);""")]
     [InlineData("AURA0104", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, int Create);""")]
     [InlineData("AURA0104", """[Table("t")] public sealed partial record T([PrimaryKey] long Id) { public static int Insert => 0; }""")]
+    [InlineData("AURA0104", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, int __auraValue0);""")]
+    [InlineData("AURA0104", """[QueryResult] public sealed partial record T(int __auraReader);""")]
     [InlineData("AURA0106", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Column("id")] long Other);""")]
     [InlineData("AURA0107", """[Table("t")] public sealed partial record T([PrimaryKey, AutoIncrement, MaxLength(10)] string Id);""")]
     [InlineData("AURA0107", """[Table("t")] public sealed partial record T([AutoIncrement] long Id);""")]
@@ -268,9 +313,70 @@ public sealed class SchemaGeneratorTests
     [InlineData("AURA0110", """[Table("t")] public sealed partial record T([PrimaryKey] string Id);""")]
     [InlineData("AURA0110", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Unique] string Email);""")]
     [InlineData("AURA0111", """[Table("t")] public sealed partial class T { private T(int x) { } public long Id { get; set; } }""")]
+    [InlineData("AURA0112", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, decimal Price);""")]
+    [InlineData("AURA0112", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, decimal? Price);""")]
+    [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default("x")] int Count);""")]
+    [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(1.5)] int Count);""")]
+    [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(null!)] int Count);""")]
     public void Generate_SchemaError_ReportsDiagnostic(string id, string declaration)
     {
         GeneratorHarness.Fails(Usings + declaration, id);
+    }
+
+    /// <summary>
+    /// Every member that a generated class inherits from its base type is a reserved name, so a base type that gains a member
+    /// cannot silently break a table or result type that has a member of the same name (AURA0104).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The public and protected members of the base types of the generated classes, read by reflection.
+    ///
+    /// Steps:
+    /// - For each name, compile a table (or, for <see cref="ResultProjection{TResult, TLevel}"/>, a result type) with a member
+    ///   of that name.
+    ///
+    /// Expected:
+    /// - AURA0104 for every name.
+    /// </remarks>
+    [Fact]
+    public void Generate_MemberNamedLikeBaseMember_ReportsAura0104()
+    {
+        const System.Reflection.BindingFlags Flags =
+            System.Reflection.BindingFlags.Public
+            | System.Reflection.BindingFlags.NonPublic
+            | System.Reflection.BindingFlags.Instance
+            | System.Reflection.BindingFlags.Static
+            | System.Reflection.BindingFlags.DeclaredOnly;
+        static IEnumerable<string> Names(Type type) =>
+            type.GetMembers(Flags)
+                .Where(m => m is not System.Reflection.ConstructorInfo && !m.Name.Contains('.', StringComparison.Ordinal))
+                .Where(m =>
+                    m
+                        is System.Reflection.MethodInfo { IsFamily: true }
+                            or System.Reflection.MethodInfo { IsPublic: true }
+                            or System.Reflection.PropertyInfo
+                )
+                .Select(m => m.Name)
+                .Where(n => !n.StartsWith("get_", StringComparison.Ordinal))
+                .Distinct();
+
+        string[] tableNames =
+        [
+            .. new[] { typeof(TableColumns<>), typeof(NullableTableColumns<>), typeof(InsertModel), typeof(ITableColumns<>) }.SelectMany(Names),
+        ];
+        string[] resultNames = [.. Names(typeof(ResultProjection<,>))];
+        Assert.NotEmpty(tableNames);
+        Assert.NotEmpty(resultNames);
+
+        foreach (string name in tableNames)
+        {
+            GeneratorHarness.Fails(Usings + "[Table(\"t\")] public sealed partial record T([PrimaryKey] long Id, int " + name + ");", "AURA0104");
+        }
+
+        foreach (string name in resultNames)
+        {
+            GeneratorHarness.Fails(Usings + "[QueryResult] public sealed partial record T(int " + name + ");", "AURA0104");
+        }
     }
 
     /// <summary>

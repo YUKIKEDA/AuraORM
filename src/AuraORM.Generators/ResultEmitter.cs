@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis.CSharp;
-
 namespace AuraORM.Generators;
 
 /// <summary>
@@ -33,7 +31,7 @@ internal static class ResultEmitter
         foreach (ResultMemberModel member in result.Members)
         {
             w.Line("/// <summary>");
-            w.Line("/// Gets the projection of <see cref=\"" + type + "." + member.Member.MemberName + "\"/>.");
+            w.Line("/// Gets the projection of <see cref=\"" + type + "." + GeneratedNames.Id(member.Member.MemberName) + "\"/>.");
             w.Line("/// </summary>");
             w.Line(
                 "public required "
@@ -44,7 +42,7 @@ internal static class ResultEmitter
                     + Lib
                     + level
                     + "> "
-                    + member.Member.MemberName
+                    + GeneratedNames.Id(member.Member.MemberName)
                     + " { get; init; }"
             );
             w.Line();
@@ -54,31 +52,42 @@ internal static class ResultEmitter
         w.Open("protected override void AddItems(" + Lib + "ProjectionItems<" + Lib + level + "> items)");
         foreach (ResultMemberModel member in result.Members)
         {
-            w.Line("items.Add(" + member.Member.MemberName + ");");
+            w.Line("items.Add(" + GeneratedNames.This(member.Member.MemberName) + ");");
         }
 
         w.Close();
         w.Line();
         w.Line("/// <inheritdoc/>");
-        w.Open("protected override " + type + " ReadResult(ref " + Lib + "RowReader reader)");
-        foreach (ResultMemberModel member in result.Members)
+        w.Open("protected override " + type + " ReadResult(ref " + Lib + "RowReader " + GeneratedNames.ReaderParameter + ")");
+        for (int i = 0; i < result.Members.Count; i++)
         {
-            w.Line("var " + Local(member.Member) + " = reader.Read(" + member.Member.MemberName + ");");
+            w.Line(
+                "var "
+                    + GeneratedNames.Local(i)
+                    + " = "
+                    + GeneratedNames.ReaderParameter
+                    + ".Read("
+                    + GeneratedNames.This(result.Members[i].Member.MemberName)
+                    + ");"
+            );
         }
 
-        w.Line("return " + Construct(result, Local) + ";");
+        w.Line("return " + Construct(result, GeneratedNames.Local) + ";");
         w.Close();
         w.Close();
     }
 
-    private static string Construct(ResultModel result, Func<MemberModel, string> value)
+    private static string Construct(ResultModel result, Func<int, string> value)
     {
-        string arguments = string.Join(", ", result.Members.Where(m => m.Member.IsPositional).Select(m => value(m.Member)));
-        List<MemberModel> initialized = result.Members.Where(m => !m.Member.IsPositional).Select(m => m.Member).ToList();
+        IEnumerable<int> all = Enumerable.Range(0, result.Members.Count);
+        string arguments = string.Join(", ", all.Where(i => result.Members[i].Member.IsPositional).Select(value));
+        List<int> initialized = all.Where(i => !result.Members[i].Member.IsPositional).ToList();
         string initializer =
-            initialized.Count == 0 ? string.Empty : " { " + string.Join(", ", initialized.Select(m => m.MemberName + " = " + value(m))) + " }";
+            initialized.Count == 0
+                ? string.Empty
+                : " { "
+                    + string.Join(", ", initialized.Select(i => GeneratedNames.Id(result.Members[i].Member.MemberName) + " = " + value(i)))
+                    + " }";
         return "new " + result.Target.Name + "(" + (result.UsesConstructor ? arguments : string.Empty) + ")" + initializer;
     }
-
-    private static string Local(MemberModel member) => "@" + char.ToLowerInvariant(member.MemberName[0]) + member.MemberName.Substring(1);
 }

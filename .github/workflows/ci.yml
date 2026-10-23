@@ -105,7 +105,8 @@ jobs:
           done
 
   # Each database job runs the integration tests against a service container, at the minimum and the latest version
-  # (docs/design.ja.md §17). AURA_TEST_REQUIRE makes a skipped test of that database fail the job.
+  # (docs/design.ja.md §17). AURA_TEST_REQUIRE makes a skipped test of that database fail the job. The image, environment,
+  # and health check of each service repeat tools/databases.json: change both in the same PR (.cursor/rules/containers.mdc).
   integration-postgresql:
     name: integration (postgresql ${{ matrix.version }})
     needs: plan
@@ -215,3 +216,16 @@ jobs:
           dotnet-version: 8.0.x
       - run: .github/scripts/integration-env.sh sqlserver
       - run: dotnet test --project tests/AuraORM.Integration.Tests/AuraORM.Integration.Tests.csproj -c Release
+
+  # The one required status check of main's branch protection. It needs every other job, so a new job joins the gate by
+  # being added to `needs` here (.cursor/rules/workflow.mdc). Job names that carry a version (the integration matrix)
+  # change with the versions; this name does not.
+  ci:
+    name: ci
+    if: always()
+    needs: [gate, plan, integration-postgresql, integration-mysql, integration-mariadb, integration-sqlserver]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: exit 1
