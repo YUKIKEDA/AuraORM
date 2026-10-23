@@ -180,7 +180,7 @@ public sealed partial record User(
 | `[AutoIncrement]` | 列 | データベースが値を振る整数の列。テーブルに一つだけで、単独の主キーでなければならない（複合主キーの一部にはできない。SQLite の `AUTOINCREMENT` は単独の `INTEGER PRIMARY KEY` にしか付かないため） |
 | `[MaxLength(n)]` | 列 | 文字列とバイト列の最大長（DDL の型に使う） |
 | `[Precision(p, s)]` | 列 | `decimal` の精度と位取り（DDL の型に使う）。`decimal` の列には必須（AURA0112） |
-| `[Default(...)]` | 列 | データベースの既定値。`SqlDefault` の値か、定数。定数は列の型に暗黙に変換できなければならない（`long` の列の `[Default(0)]` は書ける。AURA0113）。INSERT で省略できるようになる。コンストラクターは `object` を取る一つだけである（`SqlDefault` を取る多重定義があると、リテラルの `0` が列挙型に変換され `CurrentTimestamp` になるため） |
+| `[Default(...)]` | 列 | データベースの既定値。`SqlDefault` の値か、定数。定数は、C# の代入と同じく列の型に暗黙に変換できなければならない（`long` の列の `[Default(0)]`、範囲内の定数として `byte` の列の `[Default(1)]` は書ける。`byte` の列の `[Default(300)]` は AURA0113）。INSERT で省略できるようになる。コンストラクターは `object` を取る一つだけである（`SqlDefault` を取る多重定義があると、リテラルの `0` が列挙型に変換され `CurrentTimestamp` になるため） |
 | `[DefaultSql(sql)]` | 列 | 既定値を生 SQL で書く。DDL にそのまま出る。INSERT で省略できるようになる |
 | `[Unique]` | 列 | 単一列の一意制約 |
 | `[Index(name, members)]` | 型（複数可） | インデックス。列はメンバー名を `nameof` で並べ（`Members`）、`Unique` で一意にできる |
@@ -371,8 +371,9 @@ db.From(User.Table).Where(u => And(filters)).Select(u => u);
 // 両方あれば WHERE ("users"."Name" LIKE @p0 AND "users"."Age" >= @p1)、一つならその条件だけ、なければ WHERE を出さない
 ```
 
+- 一覧が空のとき、`And` も `Or` も「条件なし」になり、`Where` は全行を返す。空の `Or` は論理としては偽だが、検索の絞り込みで「選んだ条件がない」ことを表すので、Drizzle ORM の `or()` と同じく「条件なし」にする。一方、空の値の一覧を受け取る `In(a, [])` は `1 = 0`（行なし）である。`In` は「この値のどれか」を表すので、値が一つもなければどの行も当たらない。
 - `OptionalCondition<TLevel>` は、SELECT の `Where`（と行 Q3 の `Having`）だけが受け取る。「条件なし」の `Where` は `WHERE` を出さない。条件の数が値で決まることは、`In` の要素の数と同じく文の形の一部である（§0.1）。
-- UPDATE と DELETE の `Where` は `Condition<PerRow>` だけを受け取り、`OptionalCondition` は CS1503 になる（§7、§8）。条件が一つもないときに全行を更新・削除する文にならないためである。全行は `AllRows()` で明示する。
+- UPDATE と DELETE の `Where` は `Condition<PerRow>` だけを受け取り、`OptionalCondition` は CS1503 になる（§7、§8）。条件が一つもないときに全行を更新・削除する文にならないためである。たとえば `Delete(…).Where(u => Or(選んだ ID の条件の一覧))` で何も選ばれていなければ、全行の削除になってしまう。全行は `AllRows()` で明示する。
 - Drizzle ORM の `and()` も `undefined` を飛ばし、一つもなければ `undefined` を返して、`where(undefined)` は `WHERE` を出さない。Drizzle では UPDATE / DELETE でも同じなので全行が対象になる。AuraORM はそこを型で止める（§19）。
 
 **算術**（数値型。`System.Numerics.INumber<T>` を満たす `T` と、その nullable。名前は .NET の命名の指針に合わせて略さない）
