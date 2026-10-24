@@ -100,3 +100,39 @@
 - **Reason**: PostgreSQL と SQL Server は、選択リストにない `ORDER BY` の式を拒む。型で止められるので、実行前の検査にはしない（約束 3）。
 - **Rejected**: `ToSql()` で `ORDER BY` のキーと選択リストを比べる案（型で表せる誤りを実行時に回す）。
 
+## D1-17 同じ式をもう一度書くときのパラメータ
+
+- **Decision**: 一つの式のオブジェクトを一つの文の中の複数の場所で使うとき（`GroupBy` のキー `k`、SQL Server の `IsNotDistinctFrom` の展開）は、同じパラメータを使う。同じ形の式でも別々に書けば、別のパラメータにする（§5.12）。
+- **Reason**: PostgreSQL は、GROUP BY のキーと SELECT の式をパラメータの番号まで含めて比べるので、パラメータを含む式のキーが別の番号になると失敗する（PostgreSQL 18 で確かめた）。Issue #28 の Grill で決めた。
+- **Rejected**: GROUP BY のキーを列に限る案（正しい SQL を拒む）。今のまま PostgreSQL で失敗すると書く案（実行時の失敗が残る）。
+
+## D1-18 一つの式の GROUP BY のキーの形
+
+- **Decision**: キーが一つの式なら、後のラムダはその式を `k` として受け取る。タプルなら `k.Item1` から（§5.5）。
+- **Reason**: `Select` の、一つの式とタプルの射影の形とそろう。Issue #28 の Grill で決めた。
+- **Rejected**: 一つのキーでも `k.Item1` と書く案（要素一つの入れ物で冗長）。
+
+## D1-19 MySQL と MariaDB の HAVING の、列ではないキー
+
+- **Decision**: MySQL と MariaDB では、列ではない GROUP BY のキーを HAVING に書くと `MIN(キー)` と出力する（§5.5）。
+- **Reason**: この二つは HAVING の式を GROUP BY の式と照らし合わせず、正しいクエリが `Unknown column` で失敗する（MySQL のバグ 24083、78395）。キーはグループの中で一つの値なので、`MIN` で結果は変わらない。SQL は固定で `ToSql()` に見える。Issue #30 の実装中に結合テストで見つかり、所有者が決めた。
+- **Rejected**: Pomelo.EntityFrameworkCore.MySql のように文をサブクエリに移し、条件を別名つきで射影に足す案（見えないサブクエリと列が増え、予測できる SQL に反する）。MySQL と MariaDB で実行時に例外にする案（正しいクエリが二つの方言で失敗する。型は方言ごとに列のキーと式のキーを見分けられない）。
+
+## D1-20 SQL Server の `float` の `Sum`
+
+- **Decision**: SQL Server では `Sum(float)` を `CAST(SUM(a) AS real)` と出力し、`float?` で読む（§4.2）。
+- **Reason**: SQL Server の `SUM` は `real` に `float`（`double`）を返し、型付きの取得メソッドで `float` として読めない（§12）。EF Core も同じ `CAST` を入れる。Issue #30 の実装中に結合テストで見つかり、所有者が決めた。
+- **Rejected**: 全方言で `double?` を返す案（.NET の `Sum(float)` と EF Core が `float` を返すのと違い、PostgreSQL にも `CAST` が要る）。読み取りで `double` を `float` に変える案（§12 の、広げも狭めもしない読み取りに反する）。
+
+## D1-21 列を含まない GROUP BY のキー
+
+- **Decision**: 列を一つも含まない GROUP BY のキーは、全方言で文を組み立てるときに `InvalidOperationException` にする（§5.5、§14.3）。生 SQL の断片は中を見ないので通す。
+- **Reason**: SQL Server はメッセージ 164 で必ず失敗し、MySQL と MariaDB は値一つのキーを列の位置として読む。SQLite と PostgreSQL で通る文も、表全体を一つのグループにするだけで意味がない。型では止められない（`Value` も列も `IExpr<T, PerRow>`）。#31 のレビューで見つかり、所有者が決めた。
+- **Rejected**: 失敗する方言だけで拒む案（同じ文が方言によって通ったり拒まれたりし、規則も複雑になる）。§14.2 に書くだけの案（SQL Server の実行時の失敗が残る）。
+
+## D1-22 値だけの ORDER BY のキー
+
+- **Decision**: 値だけ（パラメータ一つ）の ORDER BY のキーは、全方言で文を組み立てるときに `InvalidOperationException` にする（§5.8、§14.3）。値の式と関数は通す。
+- **Reason**: MySQL と MariaDB は値を SQL に埋め込むので `ORDER BY 1` になり、エラーにならずに 1 列目で並ぶ。SQL Server はメッセージ 1008 で失敗する。行 Q1 からあった問題で、#31 のレビューで同じ種類の問題として見つかり、所有者が #31 で直すと決めた。
+- **Rejected**: 別の行として後で直す案（結果が黙って変わる不具合がその行まで残る）。
+

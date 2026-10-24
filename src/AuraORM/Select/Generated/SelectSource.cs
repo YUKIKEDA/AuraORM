@@ -1049,6 +1049,372 @@ public abstract class SelectSource<TDialect, TMode, T1>
         );
         return new(Session, State.WithProjection(selected, distinct: true), selected);
     }
+
+    /// <summary>
+    /// Groups the rows by one key: <c>GROUP BY a</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that follow get the key
+    /// itself as a <see cref="PerGroup"/> expression, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <param name="key">The key, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, IExpr<TKey, PerGroup>, T1> GroupBy<TKey>(Func<T1, IExpr<TKey, PerRow>> key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        IExpr<TKey, PerGroup> grouped = GroupKey.Of(key(V1));
+        return new(Session, State with { GroupBy = [grouped.Node] }, grouped, V1);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 2 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>), T1> GroupBy<TKey1, TKey2>(
+        Func<T1, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>) items = keys(V1);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>) grouped = (GroupKey.Of(items.Item1), GroupKey.Of(items.Item2));
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node] }, grouped, V1);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 3 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>), T1> GroupBy<TKey1, TKey2, TKey3>(
+        Func<T1, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>) items = keys(V1);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3)
+        );
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node] }, grouped, V1);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 4 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>),
+        T1
+    > GroupBy<TKey1, TKey2, TKey3, TKey4>(Func<T1, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>)> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>) items = keys(V1);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4)
+        );
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node] }, grouped, V1);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 5 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>),
+        T1
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5>(
+        Func<T1, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>) items = keys(V1);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node],
+            },
+            grouped,
+            V1
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 6 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ),
+        T1
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6>(
+        Func<
+            T1,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>) items =
+            keys(V1);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node, grouped.Item6.Node],
+            },
+            grouped,
+            V1
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 7 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ),
+        T1
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7>(
+        Func<
+            T1,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>
+        ) items = keys(V1);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                ],
+            },
+            grouped,
+            V1
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 8 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <typeparam name="TKey8">The type of key 8.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ),
+        T1
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7, TKey8>(
+        Func<
+            T1,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>,
+                IExpr<TKey8, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>,
+            IExpr<TKey8, PerRow>
+        ) items = keys(V1);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7),
+            GroupKey.Of(items.Item8)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                    grouped.Item8.Node,
+                ],
+            },
+            grouped,
+            V1
+        );
+    }
 }
 
 /// <summary>
@@ -2121,6 +2487,395 @@ public abstract class SelectSource<TDialect, TMode, T1, T2>
             items.Item8
         );
         return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Groups the rows by one key: <c>GROUP BY a</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that follow get the key
+    /// itself as a <see cref="PerGroup"/> expression, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <param name="key">The key, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, IExpr<TKey, PerGroup>, T1, T2> GroupBy<TKey>(Func<T1, T2, IExpr<TKey, PerRow>> key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        IExpr<TKey, PerGroup> grouped = GroupKey.Of(key(V1, V2));
+        return new(Session, State with { GroupBy = [grouped.Node] }, grouped, V1, V2);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 2 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>), T1, T2> GroupBy<TKey1, TKey2>(
+        Func<T1, T2, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>) items = keys(V1, V2);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>) grouped = (GroupKey.Of(items.Item1), GroupKey.Of(items.Item2));
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node] }, grouped, V1, V2);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 3 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>), T1, T2> GroupBy<
+        TKey1,
+        TKey2,
+        TKey3
+    >(Func<T1, T2, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>)> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>) items = keys(V1, V2);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3)
+        );
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node] }, grouped, V1, V2);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 4 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>),
+        T1,
+        T2
+    > GroupBy<TKey1, TKey2, TKey3, TKey4>(Func<T1, T2, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>)> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>) items = keys(V1, V2);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node],
+            },
+            grouped,
+            V1,
+            V2
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 5 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>),
+        T1,
+        T2
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5>(
+        Func<T1, T2, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>) items = keys(V1, V2);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node],
+            },
+            grouped,
+            V1,
+            V2
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 6 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ),
+        T1,
+        T2
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6>(
+        Func<
+            T1,
+            T2,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>) items =
+            keys(V1, V2);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node, grouped.Item6.Node],
+            },
+            grouped,
+            V1,
+            V2
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 7 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ),
+        T1,
+        T2
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7>(
+        Func<
+            T1,
+            T2,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>
+        ) items = keys(V1, V2);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 8 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <typeparam name="TKey8">The type of key 8.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ),
+        T1,
+        T2
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7, TKey8>(
+        Func<
+            T1,
+            T2,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>,
+                IExpr<TKey8, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>,
+            IExpr<TKey8, PerRow>
+        ) items = keys(V1, V2);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7),
+            GroupKey.Of(items.Item8)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                    grouped.Item8.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2
+        );
     }
 }
 
@@ -3233,6 +3988,410 @@ public abstract class SelectSource<TDialect, TMode, T1, T2, T3>
             items.Item8
         );
         return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Groups the rows by one key: <c>GROUP BY a</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that follow get the key
+    /// itself as a <see cref="PerGroup"/> expression, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <param name="key">The key, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, IExpr<TKey, PerGroup>, T1, T2, T3> GroupBy<TKey>(Func<T1, T2, T3, IExpr<TKey, PerRow>> key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        IExpr<TKey, PerGroup> grouped = GroupKey.Of(key(V1, V2, V3));
+        return new(Session, State with { GroupBy = [grouped.Node] }, grouped, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 2 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>), T1, T2, T3> GroupBy<TKey1, TKey2>(
+        Func<T1, T2, T3, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>) items = keys(V1, V2, V3);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>) grouped = (GroupKey.Of(items.Item1), GroupKey.Of(items.Item2));
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node] }, grouped, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 3 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>), T1, T2, T3> GroupBy<
+        TKey1,
+        TKey2,
+        TKey3
+    >(Func<T1, T2, T3, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>)> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>) items = keys(V1, V2, V3);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3)
+        );
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node] }, grouped, V1, V2, V3);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 4 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>),
+        T1,
+        T2,
+        T3
+    > GroupBy<TKey1, TKey2, TKey3, TKey4>(
+        Func<T1, T2, T3, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>) items = keys(V1, V2, V3);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 5 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>),
+        T1,
+        T2,
+        T3
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5>(
+        Func<T1, T2, T3, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>) items = keys(V1, V2, V3);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 6 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ),
+        T1,
+        T2,
+        T3
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6>(
+        Func<
+            T1,
+            T2,
+            T3,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>) items =
+            keys(V1, V2, V3);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node, grouped.Item6.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 7 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ),
+        T1,
+        T2,
+        T3
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7>(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>
+        ) items = keys(V1, V2, V3);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 8 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <typeparam name="TKey8">The type of key 8.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ),
+        T1,
+        T2,
+        T3
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7, TKey8>(
+        Func<
+            T1,
+            T2,
+            T3,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>,
+                IExpr<TKey8, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>,
+            IExpr<TKey8, PerRow>
+        ) items = keys(V1, V2, V3);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7),
+            GroupKey.Of(items.Item8)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                    grouped.Item8.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3
+        );
     }
 }
 
@@ -4366,6 +5525,423 @@ public abstract class SelectSource<TDialect, TMode, T1, T2, T3, T4>
             items.Item8
         );
         return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Groups the rows by one key: <c>GROUP BY a</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that follow get the key
+    /// itself as a <see cref="PerGroup"/> expression, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <param name="key">The key, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, IExpr<TKey, PerGroup>, T1, T2, T3, T4> GroupBy<TKey>(Func<T1, T2, T3, T4, IExpr<TKey, PerRow>> key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        IExpr<TKey, PerGroup> grouped = GroupKey.Of(key(V1, V2, V3, V4));
+        return new(Session, State with { GroupBy = [grouped.Node] }, grouped, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 2 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>), T1, T2, T3, T4> GroupBy<TKey1, TKey2>(
+        Func<T1, T2, T3, T4, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>) items = keys(V1, V2, V3, V4);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>) grouped = (GroupKey.Of(items.Item1), GroupKey.Of(items.Item2));
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node] }, grouped, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 3 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>), T1, T2, T3, T4> GroupBy<
+        TKey1,
+        TKey2,
+        TKey3
+    >(Func<T1, T2, T3, T4, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>)> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>) items = keys(V1, V2, V3, V4);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3)
+        );
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node] }, grouped, V1, V2, V3, V4);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 4 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4
+    > GroupBy<TKey1, TKey2, TKey3, TKey4>(
+        Func<T1, T2, T3, T4, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>) items = keys(V1, V2, V3, V4);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 5 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5>(
+        Func<T1, T2, T3, T4, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>) items = keys(V1, V2, V3, V4);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 6 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>) items =
+            keys(V1, V2, V3, V4);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node, grouped.Item6.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 7 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>
+        ) items = keys(V1, V2, V3, V4);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 8 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <typeparam name="TKey8">The type of key 8.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7, TKey8>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>,
+                IExpr<TKey8, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>,
+            IExpr<TKey8, PerRow>
+        ) items = keys(V1, V2, V3, V4);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7),
+            GroupKey.Of(items.Item8)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                    grouped.Item8.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4
+        );
     }
 }
 
@@ -5526,6 +7102,442 @@ public abstract class SelectSource<TDialect, TMode, T1, T2, T3, T4, T5>
             items.Item8
         );
         return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Groups the rows by one key: <c>GROUP BY a</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that follow get the key
+    /// itself as a <see cref="PerGroup"/> expression, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <param name="key">The key, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, IExpr<TKey, PerGroup>, T1, T2, T3, T4, T5> GroupBy<TKey>(Func<T1, T2, T3, T4, T5, IExpr<TKey, PerRow>> key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        IExpr<TKey, PerGroup> grouped = GroupKey.Of(key(V1, V2, V3, V4, V5));
+        return new(Session, State with { GroupBy = [grouped.Node] }, grouped, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 2 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>), T1, T2, T3, T4, T5> GroupBy<TKey1, TKey2>(
+        Func<T1, T2, T3, T4, T5, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>) items = keys(V1, V2, V3, V4, V5);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>) grouped = (GroupKey.Of(items.Item1), GroupKey.Of(items.Item2));
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node] }, grouped, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 3 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>), T1, T2, T3, T4, T5> GroupBy<
+        TKey1,
+        TKey2,
+        TKey3
+    >(Func<T1, T2, T3, T4, T5, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>)> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>) items = keys(V1, V2, V3, V4, V5);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3)
+        );
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node] }, grouped, V1, V2, V3, V4, V5);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 4 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5
+    > GroupBy<TKey1, TKey2, TKey3, TKey4>(
+        Func<T1, T2, T3, T4, T5, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>) items = keys(V1, V2, V3, V4, V5);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 5 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5>(
+        Func<T1, T2, T3, T4, T5, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>) items = keys(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5
+        );
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 6 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>) items =
+            keys(V1, V2, V3, V4, V5);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node, grouped.Item6.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 7 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>
+        ) items = keys(V1, V2, V3, V4, V5);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 8 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <typeparam name="TKey8">The type of key 8.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7, TKey8>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>,
+                IExpr<TKey8, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>,
+            IExpr<TKey8, PerRow>
+        ) items = keys(V1, V2, V3, V4, V5);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7),
+            GroupKey.Of(items.Item8)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                    grouped.Item8.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5
+        );
     }
 }
 
@@ -6707,6 +8719,466 @@ public abstract class SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6>
             items.Item8
         );
         return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Groups the rows by one key: <c>GROUP BY a</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that follow get the key
+    /// itself as a <see cref="PerGroup"/> expression, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <param name="key">The key, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, IExpr<TKey, PerGroup>, T1, T2, T3, T4, T5, T6> GroupBy<TKey>(
+        Func<T1, T2, T3, T4, T5, T6, IExpr<TKey, PerRow>> key
+    )
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        IExpr<TKey, PerGroup> grouped = GroupKey.Of(key(V1, V2, V3, V4, V5, V6));
+        return new(Session, State with { GroupBy = [grouped.Node] }, grouped, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 2 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>), T1, T2, T3, T4, T5, T6> GroupBy<TKey1, TKey2>(
+        Func<T1, T2, T3, T4, T5, T6, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>) items = keys(V1, V2, V3, V4, V5, V6);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>) grouped = (GroupKey.Of(items.Item1), GroupKey.Of(items.Item2));
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node] }, grouped, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 3 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>), T1, T2, T3, T4, T5, T6> GroupBy<
+        TKey1,
+        TKey2,
+        TKey3
+    >(Func<T1, T2, T3, T4, T5, T6, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>)> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>) items = keys(V1, V2, V3, V4, V5, V6);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3)
+        );
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node] }, grouped, V1, V2, V3, V4, V5, V6);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 4 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6
+    > GroupBy<TKey1, TKey2, TKey3, TKey4>(
+        Func<T1, T2, T3, T4, T5, T6, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>) items = keys(V1, V2, V3, V4, V5, V6);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 5 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>) items = keys(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6
+        );
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 6 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>) items =
+            keys(V1, V2, V3, V4, V5, V6);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node, grouped.Item6.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 7 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>
+        ) items = keys(V1, V2, V3, V4, V5, V6);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 8 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <typeparam name="TKey8">The type of key 8.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7, TKey8>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>,
+                IExpr<TKey8, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>,
+            IExpr<TKey8, PerRow>
+        ) items = keys(V1, V2, V3, V4, V5, V6);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7),
+            GroupKey.Of(items.Item8)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                    grouped.Item8.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6
+        );
     }
 }
 
@@ -7911,6 +10383,502 @@ public abstract class SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7>
             items.Item8
         );
         return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Groups the rows by one key: <c>GROUP BY a</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that follow get the key
+    /// itself as a <see cref="PerGroup"/> expression, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <param name="key">The key, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, IExpr<TKey, PerGroup>, T1, T2, T3, T4, T5, T6, T7> GroupBy<TKey>(
+        Func<T1, T2, T3, T4, T5, T6, T7, IExpr<TKey, PerRow>> key
+    )
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        IExpr<TKey, PerGroup> grouped = GroupKey.Of(key(V1, V2, V3, V4, V5, V6, V7));
+        return new(Session, State with { GroupBy = [grouped.Node] }, grouped, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 2 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>), T1, T2, T3, T4, T5, T6, T7> GroupBy<TKey1, TKey2>(
+        Func<T1, T2, T3, T4, T5, T6, T7, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>) items = keys(V1, V2, V3, V4, V5, V6, V7);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>) grouped = (GroupKey.Of(items.Item1), GroupKey.Of(items.Item2));
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node] }, grouped, V1, V2, V3, V4, V5, V6, V7);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 3 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7
+    > GroupBy<TKey1, TKey2, TKey3>(Func<T1, T2, T3, T4, T5, T6, T7, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>)> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>) items = keys(V1, V2, V3, V4, V5, V6, V7);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 4 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7
+    > GroupBy<TKey1, TKey2, TKey3, TKey4>(
+        Func<T1, T2, T3, T4, T5, T6, T7, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>) items = keys(V1, V2, V3, V4, V5, V6, V7);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 5 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>) items = keys(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7
+        );
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 6 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>) items =
+            keys(V1, V2, V3, V4, V5, V6, V7);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node, grouped.Item6.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 7 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>
+        ) items = keys(V1, V2, V3, V4, V5, V6, V7);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 8 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <typeparam name="TKey8">The type of key 8.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7, TKey8>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>,
+                IExpr<TKey8, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>,
+            IExpr<TKey8, PerRow>
+        ) items = keys(V1, V2, V3, V4, V5, V6, V7);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7),
+            GroupKey.Of(items.Item8)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                    grouped.Item8.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7
+        );
     }
 }
 
@@ -9146,5 +12114,518 @@ public abstract class SelectSource<TDialect, TMode, T1, T2, T3, T4, T5, T6, T7, 
             items.Item8
         );
         return new(Session, State.WithProjection(selected, distinct: true), selected);
+    }
+
+    /// <summary>
+    /// Groups the rows by one key: <c>GROUP BY a</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that follow get the key
+    /// itself as a <see cref="PerGroup"/> expression, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <param name="key">The key, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, IExpr<TKey, PerGroup>, T1, T2, T3, T4, T5, T6, T7, T8> GroupBy<TKey>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, IExpr<TKey, PerRow>> key
+    )
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        IExpr<TKey, PerGroup> grouped = GroupKey.Of(key(V1, V2, V3, V4, V5, V6, V7, V8));
+        return new(Session, State with { GroupBy = [grouped.Node] }, grouped, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 2 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<TDialect, TMode, (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>), T1, T2, T3, T4, T5, T6, T7, T8> GroupBy<TKey1, TKey2>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>) items = keys(V1, V2, V3, V4, V5, V6, V7, V8);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>) grouped = (GroupKey.Of(items.Item1), GroupKey.Of(items.Item2));
+        return new(Session, State with { GroupBy = [grouped.Item1.Node, grouped.Item2.Node] }, grouped, V1, V2, V3, V4, V5, V6, V7, V8);
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 3 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7,
+        T8
+    > GroupBy<TKey1, TKey2, TKey3>(Func<T1, T2, T3, T4, T5, T6, T7, T8, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>)> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>) items = keys(V1, V2, V3, V4, V5, V6, V7, V8);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 4 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7,
+        T8
+    > GroupBy<TKey1, TKey2, TKey3, TKey4>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>)> keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>) items = keys(V1, V2, V3, V4, V5, V6, V7, V8);
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 5 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7,
+        T8
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>) items = keys(
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
+        (IExpr<TKey1, PerGroup>, IExpr<TKey2, PerGroup>, IExpr<TKey3, PerGroup>, IExpr<TKey4, PerGroup>, IExpr<TKey5, PerGroup>) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 6 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7,
+        T8
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>)
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (IExpr<TKey1, PerRow>, IExpr<TKey2, PerRow>, IExpr<TKey3, PerRow>, IExpr<TKey4, PerRow>, IExpr<TKey5, PerRow>, IExpr<TKey6, PerRow>) items =
+            keys(V1, V2, V3, V4, V5, V6, V7, V8);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy = [grouped.Item1.Node, grouped.Item2.Node, grouped.Item3.Node, grouped.Item4.Node, grouped.Item5.Node, grouped.Item6.Node],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 7 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7,
+        T8
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>
+        ) items = keys(V1, V2, V3, V4, V5, V6, V7, V8);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
+    }
+
+    /// <summary>
+    /// Groups the rows by a tuple of 8 keys: <c>GROUP BY a, b, …</c> (<c>docs/design.ja.md</c> §5.5). The lambdas that
+    /// follow get the keys as a tuple of <see cref="PerGroup"/> expressions, then the column sets.
+    /// </summary>
+    /// <typeparam name="TKey1">The type of key 1.</typeparam>
+    /// <typeparam name="TKey2">The type of key 2.</typeparam>
+    /// <typeparam name="TKey3">The type of key 3.</typeparam>
+    /// <typeparam name="TKey4">The type of key 4.</typeparam>
+    /// <typeparam name="TKey5">The type of key 5.</typeparam>
+    /// <typeparam name="TKey6">The type of key 6.</typeparam>
+    /// <typeparam name="TKey7">The type of key 7.</typeparam>
+    /// <typeparam name="TKey8">The type of key 8.</typeparam>
+    /// <param name="keys">The keys, from the column sets.</param>
+    /// <returns>The statement.</returns>
+    public SelectGrouped<
+        TDialect,
+        TMode,
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ),
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+        T7,
+        T8
+    > GroupBy<TKey1, TKey2, TKey3, TKey4, TKey5, TKey6, TKey7, TKey8>(
+        Func<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            (
+                IExpr<TKey1, PerRow>,
+                IExpr<TKey2, PerRow>,
+                IExpr<TKey3, PerRow>,
+                IExpr<TKey4, PerRow>,
+                IExpr<TKey5, PerRow>,
+                IExpr<TKey6, PerRow>,
+                IExpr<TKey7, PerRow>,
+                IExpr<TKey8, PerRow>
+            )
+        > keys
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        (
+            IExpr<TKey1, PerRow>,
+            IExpr<TKey2, PerRow>,
+            IExpr<TKey3, PerRow>,
+            IExpr<TKey4, PerRow>,
+            IExpr<TKey5, PerRow>,
+            IExpr<TKey6, PerRow>,
+            IExpr<TKey7, PerRow>,
+            IExpr<TKey8, PerRow>
+        ) items = keys(V1, V2, V3, V4, V5, V6, V7, V8);
+        (
+            IExpr<TKey1, PerGroup>,
+            IExpr<TKey2, PerGroup>,
+            IExpr<TKey3, PerGroup>,
+            IExpr<TKey4, PerGroup>,
+            IExpr<TKey5, PerGroup>,
+            IExpr<TKey6, PerGroup>,
+            IExpr<TKey7, PerGroup>,
+            IExpr<TKey8, PerGroup>
+        ) grouped = (
+            GroupKey.Of(items.Item1),
+            GroupKey.Of(items.Item2),
+            GroupKey.Of(items.Item3),
+            GroupKey.Of(items.Item4),
+            GroupKey.Of(items.Item5),
+            GroupKey.Of(items.Item6),
+            GroupKey.Of(items.Item7),
+            GroupKey.Of(items.Item8)
+        );
+        return new(
+            Session,
+            State with
+            {
+                GroupBy =
+                [
+                    grouped.Item1.Node,
+                    grouped.Item2.Node,
+                    grouped.Item3.Node,
+                    grouped.Item4.Node,
+                    grouped.Item5.Node,
+                    grouped.Item6.Node,
+                    grouped.Item7.Node,
+                    grouped.Item8.Node,
+                ],
+            },
+            grouped,
+            V1,
+            V2,
+            V3,
+            V4,
+            V5,
+            V6,
+            V7,
+            V8
+        );
     }
 }

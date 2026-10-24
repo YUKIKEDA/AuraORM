@@ -201,6 +201,9 @@ internal abstract class DialectRenderer
             case AggregateFunction.Sum:
                 RenderCall(context, "SUM", node.Argument!);
                 return;
+            case AggregateFunction.SumSingle:
+                RenderSumOfSingles(context, node.Argument!);
+                return;
             case AggregateFunction.AverageAsDouble:
                 RenderAverageAsDouble(context, node.Argument!);
                 return;
@@ -227,6 +230,20 @@ internal abstract class DialectRenderer
     /// <param name="context">The rendering context.</param>
     /// <param name="argument">The summed expression.</param>
     protected virtual void RenderSumOfIntegers(SqlRenderContext context, SqlNode argument) => RenderCall(context, "SUM", argument);
+
+    /// <summary>
+    /// Writes the sum of <see cref="float"/> values, read as <c>float</c>. The default is <c>SUM(a)</c>.
+    /// </summary>
+    /// <param name="context">The rendering context.</param>
+    /// <param name="argument">The summed expression.</param>
+    protected virtual void RenderSumOfSingles(SqlRenderContext context, SqlNode argument) => RenderCall(context, "SUM", argument);
+
+    /// <summary>
+    /// Gets a value indicating whether a <c>GROUP BY</c> key that is not a column is written as <c>MIN(key)</c> inside
+    /// <c>HAVING</c>, because the dialect does not match the expression with the one in <c>GROUP BY</c> (§5.5). The default
+    /// is <see langword="false"/>.
+    /// </summary>
+    public virtual bool AggregatesGroupKeysInHaving => false;
 
     /// <summary>
     /// Writes the average of numbers, read as <c>double</c>. The default is <c>AVG(a)</c>.

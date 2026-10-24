@@ -16,6 +16,16 @@ internal sealed record SelectState(
     ParameterNode? Offset
 )
 {
+    /// <summary>
+    /// Gets the keys of <c>GROUP BY</c>, or an empty array when the statement has none.
+    /// </summary>
+    public ImmutableArray<SqlNode> GroupBy { get; init; } = ImmutableArray<SqlNode>.Empty;
+
+    /// <summary>
+    /// Gets the condition of <c>HAVING</c>, or <see langword="null"/> when the statement has none.
+    /// </summary>
+    public SqlNode? Having { get; init; }
+
     public static SelectState From(TableAlias table) =>
         new(
             [new SelectSourceState(table, JoinKind.From, null)],

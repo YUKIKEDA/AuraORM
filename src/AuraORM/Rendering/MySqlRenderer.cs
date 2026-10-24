@@ -13,6 +13,9 @@ internal sealed class MySqlRenderer(bool isMariaDb) : DialectRenderer
     // ER_PS_MANY_PARAM: a prepared statement has at most 65535 placeholders.
     public override int MaxParameters => 65535;
 
+    // §5.5: MySQL and MariaDB do not match an expression in HAVING with the GROUP BY key (MySQL bugs 24083 and 78395).
+    public override bool AggregatesGroupKeysInHaving => true;
+
     protected override char IdentifierOpen => '`';
 
     protected override char IdentifierClose => '`';

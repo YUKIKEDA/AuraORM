@@ -102,6 +102,14 @@ internal sealed class SqlServerRenderer : DialectRenderer
         context.Write(')');
     }
 
+    // §4.2: SUM(real) is float, so the sum is cast back to real.
+    protected override void RenderSumOfSingles(SqlRenderContext context, SqlNode argument)
+    {
+        context.Write("CAST(");
+        RenderCall(context, "SUM", argument);
+        context.Write(" AS real)");
+    }
+
     // §4.2: AVG(int) is int, so each value is cast to float first.
     protected override void RenderAverageAsDouble(SqlRenderContext context, SqlNode argument)
     {

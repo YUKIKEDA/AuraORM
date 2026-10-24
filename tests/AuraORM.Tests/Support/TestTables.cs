@@ -22,6 +22,8 @@ internal static class TestTables
 
     public static Column<double> Rating { get; } = Users.Column<double>("Rating");
 
+    public static Column<float> Weight { get; } = Users.Column<float>("Weight");
+
     public static Column<bool> IsActive { get; } = Users.Column<bool>("IsActive");
 
     public static Column<UserStatus> Status { get; } = Users.Column<UserStatus>("Status");

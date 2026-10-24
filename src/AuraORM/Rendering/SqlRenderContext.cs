@@ -6,6 +6,7 @@ namespace AuraORM;
 internal sealed class SqlRenderContext : IDisposable
 {
     private readonly List<SqlStatementParameter> _parameters = [];
+    private readonly Dictionary<ParameterNode, string> _names = new(ReferenceEqualityComparer.Instance);
     private readonly List<IReadOnlyList<TableAlias>> _scopes = [];
 
     public SqlRenderContext(DialectRenderer dialect)
@@ -37,6 +38,22 @@ internal sealed class SqlRenderContext : IDisposable
     public bool UnqualifiedColumns { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the <c>HAVING</c> of the statement being rendered is written now, where a
+    /// <see cref="GroupKeyNode"/> may need an aggregate (§5.5).
+    /// </summary>
+    public bool InHaving { get; set; }
+
+    /// <summary>
+    /// Gets the number of columns written so far, and of raw SQL texts, which may name columns (§5.5).
+    /// </summary>
+    public int ColumnsWritten { get; private set; }
+
+    /// <summary>
+    /// Counts a raw SQL text in <see cref="ColumnsWritten"/>, because it may name a column.
+    /// </summary>
+    public void CountOpaqueSql() => ColumnsWritten++;
+
+    /// <summary>
     /// Enters the <c>FROM</c> of a statement: until <see cref="ExitScope"/>, a column must belong to one of these tables or
     /// to a table of an enclosing statement (§14.3).
     /// </summary>
@@ -56,6 +73,7 @@ internal sealed class SqlRenderContext : IDisposable
     /// <param name="column">The name of the column.</param>
     public void CheckInScope(TableAlias table, string column)
     {
+        ColumnsWritten++;
         if (_scopes.Count == 0)
         {
             return;
@@ -89,14 +107,21 @@ internal sealed class SqlRenderContext : IDisposable
     public void WriteIdentifier(string name) => Dialect.WriteIdentifier(Writer, name);
 
     /// <summary>
-    /// Writes the placeholder of a new parameter. A value gets a new parameter each time it is written.
+    /// Writes the placeholder of a parameter. Each value given to the builder is its own node and gets its own parameter; a
+    /// node written again (the same expression written twice in one statement, such as a GROUP BY key that the select list
+    /// repeats) writes the parameter it already has, because PostgreSQL compares a GROUP BY key with the select list by its
+    /// parameter numbers (<c>docs/design.ja.md</c> §5.12).
     /// </summary>
     /// <param name="parameter">The parameter node.</param>
     public void WriteParameter(ParameterNode parameter)
     {
-        int index = _parameters.Count;
-        string name = Dialect.ParameterName(index);
-        _parameters.Add(new SqlStatementParameter(name, parameter.ProviderValue) { DbType = Dialect.ParameterDbType(parameter) });
+        if (!_names.TryGetValue(parameter, out string? name))
+        {
+            name = Dialect.ParameterName(_parameters.Count);
+            _parameters.Add(new SqlStatementParameter(name, parameter.ProviderValue) { DbType = Dialect.ParameterDbType(parameter) });
+            _names.Add(parameter, name);
+        }
+
         Writer.Append(name);
     }
 

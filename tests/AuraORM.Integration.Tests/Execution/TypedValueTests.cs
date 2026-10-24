@@ -77,9 +77,9 @@ public abstract class TypedValueTests<TDialect>
     {
         Database<TDialect> db = await Target.CreateDatabaseAsync();
 
-        Assert.Equal(1, await InsertAsync(db, Values));
-        Assert.Equal(1, await InsertAsync(db, Nulls));
-        Assert.Equal(1, await InsertAsync(db, Large));
+        Assert.Equal(1, await TypedRows.InsertAsync(db, Values, Ct));
+        Assert.Equal(1, await TypedRows.InsertAsync(db, Nulls, Ct));
+        Assert.Equal(1, await TypedRows.InsertAsync(db, Large, Ct));
         List<TypedRow> rows = await db.QueryAsync<TypedRow>(
             $"SELECT id, flag_value, tiny_value, small_value, number_value, big_value, single_value, double_value, money_value, text_value, blob_value, key_value, at_value, at_offset_value, day_value, time_value, state_value FROM {TypedRow.Table} ORDER BY id",
             Ct
@@ -107,12 +107,6 @@ public abstract class TypedValueTests<TDialect>
         Assert.Equal(Large.TextValue, rows[2].TextValue);
         Assert.Equal(Large.BlobValue, rows[2].BlobValue);
     }
-
-    private static Task<int> InsertAsync(Database<TDialect> db, TypedRow row) =>
-        db.ExecuteAsync(
-            $"INSERT INTO {TypedRow.Table} (id, flag_value, tiny_value, small_value, number_value, big_value, single_value, double_value, money_value, text_value, blob_value, key_value, at_value, at_offset_value, day_value, time_value, state_value) VALUES ({row.Id}, {row.FlagValue}, {row.TinyValue}, {row.SmallValue}, {row.NumberValue}, {row.BigValue}, {row.SingleValue}, {row.DoubleValue}, {row.MoneyValue}, {row.TextValue}, {row.BlobValue}, {row.KeyValue}, {row.AtValue}, {row.AtOffsetValue}, {row.DayValue}, {row.TimeValue}, {row.StateValue})",
-            Ct
-        );
 }
 
 /// <summary>

@@ -39,6 +39,16 @@ version has been published to NuGet.
 - Joins: `InnerJoin`, `LeftJoin`, `RightJoin`, `FullJoin` (not on MySQL / MariaDB), and `CrossJoin`, up to eight tables.
   The nullable side of an outer join gets nullable column sets, so a value type read from it is nullable; a whole row of
   it is `null` when nothing matched. `Table.As("alias")` names a table, and a table used twice needs an alias.
+- `GroupBy` with one key or a tuple of up to eight keys, after `From`, a join, or `Where`, and `Having`, which also takes
+  the list form of `And` / `Or`. The lambdas after `GroupBy` get the key (`k` itself for one key, `k.Item1` … for a
+  tuple) and the column sets, and accept only keys and aggregates, so a column that is not a key does not compile.
+- The same expression written more than once in a statement is one parameter: a key with a value in the select list,
+  `GROUP BY`, `HAVING`, and `ORDER BY`, and the SQL Server expansion of `IsDistinctFrom` / `IsNotDistinctFrom`.
+- On MySQL and MariaDB, a key that is not a column is written as `MIN(key)` inside `HAVING`, because they do not match
+  an expression there with the `GROUP BY` key. On SQL Server, `Sum` of `float` is cast back to `real`.
+- A `GROUP BY` key without a column, and an `ORDER BY` key that is only a value, throw when the statement is built:
+  SQL Server rejects them, and MySQL and MariaDB read a value there as a column position (an `ORDER BY` of a value
+  silently ordered by the first column).
 - Analyzers in the package: a comparison with a typed null constant (AURA0201) or with a value that may be null
   (AURA0202), which matches no row in SQL, and a raw SQL hole whose value is not a column type (AURA0301).
 - On SQLite, ordering, comparing by size, and `Min` / `Max` / `Sum` / `Avg` of decimals throw when the statement is
