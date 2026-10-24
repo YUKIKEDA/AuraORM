@@ -586,16 +586,14 @@ string JoinMethod(int n, string kind, bool extension)
         }
     }
 
-    w.Append(indent + "/// <typeparam name=\"TJoinRow\">The row type of the joined table.</typeparam>\n");
     w.Append(indent + "/// <typeparam name=\"TJoinColumns\">The column set of the joined table.</typeparam>\n");
     w.Append(indent + "/// <typeparam name=\"TJoinNullable\">The nullable column set of the joined table.</typeparam>\n");
-    w.Append(indent + "/// <typeparam name=\"TJoinInsert\">The <c>INSERT</c> model of the joined table.</typeparam>\n");
     if (extension)
     {
         w.Append(indent + "/// <param name=\"from\">The statement to join the table to.</param>\n");
     }
 
-    w.Append(indent + "/// <param name=\"table\">The table, such as <c>Order.Table</c> or <c>Order.Table.As(\"o\")</c>.</param>\n");
+    w.Append(indent + "/// <param name=\"table\">The table, such as <c>Order.Table</c> or <c>Order.Table.As(\"o\")</c>, or a named query.</param>\n");
     if (hasOn)
     {
         w.Append(indent + "/// <param name=\"on\">The condition, from the column sets of the tables before it and of the joined table.</param>\n");
@@ -604,8 +602,8 @@ string JoinMethod(int n, string kind, bool extension)
     w.Append(indent + "/// <returns>The statement with the joined table.</returns>\n");
     w.Append(indent + "/// <exception cref=\"InvalidOperationException\">The statement already has a table under the same name; give the table\n");
     w.Append(indent + "/// an alias with <c>As</c>.</exception>\n");
-    string typeArguments = "TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert";
-    string tableParameter = "Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table";
+    string typeArguments = "TJoinColumns, TJoinNullable";
+    string tableParameter = "ITableSource<TJoinColumns, TJoinNullable> table";
     string onParameter = hasOn ? $", Func<{Views(n)}, TJoinColumns, Condition<PerRow>> on" : string.Empty;
     string result = $"SelectFrom<TDialect, TMode, {resultPairs}>";
     if (extension)
@@ -625,10 +623,8 @@ string JoinMethod(int n, string kind, bool extension)
         w.Append(indent).Append(CultureInfo.InvariantCulture, $"{access} {result} {name}<{typeArguments}>({tableParameter}{onParameter})\n");
     }
 
-    w.Append(indent + "    where TJoinRow : class\n");
-    w.Append(indent + "    where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>\n");
-    w.Append(indent + "    where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>\n");
-    w.Append(indent + "    where TJoinInsert : InsertModel\n");
+    w.Append(indent + "    where TJoinColumns : ITableColumns<TJoinColumns>\n");
+    w.Append(indent + "    where TJoinNullable : ITableColumns<TJoinNullable>\n");
     w.Append(indent + "{\n");
     if (extension)
     {

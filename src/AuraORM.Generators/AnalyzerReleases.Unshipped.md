@@ -17,6 +17,7 @@ AURA0110 | AuraORM | Error | Diagnostics
 AURA0111 | AuraORM | Error | Diagnostics
 AURA0112 | AuraORM | Error | Diagnostics
 AURA0113 | AuraORM | Error | Diagnostics
+AURA0114 | AuraORM | Error | Diagnostics
 AURA0201 | AuraORM | Error | Diagnostics
 AURA0202 | AuraORM | Error | Diagnostics
 AURA0203 | AuraORM | Error | Diagnostics

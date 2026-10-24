@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace AuraORM;
 
 /// <summary>
@@ -18,20 +20,24 @@ public sealed class SqlBuilder<TDialect>
     }
 
     /// <summary>
-    /// Starts a SELECT statement: <c>FROM table</c> (<c>docs/design.ja.md</c> §5). The lambdas of the statement get the
-    /// table's column set.
+    /// Starts a SELECT statement: <c>SELECT … FROM t</c>. The lambdas that follow get the column set of the table or the
+    /// named query (<c>docs/design.ja.md</c> §5.1, §5.11).
     /// </summary>
-    /// <typeparam name="TRow">The row type.</typeparam>
     /// <typeparam name="TColumns">The column set.</typeparam>
     /// <typeparam name="TNullable">The column set on the nullable side of an outer join.</typeparam>
-    /// <typeparam name="TInsert">The <c>INSERT</c> model.</typeparam>
-    /// <param name="table">The table reference, such as <c>User.Table</c>.</param>
+    /// <param name="table">A table, such as <c>User.Table</c>, or a named query (<c>query.As("t")</c>).</param>
     /// <returns>The statement.</returns>
-    public SelectFrom<TDialect, SqlOnly, TColumns, TNullable> From<TRow, TColumns, TNullable, TInsert>(
-        Table<TRow, TColumns, TNullable, TInsert> table
-    )
-        where TRow : class
-        where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
-        where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
-        where TInsert : InsertModel => SelectStart.From<TDialect, SqlOnly, TRow, TColumns, TNullable, TInsert>(session: null, table);
+    public SelectFrom<TDialect, SqlOnly, TColumns, TNullable> From<TColumns, TNullable>(ITableSource<TColumns, TNullable> table)
+        where TColumns : ITableColumns<TColumns>
+        where TNullable : ITableColumns<TNullable> =>
+        SelectStart.From<TDialect, SqlOnly, TColumns, TNullable>(session: null, table, ImmutableArray<NamedQueryDefinition>.Empty);
+
+    /// <summary>
+    /// Starts a SELECT statement with a <c>WITH</c>: the named queries are written as CTEs, in order, and a later one can use
+    /// an earlier one (<c>docs/design.ja.md</c> §5.11).
+    /// </summary>
+    /// <param name="queries">The named queries, each itself and not an aliased reference.</param>
+    /// <returns>The start of the statement.</returns>
+    /// <exception cref="ArgumentException">A query is an aliased reference, or two have the same name.</exception>
+    public SelectWith<TDialect, SqlOnly> With(params NamedQuery[] queries) => new(session: null, SelectStart.Ctes(queries));
 }

@@ -7,7 +7,19 @@ namespace AuraORM.Generators;
 /// <param name="Containers">The declarations of the containing types, outermost first (<c>partial class Outer</c>).</param>
 /// <param name="Declaration">The declaration of the type itself (<c>partial record User</c>).</param>
 /// <param name="Name">The type name.</param>
-internal sealed record TypeTarget(string? Namespace, EquatableArray<string> Containers, string Declaration, string Name);
+/// <param name="QualifiedName">The type name with its namespace and containing types (<c>global::App.Outer.User</c>).</param>
+/// <param name="FlatName">The names of the containing types and the type, joined (<c>OuterUser</c>), for the generated
+/// class at the namespace level.</param>
+/// <param name="IsPublic">A value indicating whether the type and every type that contains it are public.</param>
+internal sealed record TypeTarget(
+    string? Namespace,
+    EquatableArray<string> Containers,
+    string Declaration,
+    string Name,
+    string QualifiedName,
+    string FlatName,
+    bool IsPublic
+);
 
 /// <summary>
 /// A member of a table or result type that the generated code reads or writes.

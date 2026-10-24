@@ -262,7 +262,8 @@ public sealed partial record UserOrderTotal(string Name, decimal? Total);
 ジェネレーターは次を生成する。
 
 - `UserOrderTotal.RowProjection` と `UserOrderTotal.GroupProjection`: `required` な `init` プロパティを持つクラス。各プロパティの型は、前者が `IProjection<T, PerRow>`、後者が `IProjection<T, PerGroup>` で、`T` は対応するメンバーの型である（§4.5）。`GroupBy` のキーが一つの式なら、`Select` で `new UserOrderTotal.GroupProjection { Name = k, Total = Sum(o.Amount) }` のように使う。メンバーを書き忘れると CS9035、型や評価の段階が違うと CS0029 になる。
-- `UserOrderTotal.Columns`: この型を派生テーブルと CTE（§5.11）の行として使うときの列の集合。
+- `UserOrderTotal.Columns` と `UserOrderTotal.NullableColumns`: この型を派生テーブルと CTE（§5.11）の行として使うときの列の集合（外部結合の NULL 化した側では後者、§5.3）。各列は結果の型のメンバーに対応し、名前はメンバー名（`[Column]` があればその名前）である。行全体の射影（`Select(t => t)`）は `UserOrderTotal` として読む。
+- 結果の型の行を返すクエリの `As("名前")`（拡張メソッド、§5.11）。`[Table]` の型にも、行全体を返すクエリの `As` を生成する。C# は制約から型引数を推論しないので、列の集合の型を結果の型から決めるには、型ごとに生成する必要がある。生成するのは名前空間の直下の静的クラス `UserOrderTotalNamedQueries`（入れ子の型では、外側の型の名前を前につなげる。`Outer.Item` なら `OuterItemNamedQueries`）で、型かそれを囲む型が公開でなければ `internal` にする。拡張メソッドは入れ子のクラスに置けないためである。射影の後、`Limit` の後、`Offset` の後の段階に `As` を置く。生成するクラスの名前が、同じ名前空間の別の型（利用者の型、または別の型から生成するクラス。`Outer.Item` と `OuterItem` はどちらも `OuterItemNamedQueries` になる）と同じなら、ジェネレーターが AURA0114 を報告する（そのままでは CS0101 になり、利用者のコードにない行の二重定義に見える）。
 - `IQueryResult<UserOrderTotal>` の実装: 生のクエリ（§11.3）で、列名から値を読むコード。列名はメンバー名（`[Column]` があればその名前）である。
 
 ### 3.6 値コンバーター
@@ -681,18 +682,34 @@ db.From(Order.Table).GroupBy(o => o.UserId)
 - 外側の文と方言の違うサブクエリ（`SqlBuilder<SqliteDialect>` で作ったものを SQL Server の文に入れる）は、文を組み立てるときに `InvalidOperationException` になる（§14.3）。式の型は方言を持たないので型では止められず、サブクエリの方言ごとの規則（§5.9）を素通りさせないためである。
 - 2 行以上を返す `Scalar` は、SQLite だけ黙って 1 行目を返し、ほかはエラーになる（§14.2）。
 
-**派生テーブル**（行 Q6）
+**派生テーブルと CTE**（行 Q6）
 
-- 結果の型の射影か、一つのテーブルの行全体を射影にしたクエリに `As("名前")` を付けると、テーブル参照になる。`db.From(sub.As("t"))` は `FROM (SELECT … ) AS "t"` を出し、ラムダには `UserOrderTotal.Columns`（行全体なら `Account.Columns`）が渡り、その列は `"t"."列名"` を指す。結合の相手にもできる。
-- 派生テーブルの中の SELECT の項目には `AS "列名"` を付ける（結果の型ではメンバー名、行全体では列名）。一番外側の SELECT には今までどおり付けない（§5.12）。集合演算を派生テーブルにするときは、最初の被演算子の別名が列の名前になる（全方言で確かめた）。
-- 一つの式や式のタプルの射影は、列に名前がないので派生テーブルにできない。Drizzle ORM と Kysely も、名前のない式には別名を求める（§19）。
-- 派生テーブルにできる段階は、サブクエリと同じである（`OrderBy` だけの段階は置けない）。
+```csharp
+var totals = db.From(Order.Table)
+    .GroupBy(o => o.Customer)
+    .Select((k, o) => new UserOrderTotal.GroupProjection { Name = k, Total = Sum(o.Amount) })
+    .As("t");
 
-**CTE**（行 Q6）
+db.From(totals).Where(t => Gt(t.Total, 100m)).Select(t => t.Name);
+// SELECT "t"."Name" FROM (SELECT "orders"."Customer" AS "Name", SUM("orders"."Amount") AS "Total" FROM "orders" GROUP BY "orders"."Customer") AS "t" WHERE "t"."Total" > @p0
 
-- `var t = db.Cte("t", sub);` で名前付きのテーブル参照を作り、`db.With(t).From(t)` と書く。`WITH "t" AS (SELECT …) SELECT … FROM "t"` を出す。`sub` の条件は派生テーブルと同じである。
-- `db.With(a, b)` で複数を順に書ける。後の CTE は前の CTE を参照できる（`WITH "a" AS (…), "b" AS (… FROM "a" …)`）。
+db.With(totals).From(totals).Where(t => Gt(t.Total, 100m)).Select(t => t.Name);
+// WITH "t" AS (SELECT "orders"."Customer" AS "Name", SUM("orders"."Amount") AS "Total" FROM "orders" GROUP BY "orders"."Customer") SELECT "t"."Name" FROM "t" WHERE "t"."Total" > @p0
+```
+
+- 結果の型の射影か、一つのテーブルの行全体を射影にしたクエリに `As("名前")` を付けると、名前付きのクエリになる。結果の型（`[QueryResult]`）と `[Table]` の型ごとに、ジェネレーターが `As` を生成する（§3.5）。集合演算（§5.10）にも付けられる。
+- 名前付きのクエリは、`From` と結合の相手に書ける。ラムダには `UserOrderTotal.Columns`（行全体なら `Account.Columns`、外部結合の NULL 化した側では `NullableColumns`）が渡り、その列は `"t"."列名"` を指す。
+- 名前付きのクエリは、一番外側の文の `db.With(…)` に並べたときは CTE として書き（`WITH "t" AS (…) … FROM "t"`）、並べないときは派生テーブルとして書く（`FROM (SELECT …) AS "t"`）。どちらになるかは `With` を書いたかどうかで決まる。設計の前の版の `db.Cte("t", sub)` は、CTE の側も列の集合の型を結果の型から決める必要があり、`As` と同じ生成が要るので、`As` 一つにまとめた（D1-37）。
+- 名前付きのクエリの中の SELECT の項目には `AS "列名"` を付ける（結果の型ではメンバー名、行全体では列名）。集合演算では列の名前は最初の被演算子で決まるが、どの被演算子にも付ける。文が名前付きのクエリの中にあるかどうかだけで書き方が決まり、被演算子の位置で変わらない（D1-38）。一番外側の SELECT には今までどおり付けない（§5.12）。すべての被演算子に別名を付けた集合演算の CTE が全方言で通ることを確かめた。
+- `t.As("t2")` で、同じ名前付きのクエリの別名の参照を作る。CTE なら `FROM "t" INNER JOIN "t" AS "t2"`、派生テーブルならサブクエリをもう一度書いて `(SELECT …) AS "t2"` になる。別名のない二度目は、§5.2 と同じく組み立て時の `InvalidOperationException` になる。
+- 一つの式や式のタプルの射影は、列に名前がないので名前付きのクエリにできない。Drizzle ORM と Kysely も、名前のない式には別名を求める（§19）。それらに `As` を書くと、ライブラリの総称の `[Obsolete(error: true)]` の `As` に当たり、CS0619 と「結果の型（`[QueryResult]`）の射影か行全体にする」というメッセージになる（その多重定義がないと、関係のない結果の型の `As` を挙げる CS1929 になる）。
+- 名前付きのクエリにできる段階は、サブクエリと同じである（`OrderBy` だけの段階は CS0619）。
+- `db.With(a, b)` で複数を順に書ける。後の CTE は前の CTE を参照できる（`WITH "a" AS (…), "b" AS (… FROM "a" …)`）。前の CTE の本体が、`With` に後から並べた CTE を読むと（`With(b, a)` で `b` が `a` を読む）、文を組み立てるときに `InvalidOperationException` になり、「`a` を `b` より前に並べる」と示す。CTE は前に定義したものしか読めず、派生テーブルとして書き直すと、本体が二度出て書き手の意図と違う SQL になるためである（D1-41）。`With` に並べていない名前付きのクエリを読むときは、派生テーブルとして書く（D1-37）。
+- `With` に並べた CTE は、一番外側の文の中のどこから読んでも CTE の参照になる（`FROM "a"`）。外側の文のサブクエリ、集合演算の被演算子、ほかの CTE の本体を含む。
+- `With` には名前付きのクエリそのものを並べる。別名の参照（`a.As("a2")`）を並べると `ArgumentException` になる。同じ名前の二つの名前付きのクエリを並べても `ArgumentException` になる（SQL の CTE は名前で区別される）。
+- 名前付きのクエリの本体は、独立した文である。外側の文の列を本体の中で使うと（外側のラムダの列を持ち込む）、文の外の列として、文を組み立てるときに `InvalidOperationException` になる（§14.3）。外側の行ごとに中を評価する派生テーブル（`LATERAL`）は書けず、相関はサブクエリ（`In` / `Exists` / `Scalar`）で書く（D1-40）。
 - WITH は一番外側の文にだけ書ける。`With` を持つ文をサブクエリ、派生テーブル、CTE の本体にすると、文を組み立てるときに `InvalidOperationException` になる（§14.3）。SQL Server は入れ子の WITH をメッセージ 156 で拒む。先頭で宣言した CTE は、内側のサブクエリと派生テーブルから参照できる（全方言で確かめた）。Drizzle ORM と Kysely は入れ子の WITH をそのまま出し（SQL Server で失敗する）、linq2db は外側に移す（書いた位置と出る位置が違い、パラメータの番号も入れ替わる。jOOQ の issue 3175 が同じ問題を挙げる）（§19）。
+- `With` に並べた CTE と同じ名前の本物のテーブルを、その文の中で使うと、文を組み立てるときに `InvalidOperationException` になる（§14.3）。SQL はその名前を CTE と解釈するので、例外もエラーもなく誤った結果になる（`WITH "accounts" AS (SELECT 9 AS "id") SELECT "accounts"."id" FROM "accounts"` は全方言で 9 を返した）。D1-34 と同じ種類の黙った誤りである（D1-39）。スキーマ付きのテーブル（`"app"."memberships"`）は CTE を指さないので、同じ名前でも例外にしない。
 - 再帰 CTE は §18 の C2 にする。
 
 ### 5.12 SQL の書式
@@ -1021,6 +1038,7 @@ CREATE TABLE "users" (
 | MySQL、MariaDB で `Limit` の後のサブクエリを `In` / `NotIn` に渡す（§5.11） | 方言のインターフェースの制約（`ILimitInSubqueryDialect`） | CS0311 |
 | `OrderBy` の後で `Limit` も `Offset` もない段階をサブクエリ、派生テーブル、CTE にする（§5.11） | その段階を受け取る `[Obsolete(error: true)]` の多重定義 | CS0619（直し方のメッセージ付き） |
 | `NotIn` のサブクエリが NULL を返しうる（§5.11） | アナライザー | AURA0203 |
+| 一つの式や式のタプルの射影に `As` を書く（§5.11） | 総称の `[Obsolete(error: true)]` の `As` | CS0619（直し方のメッセージ付き） |
 | `SqlBuilder` から作った文を実行する | 実行のメソッドは `Executable` の文にだけある（§12.3） | CS1929 |
 | 文字列の SQL を断片に入れる | 補間文字列ハンドラーだけを受け取る | CS1503 |
 | 生 SQL の穴に書式指定か幅の指定を書く | ハンドラーにその `AppendFormatted` がない | CS1739 |
@@ -1067,6 +1085,11 @@ CREATE TABLE "users" (
 | `Outer` に列のキーでないもの（集計、列でないキー）を渡した（§5.11） | `ArgumentException` |
 | `Scalar` / `GroupScalar` に、一つの式でない射影（行全体、結果の型、タプル）のサブクエリを渡した（§5.11） | `ArgumentException` |
 | `With` を持つ文を、サブクエリ、派生テーブル、CTE の本体にした（§5.11） | `InvalidOperationException` |
+| `With` に並べた CTE と同じ名前の本物のテーブルを、その文で使った（§5.11） | `InvalidOperationException` |
+| 同じ名前付きのクエリを、別名なしで一つの文に二度使った（§5.11） | `InvalidOperationException` |
+| CTE の本体が、`With` に後から並べた CTE を読んだ（§5.11） | `InvalidOperationException` |
+| 名前付きのクエリの本体で、外側の文の列を使った（§5.11） | `InvalidOperationException` |
+| `With` に別名の参照を並べた、同じ名前の二つの名前付きのクエリを並べた（§5.11） | `ArgumentException` |
 
 ## 15. 診断 ID
 
@@ -1085,6 +1108,7 @@ CREATE TABLE "users" (
 | AURA0111 | ジェネレーター | 行の型に、位置指定のレコードのコンストラクターも、アクセスできる引数なしのコンストラクターもない |
 | AURA0112 | ジェネレーター | `decimal` の列に `[Precision]` がない |
 | AURA0113 | ジェネレーター | `[Default]` の定数が列の型に暗黙に変換できない |
+| AURA0114 | ジェネレーター | 生成する `{型名}NamedQueries` のクラスと同じ名前の型が、同じ名前空間にある（§3.5） |
 | AURA0201 | アナライザー | 比較の値に `null` リテラルを書いた |
 | AURA0202 | アナライザー | 比較の値の型が nullable である |
 | AURA0203 | アナライザー | `NotIn` のサブクエリの結果の型が nullable である |

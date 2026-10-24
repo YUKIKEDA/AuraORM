@@ -110,6 +110,86 @@ public sealed class SchemaGeneratorTests
     }
 
     /// <summary>
+    /// Nested and internal table and result types get their column sets and an <c>As</c> class at the namespace level, which
+    /// is internal when a type or a type around it is not public, so a named query of each compiles and is listed in
+    /// <c>With</c> (design §3.5, §5.11).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - An internal static class <c>Outer</c> in a namespace, holding an internal table and a public result type.
+    ///
+    /// Steps:
+    /// - Run the generator and compile code that names a whole row of the table, groups it into the result type, names that,
+    ///   lists both in <c>With</c>, and reads the result type's whole row.
+    ///
+    /// Expected:
+    /// - No diagnostic, and the generated classes <c>OuterItemNamedQueries</c> and <c>OuterTotalNamedQueries</c> are
+    ///   internal.
+    /// </remarks>
+    [Fact]
+    public void Generate_NestedInternalTypes_NamedQueriesCompile()
+    {
+        IReadOnlyDictionary<string, string> sources = GeneratorHarness.Compiles(
+            Usings
+                + """
+                namespace App.Data
+                {
+                    using static AuraORM.Sql;
+
+                    internal static partial class Outer
+                    {
+                        [Table("items")]
+                        internal sealed partial record Item([PrimaryKey] long Id, string Name);
+
+                        [QueryResult]
+                        public sealed partial record Total(string Name, long Count);
+                    }
+
+                    internal static class Use
+                    {
+                        internal static SqlStatement Run()
+                        {
+                            var db = new SqlBuilder<SqliteDialect>();
+                            var items = db.From(Outer.Item.Table).Select(x => x).As("i");
+                            var totals = db.From(items).GroupBy(x => x.Name).Select((k, x) => new Outer.Total.GroupProjection { Name = k, Count = Count() }).As("t");
+                            return db.With(items, totals).From(totals).Select(x => x).ToSql();
+                        }
+                    }
+                }
+                """
+        );
+
+        Assert.Contains(sources.Values, s => s.Contains("internal static class OuterItemNamedQueries", StringComparison.Ordinal));
+        Assert.Contains(sources.Values, s => s.Contains("internal static class OuterTotalNamedQueries", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Types of the same name in different namespaces get <c>As</c> classes of the same name in their own namespaces, which do
+    /// not collide (AURA0114 is only for one namespace, design §3.5).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - A result type <c>Item</c> in the namespaces <c>A</c> and <c>B</c>.
+    ///
+    /// Steps:
+    /// - Run the generator and compile.
+    ///
+    /// Expected:
+    /// - No diagnostic.
+    /// </remarks>
+    [Fact]
+    public void Generate_SameNameInTwoNamespaces_Compiles()
+    {
+        GeneratorHarness.Compiles(
+            Usings
+                + """
+                namespace A { [QueryResult] public sealed partial record Item(int Value); }
+                namespace B { [QueryResult] public sealed partial record Item(int Value); }
+                """
+        );
+    }
+
+    /// <summary>
     /// A class with settable properties is a table too, read with its parameterless constructor.
     /// </summary>
     /// <remarks>
@@ -296,6 +376,15 @@ public sealed class SchemaGeneratorTests
     [InlineData("AURA0104", """[Table("t")] public sealed partial record T([PrimaryKey] long Id) { public static int Insert => 0; }""")]
     [InlineData("AURA0104", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, int __auraValue0);""")]
     [InlineData("AURA0104", """[QueryResult] public sealed partial record T(int __auraReader);""")]
+    [InlineData("AURA0104", """[QueryResult] public sealed partial record T(int Columns);""")]
+    [InlineData("AURA0104", """[QueryResult] public sealed partial record T(int NullableColumns);""")]
+    [InlineData("AURA0104", """[QueryResult] public sealed partial record T(int ReadRow);""")]
+    [InlineData(
+        "AURA0114",
+        """public static partial class Outer { [QueryResult] public sealed partial record Item(int A); } [QueryResult] public sealed partial record OuterItem(int A);"""
+    )]
+    [InlineData("AURA0114", """[QueryResult] public sealed partial record Item(int A); public static class ItemNamedQueries { }""")]
+    [InlineData("AURA0114", """[Table("t")] public sealed partial record T([PrimaryKey] long Id); public sealed class TNamedQueries { }""")]
     [InlineData("AURA0106", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Column("id")] long Other);""")]
     [InlineData("AURA0107", """[Table("t")] public sealed partial record T([PrimaryKey, AutoIncrement, MaxLength(10)] string Id);""")]
     [InlineData("AURA0107", """[Table("t")] public sealed partial record T([AutoIncrement] long Id);""")]

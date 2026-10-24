@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace AuraORM;
 
 /// <summary>
@@ -6,19 +8,53 @@ namespace AuraORM;
 /// </summary>
 internal static class SelectStart
 {
-    public static SelectFrom<TDialect, TMode, TColumns, TNullable> From<TDialect, TMode, TRow, TColumns, TNullable, TInsert>(
+    public static SelectFrom<TDialect, TMode, TColumns, TNullable> From<TDialect, TMode, TColumns, TNullable>(
         IStatementRunner? session,
-        Table<TRow, TColumns, TNullable, TInsert> table
+        ITableSource<TColumns, TNullable> table,
+        ImmutableArray<NamedQueryDefinition> ctes
     )
         where TDialect : IDialect
         where TMode : ExecutionMode
-        where TRow : class
-        where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
-        where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
-        where TInsert : InsertModel
+        where TColumns : ITableColumns<TColumns>
+        where TNullable : ITableColumns<TNullable>
     {
         ArgumentNullException.ThrowIfNull(table);
-        var alias = new TableAlias(table.Info.Schema, table.Info.Name, table.Alias);
-        return new SelectFrom<TDialect, TMode, TColumns, TNullable>(session, SelectState.From(alias), TColumns.Create(alias));
+        TableAlias alias = table.CreateOccurrence();
+        return new SelectFrom<TDialect, TMode, TColumns, TNullable>(session, SelectState.From(alias) with { Ctes = ctes }, TColumns.Create(alias));
+    }
+
+    /// <summary>
+    /// Checks the named queries of <c>With</c> and returns their definitions (§5.11).
+    /// </summary>
+    /// <param name="queries">The named queries.</param>
+    /// <returns>The definitions, in order.</returns>
+    /// <exception cref="ArgumentException">A query is an aliased reference, or two have the same name.</exception>
+    public static ImmutableArray<NamedQueryDefinition> Ctes(NamedQuery[] queries)
+    {
+        ArgumentNullException.ThrowIfNull(queries);
+        var definitions = ImmutableArray.CreateBuilder<NamedQueryDefinition>(queries.Length);
+        foreach (NamedQuery query in queries)
+        {
+            ArgumentNullException.ThrowIfNull(query, nameof(queries));
+            if (query.Alias is not null)
+            {
+                throw new ArgumentException(
+                    "With takes a named query itself, not an aliased reference to it (As(\"...\") on a named query).",
+                    nameof(queries)
+                );
+            }
+
+            foreach (NamedQueryDefinition defined in definitions)
+            {
+                if (defined.Name == query.Definition.Name)
+                {
+                    throw new ArgumentException("Two named queries of With have the name " + defined.Name + ".", nameof(queries));
+                }
+            }
+
+            definitions.Add(query.Definition);
+        }
+
+        return definitions.MoveToImmutable();
     }
 }

@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace AuraORM.Generators;
 
 /// <summary>
@@ -16,8 +18,27 @@ internal static class ResultEmitter
         w.Line();
         EmitProjection(w, result, "GroupProjection", "PerGroup", "evaluated once for each group (keys and aggregates)");
         w.Line();
+
+        // §3.5: the columns of a derived table or a CTE whose rows are this type, named after the members.
+        var asTable = new TableModel(
+            result.Target,
+            type,
+            Schema: null,
+            new EquatableArray<ColumnModel>(
+                result
+                    .Members.Select(m => new ColumnModel(m.Member, m.ColumnName, string.Empty, false, false, false, -1, -1, -1, null, null))
+                    .ToImmutableArray()
+            ),
+            new EquatableArray<IndexModel>(ImmutableArray<IndexModel>.Empty),
+            result.UsesConstructor
+        );
+        TableEmitter.EmitColumns(w, asTable, type, "a derived table or a CTE whose rows are <see cref=\"" + type + "\"/>");
+        w.Line();
+        TableEmitter.EmitNullableColumns(w, asTable, type, "a derived table or a CTE whose rows are <see cref=\"" + type + "\"/>");
+        w.Line();
         NamedReading.Emit(w, type, result.Members.Select(m => (m.Member, m.ColumnName)).ToList(), values => Construct(result, values));
         w.EndTarget(opened);
+        NamedQueryEmitter.Emit(w, result.Target, result.Members.Select(m => m.ColumnName).ToList());
         return w.ToString();
     }
 

@@ -1,12 +1,46 @@
+using System.Collections.Immutable;
+
 namespace AuraORM;
 
 /// <summary>
 /// A SELECT statement in the statement tree (<c>docs/design.ja.md</c> §5). The clauses are written in the standard order,
-/// whatever order the builder was called in.
+/// whatever order the builder was called in. Inside a named query, each item is written with its name (§5.11).
 /// </summary>
-internal sealed class SelectNode(SelectState state) : SqlNode
+internal sealed class SelectNode(SelectState state, ImmutableArray<string> columnNames = default) : SqlNode
 {
     public override void Render(SqlRenderContext context)
+    {
+        int depth = context.EnterStatement();
+        if (!state.Ctes.IsEmpty)
+        {
+            if (depth > 1)
+            {
+                // §5.11: SQL Server rejects a WITH inside a subquery, a derived table, or a set operation's operand.
+                throw new InvalidOperationException(
+                    "A statement with With is used inside another statement; only the outermost statement has a WITH. List all the named queries in its With."
+                );
+            }
+
+            context.ListCtes(state.Ctes);
+            context.Write("WITH ");
+            for (int i = 0; i < state.Ctes.Length; i++)
+            {
+                if (i > 0)
+                {
+                    context.Write(", ");
+                }
+
+                context.WriteCte(state.Ctes[i]);
+            }
+
+            context.Write(' ');
+        }
+
+        RenderStatement(context);
+        context.ExitStatement();
+    }
+
+    private void RenderStatement(SqlRenderContext context)
     {
         var tables = new TableAlias[state.Sources.Length];
         for (int i = 0; i < tables.Length; i++)
@@ -45,17 +79,48 @@ internal sealed class SelectNode(SelectState state) : SqlNode
                     _ => " EXCEPT ",
                 }
             );
-            new SelectNode(operand.State).Render(context);
+            new SelectNode(operand.State, columnNames).Render(context);
         }
 
         RenderTail(context);
         context.InHaving = inHaving;
     }
 
+    // §5.11: the items of a named query are named, so that the statement around it can name its columns.
+    private void WriteNamedItems(SqlRenderContext context)
+    {
+        if (columnNames.Length != state.Items.Length)
+        {
+            throw new InvalidOperationException(
+                "A named query selects " + state.Items.Length + " items for " + columnNames.Length + " column names."
+            );
+        }
+
+        for (int i = 0; i < state.Items.Length; i++)
+        {
+            if (i > 0)
+            {
+                context.Write(", ");
+            }
+
+            state.Items[i].Render(context);
+            context.Write(" AS ");
+            context.WriteIdentifier(columnNames[i]);
+        }
+    }
+
     private void RenderCore(SqlRenderContext context)
     {
         context.Write(state.Distinct ? "SELECT DISTINCT " : "SELECT ");
-        context.WriteList(state.Items);
+        if (columnNames.IsDefaultOrEmpty)
+        {
+            context.WriteList(state.Items);
+        }
+        else
+        {
+            WriteNamedItems(context);
+        }
+
         context.Write(" FROM ");
         foreach (SelectSourceState source in state.Sources)
         {

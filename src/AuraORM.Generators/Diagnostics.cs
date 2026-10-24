@@ -81,6 +81,12 @@ internal static class Diagnostics
         "The [Default] value of '{0}' is of type '{1}', which does not convert implicitly to the column type '{2}'; write a value of the column type, or use [DefaultSql]"
     );
 
+    public static readonly DiagnosticDescriptor NamedQueriesCollision = Error(
+        "AURA0114",
+        "The generated class of As has the name of another type",
+        "The class '{0}' that the generator writes for the As of '{1}' has the name of another type in the namespace; rename one of the types"
+    );
+
     public static readonly DiagnosticDescriptor NullLiteralComparison = Error(
         "AURA0201",
         "A comparison with a null constant matches no row",
@@ -119,6 +125,7 @@ internal static class Diagnostics
         NoConstructor,
         MissingPrecision,
         DefaultTypeMismatch,
+        NamedQueriesCollision,
     ];
 
     public static DiagnosticDescriptor ById(string id) => All.First(d => d.Id == id);

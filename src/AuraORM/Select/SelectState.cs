@@ -43,6 +43,11 @@ internal sealed record SelectState(
     public ImmutableArray<SetOperand> SetOperands { get; init; } = ImmutableArray<SetOperand>.Empty;
 
     /// <summary>
+    /// Gets the named queries that the statement writes as CTEs, in order, or an empty array (§5.11).
+    /// </summary>
+    public ImmutableArray<NamedQueryDefinition> Ctes { get; init; } = ImmutableArray<NamedQueryDefinition>.Empty;
+
+    /// <summary>
     /// Adds an operand of a set operation.
     /// </summary>
     /// <typeparam name="TDialect">The dialect.</typeparam>
@@ -81,13 +86,17 @@ internal sealed record SelectState(
     /// Creates the occurrence of a table that a join adds. A table that the statement already has under the same name (its
     /// alias, or its name when it has none) needs an alias (<c>docs/design.ja.md</c> §5.2, §14.3).
     /// </summary>
-    /// <param name="table">The table reference.</param>
+    /// <typeparam name="TColumns">The column set.</typeparam>
+    /// <typeparam name="TNullable">The nullable column set.</typeparam>
+    /// <param name="table">The table or named query.</param>
     /// <returns>The occurrence.</returns>
     /// <exception cref="InvalidOperationException">The statement already has a table under the same name.</exception>
-    public TableAlias NewSource(ITableReference table)
+    public TableAlias NewSource<TColumns, TNullable>(ITableSource<TColumns, TNullable> table)
+        where TColumns : ITableColumns<TColumns>
+        where TNullable : ITableColumns<TNullable>
     {
         ArgumentNullException.ThrowIfNull(table);
-        var alias = new TableAlias(table.Info.Schema, table.Info.Name, table.Alias);
+        TableAlias alias = table.CreateOccurrence();
         foreach (SelectSourceState source in Sources)
         {
             if (source.Table.Reference == alias.Reference)
