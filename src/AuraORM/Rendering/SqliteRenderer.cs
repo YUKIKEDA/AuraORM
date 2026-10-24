@@ -10,6 +10,9 @@ internal sealed class SqliteRenderer : DialectRenderer
     // SQLITE_MAX_VARIABLE_NUMBER defaults to 32766 from SQLite 3.32.0 (https://www.sqlite.org/limits.html).
     public override int MaxParameters => 32766;
 
+    // §5.10: SQLITE_MAX_COMPOUND_SELECT, which defaults to 500.
+    public override int MaxSetOperands => 500;
+
     protected override string LengthFunction => "LENGTH";
 
     // §3.3: a decimal is stored as TEXT, so comparing it by size, ordering by it, and MIN / MAX would order strings

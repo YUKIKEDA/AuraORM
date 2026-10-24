@@ -419,3 +419,63 @@ public sealed class SqlServerSubqueryTests : LimitInSubqueryTests<SqlServerDiale
 
     public ValueTask DisposeAsync() => _target.DisposeAsync();
 }
+
+/// <summary>
+/// <see cref="SetOperationTests{TDialect}"/> on postgresql.
+/// </summary>
+[Collection("postgresql")]
+public sealed class PostgreSqlSetOperationTests : SetOperationTests<PostgreSqlDialect>, IAsyncLifetime
+{
+    private readonly PostgreSqlTarget _target = new();
+
+    private protected override ITestTarget<PostgreSqlDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="SetOperationTests{TDialect}"/> on mysql.
+/// </summary>
+[Collection("mysql")]
+public sealed class MySqlSetOperationTests : SetOperationTests<MySqlDialect>, IAsyncLifetime
+{
+    private readonly MySqlTarget _target = new();
+
+    private protected override ITestTarget<MySqlDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="SetOperationTests{TDialect}"/> on mariadb.
+/// </summary>
+[Collection("mariadb")]
+public sealed class MariaDbSetOperationTests : SetOperationTests<MariaDbDialect>, IAsyncLifetime
+{
+    private readonly MariaDbTarget _target = new();
+
+    private protected override ITestTarget<MariaDbDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="SetOperationTests{TDialect}"/> on sqlserver.
+/// </summary>
+[Collection("sqlserver")]
+public sealed class SqlServerSetOperationTests : SetOperationTests<SqlServerDialect>, IAsyncLifetime
+{
+    private readonly SqlServerTarget _target = new();
+
+    private protected override ITestTarget<SqlServerDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}

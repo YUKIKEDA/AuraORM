@@ -11,7 +11,7 @@ namespace AuraORM;
 /// <typeparam name="TResult">The type that each row is read as.</typeparam>
 /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
 /// <typeparam name="T1">The column set of table 1.</typeparam>
-public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1> : SelectProjection<TDialect, TMode, TResult, TLevel>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1> : SelectOperand<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel
@@ -48,7 +48,7 @@ public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1> : Sele
 /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
 /// <typeparam name="T1">The column set of table 1.</typeparam>
 /// <typeparam name="T2">The column set of table 2.</typeparam>
-public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2> : SelectProjection<TDialect, TMode, TResult, TLevel>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2> : SelectOperand<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel
@@ -88,7 +88,7 @@ public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2> : 
 /// <typeparam name="T1">The column set of table 1.</typeparam>
 /// <typeparam name="T2">The column set of table 2.</typeparam>
 /// <typeparam name="T3">The column set of table 3.</typeparam>
-public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3> : SelectProjection<TDialect, TMode, TResult, TLevel>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3> : SelectOperand<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel
@@ -131,7 +131,7 @@ public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3
 /// <typeparam name="T2">The column set of table 2.</typeparam>
 /// <typeparam name="T3">The column set of table 3.</typeparam>
 /// <typeparam name="T4">The column set of table 4.</typeparam>
-public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4> : SelectProjection<TDialect, TMode, TResult, TLevel>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4> : SelectOperand<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel
@@ -177,7 +177,7 @@ public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3
 /// <typeparam name="T3">The column set of table 3.</typeparam>
 /// <typeparam name="T4">The column set of table 4.</typeparam>
 /// <typeparam name="T5">The column set of table 5.</typeparam>
-public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5> : SelectProjection<TDialect, TMode, TResult, TLevel>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5> : SelectOperand<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel
@@ -226,7 +226,7 @@ public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3
 /// <typeparam name="T4">The column set of table 4.</typeparam>
 /// <typeparam name="T5">The column set of table 5.</typeparam>
 /// <typeparam name="T6">The column set of table 6.</typeparam>
-public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6> : SelectProjection<TDialect, TMode, TResult, TLevel>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6> : SelectOperand<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel
@@ -288,7 +288,7 @@ public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3
 /// <typeparam name="T5">The column set of table 5.</typeparam>
 /// <typeparam name="T6">The column set of table 6.</typeparam>
 /// <typeparam name="T7">The column set of table 7.</typeparam>
-public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6, T7> : SelectProjection<TDialect, TMode, TResult, TLevel>
+public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6, T7> : SelectOperand<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel
@@ -355,7 +355,7 @@ public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3
 /// <typeparam name="T7">The column set of table 7.</typeparam>
 /// <typeparam name="T8">The column set of table 8.</typeparam>
 public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, T1, T2, T3, T4, T5, T6, T7, T8>
-    : SelectProjection<TDialect, TMode, TResult, TLevel>
+    : SelectOperand<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel

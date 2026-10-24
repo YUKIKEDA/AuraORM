@@ -11,7 +11,7 @@ namespace AuraORM;
 /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
 /// <typeparam name="TItems">The selected items as the <c>OrderBy</c> lambda gets them: a <see cref="DistinctItem{T, TLevel}"/>,
 /// or a tuple of them.</typeparam>
-public sealed class SelectDistinctProjected<TDialect, TMode, TResult, TLevel, TItems> : SelectProjection<TDialect, TMode, TResult, TLevel>
+public sealed class SelectDistinctProjected<TDialect, TMode, TResult, TLevel, TItems> : SelectOperand<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel

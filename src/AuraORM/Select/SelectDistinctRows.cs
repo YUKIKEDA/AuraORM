@@ -9,7 +9,7 @@ namespace AuraORM;
 /// <typeparam name="TMode">Whether the statement can be run: <see cref="Executable"/> or <see cref="SqlOnly"/>.</typeparam>
 /// <typeparam name="TResult">The type that each row is read as.</typeparam>
 /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
-public sealed class SelectDistinctRows<TDialect, TMode, TResult, TLevel> : SelectProjection<TDialect, TMode, TResult, TLevel>
+public sealed class SelectDistinctRows<TDialect, TMode, TResult, TLevel> : SelectOperand<TDialect, TMode, TResult, TLevel>
     where TDialect : IDialect
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel

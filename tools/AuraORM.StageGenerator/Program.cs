@@ -21,6 +21,7 @@ Write("SelectGrouped.cs", SelectGrouped);
 Write("SelectHaving.cs", SelectHaving);
 Write("SelectGroupedProjected.cs", SelectGroupedProjected);
 Write("TupleProjection.cs", TupleProjection);
+Write("SelectCombinationOrdering.cs", SelectCombinationOrdering);
 return 0;
 
 void Write(string file, Action<StringBuilder> emit)
@@ -406,7 +407,7 @@ void SelectGroupedProjected(StringBuilder s)
             /// <typeparam name="TResult">The type that each row is read as.</typeparam>
             /// <typeparam name="TKey">The key as the lambdas get it: an expression, or a tuple of expressions.</typeparam>
             {{ViewDocs(n)}}
-            public sealed class SelectGroupedProjected<TDialect, TMode, TResult, TKey, {{views}}> : SelectProjection<TDialect, TMode, TResult, PerGroup>
+            public sealed class SelectGroupedProjected<TDialect, TMode, TResult, TKey, {{views}}> : SelectOperand<TDialect, TMode, TResult, PerGroup>
                 where TDialect : IDialect
                 where TMode : ExecutionMode
             {
@@ -703,7 +704,7 @@ void SelectProjected(StringBuilder s)
             /// <typeparam name="TResult">The type that each row is read as.</typeparam>
             /// <typeparam name="TLevel">The evaluation level of the projection.</typeparam>
             {{ViewDocs(n)}}
-            public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, {{Views(n)}}> : SelectProjection<TDialect, TMode, TResult, TLevel>
+            public sealed class SelectProjected<TDialect, TMode, TResult, TLevel, {{Views(n)}}> : SelectOperand<TDialect, TMode, TResult, TLevel>
                 where TDialect : IDialect
                 where TMode : ExecutionMode
                 where TLevel : EvaluationLevel
@@ -750,9 +751,11 @@ void TupleProjection(StringBuilder s)
             /// </summary>
             {{Lines(k, i => $"/// <typeparam name=\"TItem{i}\">The type of item {i}.</typeparam>")}}
             /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
-            internal sealed class TupleProjection<{{results}}, TLevel>({{parameters}}) : IProjection<({{results}}), TLevel>
+            internal sealed class TupleProjection<{{results}}, TLevel>({{parameters}}) : IProjection<({{results}}), TLevel>, IExpressionTuple
                 where TLevel : EvaluationLevel
             {
+                bool IExpressionTuple.AllExpressions => {{string.Join(" && ", Enumerable.Range(1, k).Select(i => $"p{i} is IExpr<TItem{i}, TLevel>"))}};
+
                 void IProjection<({{results}}), TLevel>.CollectSelectItems(List<SqlNode> items)
                 {
             {{Lines(k, i => $"        p{i}.CollectSelectItems(items);")}}
@@ -767,6 +770,87 @@ void TupleProjection(StringBuilder s)
             """
         );
     }
+}
+
+void SelectCombinationOrdering(StringBuilder s)
+{
+    s.Append(
+        """
+
+        /// <summary>
+        /// <c>OrderBy</c> after a set operation (<c>docs/design.ja.md</c> §5.10): the lambda gets an item for each element of the
+        /// result type, and each key names its item by its position (<c>ORDER BY 1 ASC</c>), because each operand selects the
+        /// item from its own tables. A projection that holds a whole row or a result type throws, because its items have no
+        /// positions.
+        /// </summary>
+        public static class SelectCombinationOrdering
+        {
+            /// <summary>
+            /// Orders the result of a set operation of one expression: <c>ORDER BY 1 ASC</c>.
+            /// </summary>
+            /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+            /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
+            /// <typeparam name="TResult">The type of the item.</typeparam>
+            /// <typeparam name="TLevel">The evaluation level of the first statement's projection.</typeparam>
+            /// <param name="combination">The set operation.</param>
+            /// <param name="orderings">The keys, in order, from the item: <c>s =&gt; [Desc(s)]</c>.</param>
+            /// <returns>The statement.</returns>
+            /// <exception cref="ArgumentException">There is no key.</exception>
+            /// <exception cref="InvalidOperationException">The projection is a whole row or a result type.</exception>
+            public static SelectOrdered<TDialect, TMode, TResult> OrderBy<TDialect, TMode, TResult, TLevel>(
+                this SelectCombination<TDialect, TMode, TResult, TLevel> combination,
+                Func<SetItem<TResult, TLevel>, Ordering<TLevel>[]> orderings
+            )
+                where TDialect : IDialect
+                where TMode : ExecutionMode
+                where TLevel : EvaluationLevel
+            {
+                ArgumentNullException.ThrowIfNull(combination);
+                ArgumentNullException.ThrowIfNull(orderings);
+                return combination.OrderByCore(orderings(new SetItem<TResult, TLevel>(1)));
+            }
+
+        """
+    );
+    for (int k = 2; k <= MaxTuple; k++)
+    {
+        string results = string.Join(", ", Enumerable.Range(1, k).Select(i => $"TItem{i}"));
+        string items = "(" + string.Join(", ", Enumerable.Range(1, k).Select(i => $"SetItem<TItem{i}, TLevel>")) + ")";
+        string created = "(" + string.Join(", ", Enumerable.Range(1, k).Select(i => $"new SetItem<TItem{i}, TLevel>({i})")) + ")";
+        s.Append(
+            CultureInfo.InvariantCulture,
+            $$"""
+
+                /// <summary>
+                /// Orders the result of a set operation of a tuple of {{k}} items: <c>ORDER BY 1 ASC, 2 DESC</c>.
+                /// </summary>
+                /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+                /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
+            {{Lines(k, i => $"    /// <typeparam name=\"TItem{i}\">The type of item {i}.</typeparam>")}}
+                /// <typeparam name="TLevel">The evaluation level of the first statement's projection.</typeparam>
+                /// <param name="combination">The set operation.</param>
+                /// <param name="orderings">The keys, in order, from the items: <c>s =&gt; [Asc(s.Item1), Desc(s.Item2)]</c>.</param>
+                /// <returns>The statement.</returns>
+                /// <exception cref="ArgumentException">There is no key.</exception>
+                /// <exception cref="InvalidOperationException">An item is a whole row or a result type.</exception>
+                public static SelectOrdered<TDialect, TMode, ({{results}})> OrderBy<TDialect, TMode, {{results}}, TLevel>(
+                    this SelectCombination<TDialect, TMode, ({{results}}), TLevel> combination,
+                    Func<{{items}}, Ordering<TLevel>[]> orderings
+                )
+                    where TDialect : IDialect
+                    where TMode : ExecutionMode
+                    where TLevel : EvaluationLevel
+                {
+                    ArgumentNullException.ThrowIfNull(combination);
+                    ArgumentNullException.ThrowIfNull(orderings);
+                    return combination.OrderByCore(orderings({{created}}));
+                }
+
+            """
+        );
+    }
+
+    s.Append("}\n");
 }
 
 static string Pairs(int n) => string.Join(", ", Enumerable.Range(1, n).Select(i => $"T{i}, TNullable{i}"));

@@ -31,6 +31,41 @@ internal sealed record SelectState(
     /// </summary>
     public bool SingleExpression { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether every item of the projection is an expression (no whole row, no result type), so that
+    /// the items have positions in the select list (§5.10).
+    /// </summary>
+    public bool AllExpressions { get; init; }
+
+    /// <summary>
+    /// Gets the statements combined with this one by a set operation, in order, or an empty array (§5.10).
+    /// </summary>
+    public ImmutableArray<SetOperand> SetOperands { get; init; } = ImmutableArray<SetOperand>.Empty;
+
+    /// <summary>
+    /// Adds an operand of a set operation.
+    /// </summary>
+    /// <typeparam name="TDialect">The dialect.</typeparam>
+    /// <typeparam name="TMode">The other statement's mode.</typeparam>
+    /// <typeparam name="TResult">The result type.</typeparam>
+    /// <typeparam name="TLevel">The other statement's level.</typeparam>
+    /// <param name="state">The set operation so far, or its first statement.</param>
+    /// <param name="setOperator">The operator.</param>
+    /// <param name="other">The other statement.</param>
+    /// <returns>The state of the set operation.</returns>
+    public static SelectState Combine<TDialect, TMode, TResult, TLevel>(
+        SelectState state,
+        SetOperator setOperator,
+        SelectOperand<TDialect, TMode, TResult, TLevel> other
+    )
+        where TDialect : IDialect
+        where TMode : ExecutionMode
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return state with { SetOperands = state.SetOperands.Add(new SetOperand(setOperator, other.State)) };
+    }
+
     public static SelectState From(TableAlias table) =>
         new(
             [new SelectSourceState(table, JoinKind.From, null)],
@@ -78,7 +113,14 @@ internal sealed record SelectState(
         ArgumentNullException.ThrowIfNull(projection);
         var items = new List<SqlNode>();
         projection.CollectSelectItems(items);
-        return this with { Items = [.. items], Distinct = distinct, SingleExpression = projection is IExpr<T, TLevel> };
+        bool single = projection is IExpr<T, TLevel>;
+        return this with
+        {
+            Items = [.. items],
+            Distinct = distinct,
+            SingleExpression = single,
+            AllExpressions = single || projection is IExpressionTuple { AllExpressions: true },
+        };
     }
 
     public SelectState WithOrderBy<TLevel>(Ordering<TLevel>[] orderings)

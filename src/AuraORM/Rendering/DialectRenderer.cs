@@ -23,6 +23,11 @@ internal abstract class DialectRenderer
     public abstract int MaxParameters { get; }
 
     /// <summary>
+    /// Gets the largest number of statements that one set operation can combine (§5.10). The default has no limit.
+    /// </summary>
+    public virtual int MaxSetOperands => int.MaxValue;
+
+    /// <summary>
     /// Gets a value indicating whether parameters are unnamed and bound by position (PostgreSQL, §5.12).
     /// </summary>
     public virtual bool UsesPositionalParameters => false;

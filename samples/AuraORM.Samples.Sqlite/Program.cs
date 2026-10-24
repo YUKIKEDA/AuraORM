@@ -94,6 +94,21 @@ List<long> loanedIds = await db.From(Book.Table)
     .ToListAsync();
 checks.SameItems("group subquery", [3L], loanedIds);
 
+// Set operations, ordered by the position of an item, and one as a subquery.
+List<string> names = await db.From(Book.Table)
+    .Select(b => b.Title)
+    .Union(db.From(Loan.Table).Select(l => l.Borrower))
+    .OrderBy(s => [Desc(s)])
+    .Limit(2)
+    .ToListAsync();
+checks.SameItems("union", ["Dune", "Cosmos"], names);
+List<long> notLent = await db.From(Book.Table)
+    .Select(b => b.Id)
+    .Except(db.From(Loan.Table).Select(l => l.BookId))
+    .OrderBy(s => [Asc(s)])
+    .ToListAsync();
+checks.SameItems("except", [1L, 2L], notLent);
+
 SqlStatement offline = new SqlBuilder<SqliteDialect>().From(Book.Table).Select(b => b.Title).Limit(1).ToSql();
 checks.Equal("sql builder", "SELECT \"books\".\"title\" FROM \"books\" LIMIT @p0", offline.Text);
 checks.Equal("select aggregates", (3L, (int?)412), (count, longest));
