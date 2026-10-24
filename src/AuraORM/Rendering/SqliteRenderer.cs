@@ -13,6 +13,9 @@ internal sealed class SqliteRenderer : DialectRenderer
     // §5.10: SQLITE_MAX_COMPOUND_SELECT, which defaults to 500.
     public override int MaxSetOperands => 500;
 
+    // §10.1: "The upsert-clause is not supported after DEFAULT VALUES" (lang_insert.html).
+    public override bool AcceptsUpsertAfterDefaultValues => false;
+
     protected override string LengthFunction => "LENGTH";
 
     // §3.3: a decimal is stored as TEXT, so comparing it by size, ordering by it, and MIN / MAX would order strings

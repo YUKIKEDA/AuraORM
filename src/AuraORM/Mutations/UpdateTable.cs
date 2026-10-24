@@ -36,23 +36,7 @@ public sealed class UpdateTable<TDialect, TMode, TColumns>
     public UpdateSet<TDialect, TMode, TColumns> Set(Func<TColumns, Assignment[]> assignments)
     {
         ArgumentNullException.ThrowIfNull(assignments);
-        Assignment[] list = assignments(_columns);
-        ArgumentNullException.ThrowIfNull(list, nameof(assignments));
-        if (list.Length == 0)
-        {
-            throw new ArgumentException("UPDATE needs at least one assignment.", nameof(assignments));
-        }
-
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (Assignment assignment in list)
-        {
-            ArgumentNullException.ThrowIfNull(assignment, nameof(assignments));
-            if (!names.Add(assignment.Column.Name))
-            {
-                throw new ArgumentException("The UPDATE assigns the column " + assignment.Column.Name + " twice.", nameof(assignments));
-            }
-        }
-
-        return new UpdateSet<TDialect, TMode, TColumns>(_session, _target, _columns, ImmutableArray.Create(list));
+        ImmutableArray<Assignment> list = AssignmentList.Check(assignments(_columns), "UPDATE", target: null, nameof(assignments));
+        return new UpdateSet<TDialect, TMode, TColumns>(_session, _target, _columns, list);
     }
 }

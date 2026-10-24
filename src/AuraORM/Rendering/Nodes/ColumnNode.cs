@@ -12,6 +12,12 @@ internal sealed class ColumnNode(TableAlias table, string name) : SqlNode
     public override void Render(SqlRenderContext context)
     {
         context.CheckInScope(Table, Name);
+        if (Table.IsExcluded)
+        {
+            context.Dialect.RenderExcludedColumn(context, Name);
+            return;
+        }
+
         if (!context.UnqualifiedColumns && !context.WriteReturningQualifier(Table))
         {
             context.WriteIdentifier(Table.Reference);

@@ -26,6 +26,34 @@ internal sealed class MySqlRenderer(bool isMariaDb) : DialectRenderer
     // §7: MySQL rejects a subquery on the target with error 1093; MariaDB accepts it (UPDATE since 10.3.2, DELETE since 10.3.1).
     public override bool RejectsTargetInMutationSubquery => !IsMariaDb;
 
+    // §10.2: MariaDB does not accept MySQL's row alias (10.11 and 12.3, error 1064) and reads the row with VALUES(a).
+    public override bool NamesProposedRowExcluded => !IsMariaDb;
+
+    // §10.2: MySQL's row alias has only the columns of the column list; another one is error 1054 (8.4 and 9.7).
+    public override void RenderExcludedColumn(SqlRenderContext context, string column)
+    {
+        if (IsMariaDb)
+        {
+            context.Write("VALUES(");
+            context.WriteIdentifier(column);
+            context.Write(')');
+            return;
+        }
+
+        if (!context.InsertedColumns.Contains(column))
+        {
+            throw new InvalidOperationException(
+                "OnDuplicateKeyUpdate reads excluded."
+                    + column
+                    + ", which the rows do not set. MySQL's row alias has only the columns that the INSERT lists (error 1054); set "
+                    + column
+                    + " in the rows."
+            );
+        }
+
+        base.RenderExcludedColumn(context, column);
+    }
+
     protected override char IdentifierOpen => '`';
 
     protected override char IdentifierClose => '`';
