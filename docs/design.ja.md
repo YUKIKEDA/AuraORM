@@ -148,6 +148,8 @@ flowchart LR
 | `IOnDuplicateKeyDialect` | `ON DUPLICATE KEY UPDATE` による UPSERT | | | ✓ | ✓ | |
 | `ICreateTableIfNotExistsDialect` | `CREATE TABLE IF NOT EXISTS` | ✓ | ✓ | ✓ | ✓ | |
 | `ICreateIndexIfNotExistsDialect` | `CREATE INDEX IF NOT EXISTS` | ✓ | ✓ | | ✓ | |
+| `IDropIndexIfExistsDialect` | `DROP INDEX IF EXISTS` | ✓ | ✓ | | ✓ | ✓ |
+| `ITransactionalDdlDialect` | トランザクションの中の DDL（§13.1） | ✓ | ✓ | | | ✓ |
 
 方言は閉じた集合であり、利用者は追加できない。方言の出力は `internal` であり、型から出力への対応は `typeof` の比較で決まる（リフレクションを使わない）。
 
@@ -179,13 +181,13 @@ public sealed partial record User(
 | `[Column(name)]` | 列 | 列名を指定する |
 | `[PrimaryKey]` | 列 | 主キー。複数の列に付けると複合主キーになり、順序は宣言順 |
 | `[AutoIncrement]` | 列 | データベースが値を振る整数の列。テーブルに一つだけで、単独の主キーでなければならない（複合主キーの一部にはできない。SQLite の `AUTOINCREMENT` は単独の `INTEGER PRIMARY KEY` にしか付かないため） |
-| `[MaxLength(n)]` | 列 | 文字列とバイト列の最大長（DDL の型に使う） |
-| `[Precision(p, s)]` | 列 | `decimal` の精度と位取り（DDL の型に使う）。`decimal` の列には必須（AURA0112） |
-| `[Default(...)]` | 列 | データベースの既定値。`SqlDefault` の値か、定数。定数は、C# の代入と同じく列の型に暗黙に変換できなければならない（`long` の列の `[Default(0)]`、範囲内の定数として `byte` の列の `[Default(1)]` は書ける。`byte` の列の `[Default(300)]` は AURA0113）。INSERT で省略できるようになる。コンストラクターは `object` を取る一つだけである（`SqlDefault` を取る多重定義があると、リテラルの `0` が列挙型に変換され `CurrentTimestamp` になるため） |
+| `[MaxLength(n)]` | 列 | 文字列とバイト列の最大長（DDL の型に使う）。1 以上（AURA0119）。方言の上限は §13.7 |
+| `[Precision(p, s)]` | 列 | `decimal` の精度と位取り（DDL の型に使う）。`decimal` の列には必須（AURA0112）。精度は 1 以上、位取りは 0 以上で精度以下（AURA0119）。方言の上限は §13.7 |
+| `[Default(...)]` | 列 | データベースの既定値。`SqlDefault` の値か、定数。定数は、C# の代入と同じく列の型に暗黙に変換できなければならない（`long` の列の `[Default(0)]`、範囲内の定数として `byte` の列の `[Default(1)]` は書ける。`byte` の列の `[Default(300)]` は AURA0113）。`SqlDefault.CurrentTimestamp` は `DateTime` と `DateTimeOffset` の列だけで、UTC の現在時刻になる（AURA0117、§13.3）。`null` は NULL を許す列だけで、配列と有限でない数は書けない（AURA0113）。INSERT で省略できるようになる。コンストラクターは `object` を取る一つだけである（`SqlDefault` を取る多重定義があると、リテラルの `0` が列挙型に変換され `CurrentTimestamp` になるため） |
 | `[DefaultSql(sql)]` | 列 | 既定値を生 SQL で書く。DDL にそのまま出る。INSERT で省略できるようになる |
-| `[Unique]` | 列 | 単一列の一意制約 |
-| `[Index(name, members)]` | 型（複数可） | インデックス。列はメンバー名を `nameof` で並べ（`Members`）、`Unique` で一意にできる |
-| `[References(typeof(T), nameof(T.Member))]` | 列 | 外部キー。参照先が `[Table]` の型で、その列の型が一致することをジェネレーターが検査する |
+| `[Unique]` | 列 | 単一列の一意制約。CREATE TABLE の表の制約になる（§13.4） |
+| `[Index(name, members)]` | 型（複数可） | インデックス。列はメンバー名を `nameof` で並べ（`Members`）、`Unique` で一意にできる。`CreateIndexes` が作る（§13.4）。名前は同じスキーマのテーブルの間で一意（AURA0118） |
+| `[References(typeof(T), nameof(T.Member))]` | 列 | 外部キー。参照先が `[Table]` の型の、単独の主キーか `[Unique]` の列で、その列の型が一致することをジェネレーターが検査する（§13.5） |
 | `[ValueConverter(typeof(C))]` | 型、アセンブリ（複数可） | 値コンバーター（§3.6）。型に付けるとその型の、アセンブリに付けると `C` の `TModel` のコンバーターになる |
 | `[NotColumn]` | プロパティ | 列にしない |
 
@@ -229,6 +231,7 @@ public sealed partial record User(
 - `Guid` は Microsoft.Data.Sqlite の既定に合わせて SQLite では `TEXT`（`00000000-0000-0000-0000-000000000000` の形）で保存する。
 - `DateTimeOffset` を MySQL / MariaDB の `DATETIME(6)` に保存すると、オフセットは保存されない（`DATETIME` はタイムゾーンを持たない）。
 - 主キー、一意制約、インデックス、外部キーに使う `string` と `byte[]` の列は `[MaxLength]` が必須である（エラー AURA0110）。MySQL と SQL Server では、長さのない型にインデックスを張れないためである。
+- 長さ、精度、キーの大きさの方言ごとの上限は §13.7 にある。超えると DDL の組み立てで `InvalidOperationException` になる。
 - 値をパラメータにするときと、結果から読むときの変換は、ADO.NET プロバイダーに任せる。AuraORM は CLR の値をそのままパラメータの `Value` に入れ、型付きの取得メソッド（`GetInt64` など）か `GetFieldValue<T>` で読む。方言とプロバイダーの組み合わせごとの既知の差は §12.6 に書く。
 - 表にない型はコンバーター（§3.6）で表にある型に変換する。どちらもなければエラー AURA0103 になる。
 
@@ -292,7 +295,7 @@ public sealed class UserIdConverter : IValueConverter<UserId, long>
 - 登録のない型の値をパラメータにするとき、または結果を読むときは、`InvalidOperationException` になる（§14.3）。宣言したアセンブリのコードがまだ一度も動いていない（`default(UserId)` だけを使った）ときに起こりうる。
 - 別のアセンブリが同じ型に別のコンバーターを登録しようとしても、初期化子は例外を投げない。最初の登録を残して衝突を記録し、その型の値をパラメータにするとき、または結果を読むときに `InvalidOperationException` にする（§14.3）。初期化子が投げると、そのアセンブリの最初の使用が `TypeInitializationException` になり、使わない型の衝突でもアプリの起動で落ちるからである（ECMA-335 の補遺の保証で、初期化子が終わるまでモジュールのほかのコードは動かない）。
 - 変換は式の木もリフレクションも使わない（§16.3）。登録は総称の静的クラスの欄で、パラメータを作るときと読むときに、その欄を引く。
-- 変換後の型での DDL（§13）は行 S1 で扱う。
+- DDL（§13.2）の列の型は、変換後の型（`TProvider`）の §3.3 の型である。変換した列の `[Default]` の定数は書けない（AURA0113。§13.3）。
 
 ほかのライブラリでは、Dapper の `AddTypeHandler` と、その NativeAOT 版の Dapper.AOT の `[module: TypeHandler(typeof(T), typeof(H))]` が型ごとである。EF Core、linq2db、jOOQ、Drizzle ORM は、列と比べる値の変換を相手の列から決める（EF Core と linq2db は型ごとの宣言も持つ）。列から決める方式では、生 SQL の値は変換されない（EF Core の資料に「生 SQL の API では使えない」とある）。EF Core と linq2db のコンバーターは式の木で、AuraORM の方針（§16.3）とは合わない（§19）。
 
@@ -304,11 +307,13 @@ public sealed class UserIdConverter : IValueConverter<UserId, long>
 - 列の型が使えない。
 - 列名が重複している。
 - `[AutoIncrement]` が二つ以上ある、整数でない、または主キーでない。
-- `[References]` の参照先が `[Table]` の型でない、メンバーが列でない、型が一致しない。
+- `[References]` の参照先が `[Table]` の型でない、メンバーが列でない、単独の主キーでも `[Unique]` の列でもない、型が一致しない。
 - `[Index]` の列名が列でない。
 - 行の型に、行を作るためのコンストラクター（位置指定のレコードのコンストラクター、またはアクセスできる引数なしのコンストラクター）がない。
 - `decimal` の列に `[Precision]` がない。
-- `[Default]` の定数が列の型に暗黙に変換できない。
+- `[Default]` の定数が列の型に暗黙に変換できない。`SqlDefault.CurrentTimestamp` を `DateTime` / `DateTimeOffset` でない列に付けた。
+- 同じスキーマのテーブルの間で、`[Index]` の名前が重複している。
+- `[MaxLength]` が 1 未満、`[Precision]` の精度が 1 未満か、位取りが 0 未満か精度より大きい。
 
 ## 4. 式
 
@@ -1008,6 +1013,7 @@ await db.InTransactionAsync(async tx => { … });   // 例外がなければコ�
 - `CommitAsync` を呼ばずに破棄すると、ロールバックする。
 - `Transaction` に `BeginTransactionAsync` はない（入れ子のトランザクションはセーブポイントの別行 §18 で扱う）。
 - 分離レベルは `BeginTransactionAsync(IsolationLevel)` で指定できる。
+- `Transaction` の DDL（§13）は、DDL をトランザクションで戻せる方言（`ITransactionalDdlDialect`: SQLite、PostgreSQL、SQL Server）だけで書ける。MySQL と MariaDB の DDL は暗黙にコミットするので、CS0311 になる（§13.1）。
 - 本体の例外の後のロールバックも失敗したときは、本体の例外を先にした `AggregateException` を投げる。
 
 ### 12.6 プロバイダーとの組み合わせ
@@ -1025,23 +1031,56 @@ await db.InTransactionAsync(async tx => { … });   // 例外がなければコ�
 
 ```csharp
 await db.CreateTable(User.Table).ExecuteAsync();
-await db.CreateTable(User.Table).IfNotExists().ExecuteAsync();   // ICreateTableIfNotExistsDialect
+await db.CreateTable(User.Table).IfNotExists().ExecuteAsync();     // ICreateTableIfNotExistsDialect
+await db.CreateIndexes(User.Table).ExecuteAsync();                // [Index] の索引
+await db.CreateIndexes(User.Table).IfNotExists().ExecuteAsync();  // ICreateIndexIfNotExistsDialect
+await db.DropIndexes(User.Table).IfExists().ExecuteAsync();       // IDropIndexIfExistsDialect
 await db.DropTable(User.Table).IfExists().ExecuteAsync();
-await db.CreateIndexes(User.Table).ExecuteAsync();              // [Index] / [Unique] の索引
 ```
 
-`CREATE TABLE` は、列を宣言の順に、§3.3 の型で出す。続いて主キー、一意制約、外部キーを表の制約として出す。
+この節の例は次のテーブルを使う。`User` は §3.1 の型である。
+
+```csharp
+[Table("orders")]
+[Index("ix_orders_user", nameof(UserId), nameof(CreatedAt))]
+[Index("ux_orders_coupon", nameof(Coupon), Unique = true)]
+public sealed partial record Order(
+    [PrimaryKey, AutoIncrement] long Id,
+    [References(typeof(User), nameof(User.Id))] long UserId,
+    [Unique, MaxLength(20)] string Code,
+    [MaxLength(20)] string? Coupon,
+    [Precision(18, 2), Default(0)] decimal Total,
+    [Default(SqlDefault.CurrentTimestamp)] DateTime CreatedAt);
+```
+
+### 13.1 文と実行
+
+- 文は `CreateTable`、`CreateIndexes`、`DropIndexes`、`DropTable` の四つで、`Database<TDialect>`、`Transaction<TDialect>`、`SqlBuilder<TDialect>` から作る。`SqlBuilder` の文は `ToSql()` だけを持つ（§12.3）。
+- `CreateTable` と `DropTable` は、一つのテーブルの一つの文である。`ToSql()` は `SqlStatement` を返す。
+- `CreateIndexes` と `DropIndexes` は、テーブルの `[Index]` を宣言の順に並べ、索引ごとに一つの文にする。`ToSql()` は `IReadOnlyList<SqlStatement>` を返す。`[Index]` がなければ一覧は空で、`ExecuteAsync` は何もしない。`ExecuteAsync` は文を順に一つずつ実行し、例外が起きたらそこで止める。先に実行した文は戻らない。戻したいときは、トランザクションの中で実行する。
+- `ExecuteAsync` は `Task` を返す。DDL の影響行数には意味がないので返さない。
+- DDL の文はパラメータを持たない。既定値の定数は SQL のリテラルとして書く（§13.3）。
+- 一つの呼び出しは一つのテーブルである。外部キーの参照先を先に作り、参照する側を先に消す順序は、利用者が決める。
+- `Transaction<TDialect>` の DDL は、`TDialect` が `ITransactionalDdlDialect`（SQLite、PostgreSQL、SQL Server）のときだけ書ける。MySQL と MariaDB では CS0311 になる。この二つの DDL は暗黙のコミットを起こす（MySQL の「Statements That Cause an Implicit Commit」、MariaDB の「SQL Statements That Cause an Implicit Commit」）。トランザクションの中で 1 行を INSERT し、CREATE TABLE を実行してから ROLLBACK すると、MySQL と MariaDB ではその 1 行も新しいテーブルも残った。SQLite、PostgreSQL、SQL Server では、どちらも残らなかった（最新と最低の版）。ロールバックしても戻らないうえ、それより前の文までコミットされる。`Database` からは、すべての方言で書ける。
+
+### 13.2 CREATE TABLE
+
+`CREATE TABLE` は、列を宣言の順に、§3.3 の型で出す。続いて表の制約を、主キー、一意制約（`[Unique]` の列の宣言の順）、外部キー（`[References]` の列の宣言の順）の順に出す。制約には名前を付けず、名前はデータベースが付ける。
 
 ```sql
+-- SQLite
+CREATE TABLE "orders" ("Id" INTEGER PRIMARY KEY AUTOINCREMENT, "UserId" INTEGER NOT NULL, "Code" TEXT NOT NULL, "Coupon" TEXT, "Total" TEXT NOT NULL DEFAULT '0.0', "CreatedAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')), UNIQUE ("Code"), FOREIGN KEY ("UserId") REFERENCES "users" ("Id"))
 -- PostgreSQL
-CREATE TABLE "users" (
-  "Id" bigint GENERATED BY DEFAULT AS IDENTITY NOT NULL,
-  "Name" varchar(100) NOT NULL,
-  "Age" integer,
-  "CreatedAt" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY ("Id")
-)
+CREATE TABLE "orders" ("Id" bigint GENERATED BY DEFAULT AS IDENTITY NOT NULL, "UserId" bigint NOT NULL, "Code" varchar(20) NOT NULL, "Coupon" varchar(20), "Total" numeric(18,2) NOT NULL DEFAULT 0, "CreatedAt" timestamp NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), PRIMARY KEY ("Id"), UNIQUE ("Code"), FOREIGN KEY ("UserId") REFERENCES "users" ("Id"))
+-- MySQL / MariaDB
+CREATE TABLE `orders` (`Id` BIGINT AUTO_INCREMENT NOT NULL, `UserId` BIGINT NOT NULL, `Code` VARCHAR(20) NOT NULL, `Coupon` VARCHAR(20), `Total` DECIMAL(18,2) NOT NULL DEFAULT 0, `CreatedAt` DATETIME(6) NOT NULL DEFAULT (UTC_TIMESTAMP(6)), PRIMARY KEY (`Id`), UNIQUE (`Code`), KEY (`UserId`), FOREIGN KEY (`UserId`) REFERENCES `users` (`Id`))
+-- SQL Server
+CREATE TABLE [orders] ([Id] bigint IDENTITY(1,1) NOT NULL, [UserId] bigint NOT NULL, [Code] nvarchar(20) NOT NULL, [Coupon] nvarchar(20) NULL, [Total] decimal(18,2) NOT NULL DEFAULT 0, [CreatedAt] datetime2 NOT NULL DEFAULT SYSUTCDATETIME(), PRIMARY KEY ([Id]), UNIQUE ([Code]), FOREIGN KEY ([UserId]) REFERENCES [users] ([Id]))
 ```
+
+- 列の定義は「名前、型、自動採番、NULL 可否、既定値」の順である。NULL を許さない列には `NOT NULL` を付ける。NULL を許す列には何も付けないが、SQL Server だけは `NULL` と書く。SQL Server で何も書かない列の NULL 可否は、セッションの `ANSI_NULL_DFLT_ON` / `ANSI_NULL_DFLT_OFF` とデータベースの `ANSI_NULL_DEFAULT` で変わるためである（CREATE TABLE の資料）。
+- `CreateTable(…).IfNotExists()` は `CREATE TABLE IF NOT EXISTS` を出す。SQL Server にはこの構文がない（CS0311）。
+- 値コンバーターで変換した列（§3.6）の型は、変換後の型（`TProvider`）の §3.3 の型である。`[MaxLength]` と `[Precision]` も変換後の型に当てる。
 
 `[AutoIncrement]` の出し方:
 
@@ -1055,8 +1094,118 @@ CREATE TABLE "users" (
 - SQLite の `AUTOINCREMENT` は、削除された値を再利用しない。ほかの方言の自動採番と同じ振る舞いにそろえるために付ける。
 - PostgreSQL は `GENERATED ALWAYS` ではなく `BY DEFAULT` にする。`ALWAYS` は値を指定した INSERT に `OVERRIDING SYSTEM VALUE` を要求する。
 - SQL Server の IDENTITY 列は更新できない。`[AutoIncrement]` の列を `ReadOnlyColumn<T>` にする理由である。
-- `IfNotExists` は SQL Server にない（`CREATE TABLE IF NOT EXISTS` の構文がない）。`DropTable(…).IfExists()` はすべての方言で書ける。`CreateIndexes(…).IfNotExists()` は SQLite、PostgreSQL、MariaDB だけで書ける。
-- 差分のマイグレーションは §18 の別行にする。
+
+### 13.3 既定値
+
+`[Default(SqlDefault.CurrentTimestamp)]` は、すべての方言で UTC の現在時刻を既定値にする。`DateTime` と `DateTimeOffset` の列（とその NULL を許す形）にだけ付けられ、ほかの型の列ではジェネレーターのエラー AURA0117 になる。`DateOnly` と `TimeOnly` は、MySQL の `DATE DEFAULT CURRENT_TIMESTAMP` がエラー 1067 になり、SQLite では `CURRENT_TIMESTAMP` の文字列の形が Microsoft.Data.Sqlite の `DateOnly` の形（`yyyy-MM-dd`）と合わないので、許さない。これらの列には `[DefaultSql]` で方言の式を書く。
+
+| 方言 | `DateTime` の列 | `DateTimeOffset` の列 |
+| --- | --- | --- |
+| SQLite | `DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))` | `DEFAULT (strftime('%Y-%m-%d %H:%M:%f+00:00', 'now'))` |
+| PostgreSQL | `DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')` | `DEFAULT CURRENT_TIMESTAMP` |
+| MySQL / MariaDB | `DEFAULT (UTC_TIMESTAMP(6))` | `DEFAULT (UTC_TIMESTAMP(6))` |
+| SQL Server | `DEFAULT SYSUTCDATETIME()` | `DEFAULT SYSDATETIMEOFFSET()` |
+
+- SQL の `CURRENT_TIMESTAMP` をそのまま出すと、値のタイムゾーンが方言とセッションで変わる。SQLite の `CURRENT_TIMESTAMP` は UTC である（CREATE TABLE の資料）。PostgreSQL の `CURRENT_TIMESTAMP` は `timestamp with time zone` で、`timestamp` の列にはセッションのタイムゾーンの時刻が入る。MySQL の `CURRENT_TIMESTAMP` もセッションのタイムゾーンの時刻である。セッションのタイムゾーンを `+09:00`（PostgreSQL では `Asia/Tokyo`）にして 1 行を INSERT すると、PostgreSQL と MySQL の `CURRENT_TIMESTAMP` の列は UTC より 9 時間進んだ時刻になり、上の表の式の列は UTC の時刻になった（最新と最低の版）。SQL Server の `CURRENT_TIMESTAMP` は `GETDATE()` と同じで、サーバーのオペレーティングシステムの時刻である（CURRENT_TIMESTAMP の資料）。
+- SQLite の式は、Microsoft.Data.Sqlite が `DateTime` と `DateTimeOffset` を書く形（`yyyy-MM-dd HH:mm:ss.FFFFFFF`、`yyyy-MM-dd HH:mm:ss.FFFFFFFzzz`、Microsoft.Data.Sqlite の型の資料）に合わせ、秒の小数を 3 桁（`%f` は `SS.SSS`、日付と時刻の関数の資料）で書く。
+- PostgreSQL の `timestamp with time zone` の列は時点を持つので、`CURRENT_TIMESTAMP` のままでよい。
+- MySQL は、`DATETIME(6)` の列の `DEFAULT CURRENT_TIMESTAMP` をエラー 1067 にする（`CURRENT_TIMESTAMP(6)` なら通った）。かっこで囲んだ式の既定値は、MySQL は 8.0.13 から、MariaDB は 10.2.1 から書ける（MySQL の「Data Type Default Values」、MariaDB 10.2.1 のリリースノート）。MariaDB は、かっこのない `DEFAULT UTC_TIMESTAMP(6)` も受け付けたが、MySQL と同じ形にする。
+- SQL Server の `SYSDATETIMEOFFSET()` は、サーバーのオフセットを付けた時刻を返す（SYSDATETIMEOFFSET の資料）。値は同じ時点を表す。
+
+`[Default]` の定数は、列の型と方言ごとに次のリテラルで書く。
+
+| 列の型 | リテラル |
+| --- | --- |
+| `bool` | SQLite と SQL Server は `1` / `0`、PostgreSQL、MySQL、MariaDB は `TRUE` / `FALSE` |
+| 整数、列挙型 | 10 進の整数（列挙型は基になる整数の値）。負の値は `-1` |
+| `float`、`double` | `R` 書式の、カルチャに依存しない 10 進の表記（`1.5`）。有限でない値（`double.NaN` など）は AURA0113 |
+| `decimal` | 10 進の表記（`0`）。SQLite だけは、Microsoft.Data.Sqlite が `decimal` を書く文字列（`0.0###########################` の書式で、`0` は `'0.0'`）にする。パラメータで書いた値と、文字列として等しくするためである |
+| `string` | 単一引用符で囲み、`'` を `''` にする。SQL Server は `N'…'` |
+| `null` | `NULL`。NULL を許す列にだけ書ける（許さない列では AURA0113） |
+
+- MySQL と MariaDB で、長さのない文字列とバイト列の列（`LONGTEXT`、`LONGBLOB`）の定数は、かっこで囲む（`DEFAULT ('x')`）。MySQL は BLOB と TEXT の既定値を、式の形でしか受け付けない（「Data Type Default Values」。`DEFAULT 'x'` はエラー 1101）。MariaDB はかっこなしでも受け付けたが、同じ形にする。Pomelo.EntityFrameworkCore.MySql も、式の既定値を書けるサーバーでは、この形にする（`MySqlMigrationsSqlGenerator.cs`、§19）。
+- MySQL と MariaDB で、バックスラッシュを含む文字列の定数は、組み立て時に `InvalidOperationException` になる（§14.3）。文字列のリテラルの中のバックスラッシュの意味は、`sql_mode` の `NO_BACKSLASH_ESCAPES` で変わるためである（MySQL の「String Literals」）。
+- `byte[]` の定数（`[Default(new byte[] { 1 })]`）は AURA0113 にする。バイト列の既定値は `[DefaultSql]` で書く。
+- 値コンバーターで変換した列の `[Default]` の定数は、列の型（モデルの型）に変換できないので AURA0113 になる。変換した列の既定値は `[DefaultSql]` で書く。
+- `[DefaultSql(sql)]` は `DEFAULT` の後にそのまま出す。かっこが要る方言では、利用者が書く。
+
+### 13.4 索引と一意制約
+
+`[Unique]` は CREATE TABLE の表の制約（`UNIQUE ("Code")`）になる。`[Index]` は `CreateIndexes` の `CREATE INDEX` に、`Unique = true` の `[Index]` は `CREATE UNIQUE INDEX` になる。
+
+```sql
+-- SQLite / PostgreSQL（IfNotExists は CREATE INDEX IF NOT EXISTS）
+CREATE INDEX "ix_orders_user" ON "orders" ("UserId", "CreatedAt")
+CREATE UNIQUE INDEX "ux_orders_coupon" ON "orders" ("Coupon")
+-- MySQL / MariaDB（IfNotExists は MariaDB だけ）
+CREATE INDEX `ix_orders_user` ON `orders` (`UserId`, `CreatedAt`)
+CREATE UNIQUE INDEX `ux_orders_coupon` ON `orders` (`Coupon`)
+-- SQL Server
+CREATE INDEX [ix_orders_user] ON [orders] ([UserId], [CreatedAt])
+CREATE UNIQUE INDEX [ux_orders_coupon] ON [orders] ([Coupon]) WHERE [Coupon] IS NOT NULL
+
+-- DropIndexes
+DROP INDEX "ix_orders_user"                    -- SQLite / PostgreSQL（IfExists は DROP INDEX IF EXISTS）
+DROP INDEX `ix_orders_user` ON `orders`        -- MySQL / MariaDB（IfExists は MariaDB だけ）
+DROP INDEX [ix_orders_user] ON [orders]        -- SQL Server（IfExists は DROP INDEX IF EXISTS … ON …）
+```
+
+- `CreateIndexes(…).IfNotExists()` は SQLite、PostgreSQL、MariaDB だけで書ける（`ICreateIndexIfNotExistsDialect`）。`DropIndexes(…).IfExists()` は SQLite、PostgreSQL、MariaDB、SQL Server で書ける（`IDropIndexIfExistsDialect`。SQL Server は 2016 から）。MySQL の CREATE INDEX と DROP INDEX にはこの構文がない（MySQL の CREATE INDEX と DROP INDEX の資料。どちらもエラー 1064 になった）。ほかの方言では CS0311 になる。
+- `DropIndexes` は `[Index]` の索引だけを消す。`[Unique]` の一意制約はテーブルの一部であり、テーブルと一緒に消える。
+- 一意制約と一意の索引の NULL: SQLite、PostgreSQL、MySQL、MariaDB は、NULL を何行でも許す。SQL Server の一意制約は、列ごとに NULL を一つしか許さない（一意制約の資料。2 行目の NULL はエラー 2627 になった）。そこで SQL Server では、NULL を許す列を含む `Unique = true` の `[Index]` に、その列ごとの `IS NOT NULL` を `AND` でつないだ `WHERE` を付ける（`WHERE [a] IS NOT NULL AND [b] IS NOT NULL`）。どれかの列が NULL の行は一意の検査から外れるので、ほかの方言と同じになる。NULL の 2 行は通り、同じ値の 2 行（`(a, 1)` の二度目）はエラー 2601 になった（最新と最低の版）。EF Core の SQL Server のプロバイダーも、NULL を許す列の一意の索引に同じ `WHERE` を付ける（`SqlServerIndexConvention.cs`、§19）。
+- フィルター付きの索引は、セッションの `QUOTED_IDENTIFIER` などが ON でないと作れない（CREATE INDEX の資料）。Microsoft.Data.SqlClient の接続は、それらを ON にする。
+- SQL Server では、NULL を許す列の `[Unique]` は、CREATE TABLE を組み立てるときに `InvalidOperationException` になる（§14.3）。表の制約にはフィルターを付けられず（「Create filtered indexes」の資料）、フィルター付きの索引は外部キーの参照先にならない（エラー 1776 になった）。NULL を許す一意の列は `[Index(…, Unique = true)]` で書く。
+- 索引の名前は利用者が決める。PostgreSQL では、索引の名前はスキーマの中のすべてのテーブルと索引の間で一意でなければならない（PostgreSQL の CREATE INDEX の資料）。SQLite も、別のテーブルの同じ名前の索引をエラーにした。MySQL、MariaDB、SQL Server では、テーブルの中で一意であればよい。そこで、同じスキーマ（`[Table]` の `Schema`）のテーブルの間で、または一つのテーブルの中で、同じ名前の `[Index]` があれば、ジェネレーターのエラー AURA0118 にする。ジェネレーターに見えるのは同じコンパイルの中のテーブルだけである。
+
+### 13.5 外部キー
+
+- `[References]` は、表の制約 `FOREIGN KEY ("UserId") REFERENCES "users" ("Id")` になる。`ON DELETE` と `ON UPDATE` は書かない（属性にない）。
+- MySQL と MariaDB では、外部キーの列が主キーの先頭の列でも `[Unique]` の列でもなければ、外部キーの前にその列の索引 ``KEY (`UserId`)`` を書く。この二つは外部キーの列の先頭に索引を要求し、なければ CREATE TABLE が暗黙に作るが、後から同じ列で始まる索引を作るとその暗黙の索引を消し、新しい索引を外部キーに使う。すると `DropIndexes` が、その列で始まる最後の `[Index]` をエラー 1553（「needed in a foreign key constraint」）で消せなくなる。この節の `Order` の `ix_orders_user` が、まさにそれで失敗した。主キーがその列で始まるとき、その列が `[Unique]` のとき、明示した `KEY` があるときは、同じ手順で消せた（最新と最低の版）。
+- 参照先は、単独の主キーの列か、`[Unique]` の列でなければならない。それ以外はジェネレーターのエラー AURA0108 になる。主キーでも一意でもない列と、複合主キーの一つの列を参照すると、PostgreSQL（「there is no unique constraint matching given keys」）、MySQL（エラー 6125）、SQL Server（エラー 1776）は CREATE TABLE で、SQLite は外部キーが有効なときの INSERT で（「foreign key mismatch」、SQLite の外部キーの資料 §3）失敗した。MariaDB は、主キーでも一意でもない列ではエラー 150 にしたが、複合主キーの先頭の列は受け付けた。どの方言でも通る形に限る。
+- SQLite の外部キーの検査は、接続ごとに `PRAGMA foreign_keys` で有効にするまで行われない（SQLite の外部キーの資料 §2）。Microsoft.Data.Sqlite はこの PRAGMA を送らないが（接続文字列の `Foreign Keys` の既定）、同梱の e_sqlite3 は `SQLITE_DEFAULT_FOREIGN_KEYS=1` でビルドされているので、既定で有効である（Microsoft.Data.Sqlite の接続文字列の資料）。AuraORM は PRAGMA を送らない。
+- `DropTable` に `CASCADE` はない。SQL Server の DROP TABLE にはこの指定がないためである。ほかのテーブルから参照されているテーブルを消すと、PostgreSQL、MySQL（エラー 3730）、MariaDB（エラー 1451）、SQL Server（エラー 3726）はエラーにする。参照する側を先に消す。
+
+### 13.6 スキーマ
+
+- `[Table]` の `Schema` があれば、テーブルの名前をスキーマで修飾する（`"s"."orders"`）。スキーマそのものは作らない。
+- SQLite の索引は、索引の名前を修飾し、テーブルの名前は修飾しない（`CREATE INDEX "main"."ix" ON "orders" (…)`、`DROP INDEX "main"."ix"`。SQLite の CREATE INDEX の構文）。PostgreSQL の CREATE INDEX は、索引の名前を修飾できず、索引はテーブルのスキーマに作られる（PostgreSQL の CREATE INDEX の資料）。PostgreSQL の DROP INDEX は索引の名前を修飾する（`DROP INDEX "s"."ix"`）。MySQL、MariaDB、SQL Server は `ON` の後のテーブルの名前を修飾する。
+- 外部キーの参照先に `Schema` があれば、参照先の名前を修飾する。参照先に `Schema` がなく、参照する側に `Schema` があるとき、MySQL と MariaDB では CREATE TABLE の組み立てで `InvalidOperationException` になる（§14.3）。この二つは修飾のない参照先を、作るテーブルのデータベースの中で探すためである（`aura_s` に作るテーブルから修飾のない `parent` を参照すると、MySQL はエラー 1824、MariaDB はエラー 150 になった。修飾すれば通った）。修飾のない参照先が指すのは接続の既定のデータベースで、AuraORM は組み立ての時にそれを知らない。PostgreSQL と SQL Server は、修飾のない参照先を接続の既定のスキーマで探し、通った。
+
+### 13.7 方言の上限
+
+型の長さ、精度、キーの大きさが方言の上限を超えると、DDL を組み立てるときに `InvalidOperationException` になる（§14.3）。上限のうち方言に依存しないもの（長さと精度が 1 以上、位取りが 0 以上で精度以下）は、ジェネレーターのエラー AURA0119 にする。PostgreSQL は位取りが精度より大きい `numeric(10,11)` と負の位取りも受け付けたが、ほかの方言はエラーにしたので、どの方言でも通る形に限る。
+
+| 方言 | 文字列の長さ | バイト列の長さ | 精度 | 位取り |
+| --- | --- | --- | --- | --- |
+| SQLite | 上限なし | 上限なし | 上限なし | 上限なし |
+| PostgreSQL | 10485760 | （`bytea` は長さを持たない） | 1000 | 精度まで |
+| MySQL | 16383 | （行の大きさで決まる。§14.2） | 65 | 30 |
+| MariaDB | 16383 | 65532 | 65 | 38 |
+| SQL Server | 4000 | 8000 | 38 | 精度まで |
+
+- 各値は、上限ちょうどの型が通り、一つ超えた型がエラーになることを確かめた（PostgreSQL「length for type varchar cannot exceed 10485760」「NUMERIC precision 1001 must be between 1 and 1000」、MySQL と MariaDB のエラー 1074、1425、1426、SQL Server のメッセージ 2717、131、2750。最新と最低の版）。MySQL の `VARCHAR` の 16383 は utf8mb4 の 1 文字 4 バイトでの値である。SQL Server の `nvarchar` の 4000 は資料による（nchar と nvarchar の資料）。
+
+キーの大きさ（主キー、一意制約、索引の列の大きさの和）の上限:
+
+| 方言 | 上限 | 列の大きさ |
+| --- | --- | --- |
+| MySQL / MariaDB | 3072 バイト（主キー、一意制約、索引） | `VARCHAR(n)` は 4n、`VARBINARY(n)` は n、`CHAR(36)` は 144、`BOOLEAN` と `TINYINT UNSIGNED` は 1、`SMALLINT` 2、`INT` 4、`BIGINT` 8、`FLOAT` 4、`DOUBLE` 8、`DATE` 3、`TIME(6)` 6、`DATETIME(6)` 8、`DECIMAL(p,s)` は整数部（p − s 桁）と小数部（s 桁）のそれぞれで、9 桁ごとに 4 バイト、残りの 0〜8 桁に 0、1、1、2、2、3、3、4、4 バイト |
+| SQL Server | 主キー 900 バイト、一意制約と索引 1700 バイト | `nvarchar(n)` は 2n、`varbinary(n)` は n、`bit` と `tinyint` は 1、`smallint` 2、`int` 4、`bigint` 8、`real` 4、`float` 8、`decimal(p,s)` は p が 1〜9 で 5、10〜19 で 9、20〜28 で 13、29〜38 で 17、`uniqueidentifier` 16、`date` 3、`time` 5、`datetime2` 8、`datetimeoffset` 10 |
+
+- MySQL と MariaDB の 3072 バイトは InnoDB の DYNAMIC の行形式での値である（MySQL の「InnoDB Limits」）。列の大きさは MySQL の「Data Type Storage Requirements」による。`VARCHAR(766)` と `BIGINT` の索引は通り、`VARCHAR(767)` と `BIGINT` はエラー 1071 になった。`DATETIME(6)`、`CHAR(36)`、`VARBINARY` でも、上の大きさの和の 3072 と 3073 の境で同じだった。MariaDB は、長すぎる単独の列の一意制約を HASH の索引にし（MariaDB の CREATE TABLE の資料）、長すぎる単独の列の索引を先頭の 768 文字の索引にしたが、HASH の一意制約は外部キーの参照先にならず（エラー 150）、複数の列の索引と主キーはエラー 1071 にした。MySQL と同じ上限で検査する。
+- SQL Server の上限は「Maximum capacity specifications」の値である。主キーは既定でクラスター化索引に、一意制約は非クラスター化索引になる（CREATE TABLE の資料）。列の大きさは各データ型の資料による。SQL Server は上限を超える型の CREATE TABLE と CREATE INDEX を警告だけで通し、長い値の INSERT をメッセージ 1946 で失敗させる（`nvarchar(447)` と `bigint` の主キー、`nvarchar(843)` と `uniqueidentifier` の索引、`varbinary(1701)` の索引。一つ短い型は同じ INSERT が通った）。データを入れるまで誤りが分からないので、組み立て時に止める。
+- PostgreSQL の B-tree の索引の項目の上限（ページの約 3 分の 1、PostgreSQL の B-tree の資料）は、宣言ではなく値の大きさで決まるので検査しない（§14.2）。3216 バイトの値を `text` の索引に入れると、「index row size 3216 exceeds btree version 4 maximum 2704」で失敗した。
+
+### 13.8 DROP TABLE
+
+```sql
+DROP TABLE "orders"             -- SQLite / PostgreSQL（IfExists は DROP TABLE IF EXISTS）
+DROP TABLE `orders`             -- MySQL / MariaDB
+DROP TABLE [orders]             -- SQL Server
+```
+
+- `DropTable(…).IfExists()` は、すべての方言で書ける（SQL Server は 2016 から）。
+- 差分のマイグレーションは §18 の MG1 にする。
 
 ## 14. 型安全性の保証
 
@@ -1104,6 +1253,10 @@ CREATE TABLE "users" (
 - `Scalar` / `GroupScalar` のサブクエリが 2 行以上を返すこと。SQLite は黙って 1 行目を返し、ほかの方言はエラーになる（§5.11）。行の数はデータで決まるので、型でも組み立て時にも止められない。
 - UPSERT の一つの文の複数の行が同じ一意の値で衝突すること。PostgreSQL はエラーにし、SQLite、MySQL、MariaDB は行ごとに順に適用する（§10.3）。どの値が重なるかはデータで決まる。
 - UPSERT の衝突の対象に合う一意の制約がデータベースにあること（§10.3）。
+- PostgreSQL の B-tree の索引の項目の大きさ（ページの約 3 分の 1）。上限は値の大きさで決まり、宣言では決まらないので、長い値の INSERT が失敗する（§13.7）。
+- MySQL と MariaDB の行の大きさの上限（BLOB と TEXT を除いて 65535 バイト、MySQL の「The CHAR and VARCHAR Types」）。列の組み合わせで決まり、超えると CREATE TABLE がエラー 1118 で失敗する。MySQL の `VARBINARY(n)` の長さもこの上限で決まる（§13.7）。
+- SQLite で外部キーが検査されるかどうか。接続の `PRAGMA foreign_keys` と、SQLite のビルドの設定で決まる（§13.5）。
+- SQLite の `CurrentTimestamp` の既定値の文字列（秒の小数が 3 桁）と、Microsoft.Data.Sqlite がパラメータで書く文字列（小数の末尾の 0 を省く）は、同じ時刻でも文字列として等しくないことがある（§13.3）。等しいかの比較と並べ替えは文字列で行われる。
 - 参照型（`string`、`byte[]`、行全体）の NULL 可否の誤り（外部結合の NULL 化した側を NULL を許さない型で読む、など）。これは C# の null 許容の警告（CS8600、CS8619 など）が知らせるもので、利用者のプロジェクトで null 許容参照型が有効で（`<Nullable>enable</Nullable>`）、その警告をエラーにしているときだけコンパイルエラーになる。`#nullable disable` の文脈や、警告を抑止した文脈では何も出ない。値型の誤りは常にコンパイルエラーである。
 
 ### 14.3 実行前の検査
@@ -1135,6 +1288,10 @@ CREATE TABLE "users" (
 | MySQL で、INSERT に含めていない列を `excluded` で読んだ（§10.2。エラー 1054） | `InvalidOperationException` |
 | `excluded` の列を読むサブクエリの `FROM` に、`excluded` を修飾する名前のテーブルがある（§10.2） | `InvalidOperationException` |
 | SQLite で `decimal` の大小の比較、並べ替え、`Min` / `Max` / `Sum` / `Avg` を使った（§3.3） | `InvalidOperationException` |
+| SQL Server で、NULL を許す列に `[Unique]` を付けたテーブルの CREATE TABLE（§13.4） | `InvalidOperationException` |
+| 型の長さ、精度、位取り、キーの大きさが、方言の上限を超えた DDL（§13.7） | `InvalidOperationException` |
+| MySQL、MariaDB で、スキーマのあるテーブルから、スキーマのないテーブルを参照する外部キー（§13.6） | `InvalidOperationException` |
+| MySQL、MariaDB で、バックスラッシュを含む文字列の `[Default]` の定数（§13.3） | `InvalidOperationException` |
 | 生のクエリで、結果の型のメンバーに対応する列がない、または二つ以上ある（§11.3） | `InvalidOperationException` |
 | `Limit` / `Offset` に負の値を渡した | `ArgumentOutOfRangeException` |
 | SQL Server で `Limit(0)` を書いた（§5.9。`FETCH NEXT 0 ROWS` はメッセージ 10744 で失敗する） | `ArgumentOutOfRangeException` |
@@ -1168,15 +1325,18 @@ CREATE TABLE "users" (
 | AURA0105 | ジェネレーター | コンバーターが `IValueConverter<TModel, TProvider>` でない、付けた型が `TModel` でない、`TProvider` が §3.3 の NULL を許さない型（列挙型を除く）でない、`TModel` が §3.3 の型である、一つのコンバーターが `IValueConverter<,>` を二つ以上実装している、またはコンバーターかモデルの型が、生成する登録のコードから見えない（§3.6） |
 | AURA0106 | ジェネレーター | 列名が重複している |
 | AURA0107 | ジェネレーター | `[AutoIncrement]` が二つ以上、整数でない、または単独の主キーでない |
-| AURA0108 | ジェネレーター | `[References]` の参照先が不正、または型が一致しない |
+| AURA0108 | ジェネレーター | `[References]` の参照先が不正（`[Table]` の型の列でない、単独の主キーでも `[Unique]` の列でもない）、または型が一致しない（§13.5） |
 | AURA0109 | ジェネレーター | `[Index]` の列名が列でない |
 | AURA0110 | ジェネレーター | 索引や制約に使う `string` / `byte[]` の列に `[MaxLength]` がない |
 | AURA0111 | ジェネレーター | 行の型に、位置指定のレコードのコンストラクターも、アクセスできる引数なしのコンストラクターもない |
 | AURA0112 | ジェネレーター | `decimal` の列に `[Precision]` がない |
-| AURA0113 | ジェネレーター | `[Default]` の定数が列の型に暗黙に変換できない |
+| AURA0113 | ジェネレーター | `[Default]` の定数が列の型に暗黙に変換できない、NULL を許さない列の `null`、配列、有限でない数（§13.3） |
 | AURA0114 | ジェネレーター | 生成する `{型名}NamedQueries` のクラスと同じ名前の型が、同じ名前空間にある（§3.5） |
 | AURA0115 | ジェネレーター | 一つの型に、見えるコンバーターが二つ以上ある（§3.6） |
 | AURA0116 | ジェネレーター | 生成する登録のクラス `AuraORM.Generated.__AuraValueConverters` と同じ完全名の型がある（§3.6） |
+| AURA0117 | ジェネレーター | `SqlDefault.CurrentTimestamp` を `DateTime` / `DateTimeOffset` でない列に付けた（§13.3） |
+| AURA0118 | ジェネレーター | 同じスキーマのテーブルの間で、または一つのテーブルの中で、`[Index]` の名前が重複している（§13.4） |
+| AURA0119 | ジェネレーター | `[MaxLength]` が 1 未満、`[Precision]` の精度が 1 未満、位取りが 0 未満か精度より大きい（§13.7） |
 | AURA0201 | アナライザー | 比較の値に `null` リテラルを書いた |
 | AURA0202 | アナライザー | 比較の値の型が nullable である |
 | AURA0203 | アナライザー | `NotIn` のサブクエリの結果の型が nullable である |
@@ -1244,14 +1404,14 @@ v0.1 に入れるものと、その順序は [roadmap.md](./roadmap.md) にあ�
 
 ## 19. 資料
 
-本書の各データベースについての主張は、2026-10-24 までに次の資料で確かめた。
+本書の各データベースについての主張は、2026-10-25 までに次の資料で確かめた。
 
-- SQLite: [RETURNING](https://www.sqlite.org/lang_returning.html)、[SELECT（LIMIT / OFFSET、複合 SELECT）](https://www.sqlite.org/lang_select.html)、[3.39.0 のリリースノート（RIGHT / FULL JOIN、IS DISTINCT FROM）](https://www.sqlite.org/releaselog/3_39_0.html)、[式（LIKE と ESCAPE）](https://www.sqlite.org/lang_expr.html)、[日付と時刻の関数（CURRENT_TIMESTAMP は UTC）](https://www.sqlite.org/lang_datefunc.html)、[UPSERT](https://www.sqlite.org/lang_upsert.html)、[上限](https://www.sqlite.org/limits.html)、[データ型](https://www.sqlite.org/datatype3.html)、[CREATE TABLE](https://www.sqlite.org/lang_createtable.html)、[AUTOINCREMENT](https://www.sqlite.org/autoinc.html)、[CREATE INDEX](https://www.sqlite.org/lang_createindex.html)、[WITH](https://www.sqlite.org/lang_with.html)、[INSERT（DEFAULT VALUES は一行）](https://www.sqlite.org/lang_insert.html)
-- PostgreSQL: [SELECT](https://www.postgresql.org/docs/current/sql-select.html)、[INSERT](https://www.postgresql.org/docs/current/sql-insert.html)、[比較関数](https://www.postgresql.org/docs/current/functions-comparison.html)、[集計関数（min / max の型）](https://www.postgresql.org/docs/current/functions-aggregate.html)、[日付と時刻の関数（CURRENT_TIMESTAMP）](https://www.postgresql.org/docs/current/functions-datetime.html)、[パターン一致（LIKE と ESCAPE）](https://www.postgresql.org/docs/current/functions-matching.html)、[字句の構造](https://www.postgresql.org/docs/current/sql-syntax-lexical.html)、[CREATE TABLE](https://www.postgresql.org/docs/current/sql-createtable.html)、[プロトコルのメッセージ形式](https://www.postgresql.org/docs/current/protocol-message-formats.html)、[バージョンのサポート方針](https://www.postgresql.org/support/versioning/)、[RETURNING](https://www.postgresql.org/docs/15/dml-returning.html)、[WITH の中のデータを変える文（同じスナップショット）](https://www.postgresql.org/docs/15/queries-with.html)、[INSERT（ON CONFLICT、excluded、cardinality violation、行の数）](https://www.postgresql.org/docs/15/sql-insert.html)
-- MySQL: [SELECT](https://dev.mysql.com/doc/refman/8.0/en/select.html)、[JOIN](https://dev.mysql.com/doc/refman/8.0/en/join.html)、[集合演算](https://dev.mysql.com/doc/refman/8.0/en/set-operations.html)、[INSERT … ON DUPLICATE KEY UPDATE](https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html)、[比較演算子](https://dev.mysql.com/doc/refman/8.0/en/comparison-operators.html)、[識別子](https://dev.mysql.com/doc/refman/8.0/en/identifiers.html)、[文字列関数](https://dev.mysql.com/doc/refman/8.0/en/string-functions.html)、[日付と時刻の関数（NOW）](https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html)、[DATETIME の型](https://dev.mysql.com/doc/refman/8.0/en/datetime.html)、[文字列の比較（LIKE と ESCAPE）](https://dev.mysql.com/doc/refman/8.0/en/string-comparison-functions.html)、[CREATE INDEX](https://dev.mysql.com/doc/refman/8.0/en/create-index.html)、[プレースホルダーの上限（バグ 101630）](https://bugs.mysql.com/bug.php?id=101630)、[GROUP BY の扱い（HAVING から参照できる名前）](https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html)、[HAVING の GROUP BY の式（バグ 24083）](https://bugs.mysql.com/bug.php?id=24083)、[同（バグ 78395）](https://bugs.mysql.com/bug.php?id=78395)、[集計関数（SUM の結果の型）](https://dev.mysql.com/doc/refman/8.4/en/aggregate-functions.html)、[UPDATE（左から順の代入、1093、派生テーブルの併合）](https://dev.mysql.com/doc/refman/8.4/en/update.html)、[DELETE](https://dev.mysql.com/doc/refman/8.4/en/delete.html)、[サブクエリの制限（実体化した派生テーブルの例外）](https://dev.mysql.com/doc/refman/8.4/en/subquery-restrictions.html)、[派生テーブルの最適化（併合を妨げる構文）](https://dev.mysql.com/doc/refman/8.4/en/derived-table-optimization.html)、[INSERT … ON DUPLICATE KEY UPDATE（行の別名、VALUES() の非推奨、行の数、8.4）](https://dev.mysql.com/doc/refman/8.4/en/insert-on-duplicate.html)、[同（8.0.19 と 8.0.20 の版）](https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html)。8.0 のサポート終了は [Percona の記事](https://www.percona.com/blog/mysql-8-0-end-of-life-date/) による（二次資料）
-- MariaDB: [UPDATE（RETURNING は 13.0 から）](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/changing-deleting-data/update)、[10.5.0（INSERT … RETURNING）](https://mariadb.com/docs/release-notes/community-server/old-releases/10.5/10.5.0)、[ON DUPLICATE KEY UPDATE](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/inserting-loading-data/insert-on-duplicate-key-update)、[CREATE INDEX](https://mariadb.com/docs/server/reference/sql-statements/data-definition/create/create-index)、[保守の方針](https://mariadb.org/about/#maintenance-policy)、[sql_mode（SIMULTANEOUS_ASSIGNMENT）](https://mariadb.com/docs/server/server-management/variables-and-modes/sql_mode)、[10.3.5（SIMULTANEOUS_ASSIGNMENT）](https://mariadb.com/docs/release-notes/community-server/old-releases/release-notes-mariadb-10-3-series/mariadb-1035-release-notes)、[10.3.2（同じテーブルを読む UPDATE）](https://mariadb.com/docs/release-notes/community-server/old-releases/release-notes-mariadb-10-3-series/mariadb-1032-release-notes)、[10.3.1（同じテーブルを読む DELETE）](https://mariadb.com/docs/release-notes/community-server/old-releases/release-notes-mariadb-10-3-series/mariadb-1031-release-notes)、[VALUES() / VALUE()（改名と、旧名が通る所）](https://mariadb.com/docs/server/reference/sql-functions/secondary-functions/miscellaneous-functions/values-value)、[INSERT … RETURNING](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/inserting-loading-data/insertreturning)
-- SQL Server: [OUTPUT 句](https://learn.microsoft.com/en-us/sql/t-sql/queries/output-clause-transact-sql)、[UPDATE](https://learn.microsoft.com/en-us/sql/t-sql/queries/update-transact-sql)、[ORDER BY（OFFSET / FETCH）](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-order-by-clause-transact-sql)、[IS DISTINCT FROM](https://learn.microsoft.com/en-us/sql/t-sql/queries/is-distinct-from-transact-sql)、[識別子](https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers)、[CONCAT](https://learn.microsoft.com/en-us/sql/t-sql/functions/concat-transact-sql)、[CONCAT_NULL_YIELDS_NULL](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-concat-null-yields-null-transact-sql)、[比較演算子（真偽値）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/comparison-operators-transact-sql)、[検索条件](https://learn.microsoft.com/en-us/sql/t-sql/queries/search-condition-transact-sql)、[最大容量（パラメータ 2100）](https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server)、[CREATE TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-table-transact-sql)、[DROP TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/drop-table-transact-sql)、[CREATE INDEX](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-index-transact-sql)、[集合演算子](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/set-operators-except-and-intersect-transact-sql)、[MIN](https://learn.microsoft.com/en-us/sql/t-sql/functions/min-transact-sql)、[SUM（real は float を返す）](https://learn.microsoft.com/en-us/sql/t-sql/functions/sum-transact-sql)、[LEN（max の型で bigint）](https://learn.microsoft.com/en-us/sql/t-sql/functions/len-transact-sql)、[テーブル値コンストラクター（1000 行）](https://learn.microsoft.com/en-us/sql/t-sql/queries/table-value-constructor-transact-sql)、[CURRENT_TIMESTAMP](https://learn.microsoft.com/en-us/sql/t-sql/functions/current-timestamp-transact-sql)、[LIKE（ESCAPE）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/like-transact-sql)、[WITH](https://learn.microsoft.com/en-us/sql/t-sql/queries/with-common-table-expression-transact-sql)
-- ほかのライブラリ: [Drizzle ORM の `and()`（`undefined` を飛ばし、一つもなければ `undefined`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/sql/expressions/conditions.ts)、[同・`where` が `undefined` なら WHERE を出さない（`pg-core/dialect.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/dialect.ts)、[同・`TBuilderMode`（`pg-core/query-builders/select.ts`、`select.types.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/select.types.ts)、[同・standalone query builder](https://orm.drizzle.team/docs/goodies)、[Kysely の DummyDriver](https://kysely.dev/docs/recipes/splitting-query-building-and-execution)、[EF Core の SQLite の制限（decimal の比較と並べ替え）](https://learn.microsoft.com/en-us/ef/core/providers/sqlite/limitations)、[EF Core の `QueryableAggregateMethodTranslator`（`float` の `SUM` / `AVG` を `real` に戻す、commit 4dbb574）](https://github.com/dotnet/efcore/blob/4dbb574be1801b9d350649616b4e732e633f5624/src/EFCore.Relational/Query/Internal/QueryableAggregateMethodTranslator.cs)、[jOOQ の `Field.in(Select<? extends Record1<T>>)`（commit 0b0bcfe）](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/Field.java#L905-L914)、[同・MySQL の IN と LIMIT を派生テーブルで包む `Eq`](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/impl/Eq.java#L173-L177)、[同・入れ子の CTE を外に移す issue 3175](https://github.com/jOOQ/jOOQ/issues/3175)、[同・集合演算の ORDER BY](https://www.jooq.org/doc/latest/manual/sql-building/sql-statements/select-statement/order-by-clause/)、[Kysely の選択の中のサブクエリを NULL を許す型にする `select-parser.ts`（commit b506b63）](https://github.com/kysely-org/kysely/blob/b506b6390a06f47410d359bf0f640a13251b28df/src/parser/select-parser.ts#L104-L119)、[同・入れ子の WITH をそのまま出す `default-query-compiler.ts`](https://github.com/kysely-org/kysely/blob/b506b6390a06f47410d359bf0f640a13251b28df/src/query-compiler/default-query-compiler.ts#L156-L177)、[Drizzle ORM の別名のないサブクエリの列を拒む `select.types.ts`](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/query-builders/select.types.ts#L116-L131)、[同・集合演算の被演算子の形を求める `ValidateShape`（`pg-core/query-builders/select.types.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/select.types.ts#L366-L387)、[同・集合演算の後の ORDER BY と LIMIT（`pg-core/dialect.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/dialect.ts#L468-L509)、[EF Core の NULL を含みうる NOT IN の書き換え（`SqlNullabilityProcessor`、commit c0f183b）](https://github.com/dotnet/efcore/blob/c0f183ba1b7dc5ff392c596350a701f6ad206052/src/EFCore.Relational/Query/SqlNullabilityProcessor.cs#L754-L913)、[同・LIMIT のないサブクエリの ORDER BY を消す](https://github.com/dotnet/efcore/blob/c0f183ba1b7dc5ff392c596350a701f6ad206052/src/EFCore.Relational/Query/RelationalQueryableMethodTranslatingExpressionVisitor.cs#L660-L669)、[linq2db の CTE を文の先頭に集める `BasicSqlOptimizer`（commit a987817）](https://github.com/linq2db/linq2db/blob/a987817007fb97817206de66ca24df20e851911f/Source/LinqToDB/Internal/SqlProvider/BasicSqlOptimizer.cs#L733-L763)、[同・MySQL の IN と LIMIT の包みを残す `SelectQueryOptimizerVisitor`](https://github.com/linq2db/linq2db/blob/a987817007fb97817206de66ca24df20e851911f/Source/LinqToDB/Internal/SqlQuery/Visitors/SelectQueryOptimizerVisitor.cs#L2554-L2567)、[Pomelo.EntityFrameworkCore.MySql の `MySqlHavingExpressionVisitor`（HAVING の式をサブクエリと別名に移す、commit 14c2cd5）](https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql/blob/14c2cd558e37c71e7a2fca75e339ef902effdf60/src/EFCore.MySql/Query/ExpressionVisitors/Internal/MySqlHavingExpressionVisitor.cs)、[Dapper の `SqlMapper.cs`（`QueryImpl` の `finally` で `cmd?.Cancel()`、commit eb47546）](https://github.com/DapperLib/Dapper/blob/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/Dapper/SqlMapper.cs)、[jOOQ の MySQL で DML のサブクエリを派生テーブルで包む `SelectQueryImpl`（commit 0b0bcfe）](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/impl/SelectQueryImpl.java#L1528-L1552)、[linq2db の MySQL の UPDATE だけを包む `MySqlSqlOptimizer`（commit a987817）](https://github.com/linq2db/linq2db/blob/a987817007fb97817206de66ca24df20e851911f/Source/LinqToDB/Internal/DataProvider/MySql/MySqlSqlOptimizer.cs#L45-L102)、[Pomelo の 1093 を MySQL の例外として期待するテスト（commit 14c2cd5）](https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql/blob/14c2cd558e37c71e7a2fca75e339ef902effdf60/test/EFCore.MySql.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesMySqlTest.cs#L931-L939)、[Drizzle ORM の空の `values()` の例外（`pg-core/query-builders/insert.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/insert.ts#L86-L90)、[同・MySQL の SET を宣言の順に並べる `mysql-core/dialect.ts`](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/mysql-core/dialect.ts#L149-L172)、[EF Core の SQL Server で全列が既定値の複数行を一行ずつに分ける `SqlServerUpdateSqlGenerator`（commit c0f183b）](https://github.com/dotnet/efcore/blob/c0f183ba1b7dc5ff392c596350a701f6ad206052/src/EFCore.SqlServer/Update/Internal/SqlServerUpdateSqlGenerator.cs#L252-L282)、[Drizzle ORM の `onConflictDoNothing` / `onConflictDoUpdate`（`pg-core/query-builders/insert.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/insert.ts#L323-L388)、[同・`onDuplicateKeyUpdate`（`mysql-core/query-builders/insert.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/mysql-core/query-builders/insert.ts#L250-L280)、[jOOQ の MySQL と MariaDB で `excluded` を書き分ける `Excluded.java`（commit 0b0bcfe）](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/impl/Excluded.java#L107-L116)、[同・MySQL の行の別名 `AS excluded`（`InsertQueryImpl.java`）](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/impl/InsertQueryImpl.java#L584-L612)、[Kysely の `OnConflictBuilder`（commit b506b63）](https://github.com/kysely-org/kysely/blob/b506b6390a06f47410d359bf0f640a13251b28df/src/query-builder/on-conflict-builder.ts#L39-L289)、[Dapper の型ごとの `AddTypeHandler`（`SqlMapper.cs`、commit eb47546）](https://github.com/DapperLib/Dapper/blob/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/Dapper/SqlMapper.cs#L345-L426)、[Dapper.AOT のビルド時の型ごとの宣言 `[module: TypeHandler]`（`docs/gettingstarted.md`、commit 93d99d3）](https://github.com/DapperLib/DapperAOT/blob/93d99d36dd0142a07bf1b00567351f89b8dddb72/docs/gettingstarted.md#L208-L218)、[EF Core の値の変換（生 SQL の制限、NULL）](https://learn.microsoft.com/en-us/ef/core/modeling/value-conversions)、[同・比べる相手の列から型の対応を決める `SqlExpressionFactory`（commit c0f183b）](https://github.com/dotnet/efcore/blob/c0f183ba1b7dc5ff392c596350a701f6ad206052/src/EFCore.Relational/Query/SqlExpressionFactory.cs#L186-L189)、[linq2db の列の変換を重ねる `ColumnDescriptor`（commit a987817）](https://github.com/linq2db/linq2db/blob/a987817007fb97817206de66ca24df20e851911f/Source/LinqToDB/Mapping/ColumnDescriptor.cs#L749-L811)、[jOOQ の forcedTypes](https://www.jooq.org/doc/3.20/manual/code-generation/codegen-advanced/codegen-config-database/codegen-database-forced-types/codegen-database-forced-types-matching/)、[Drizzle ORM の列ごとの `customType`（`pg-core/columns/custom.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/columns/custom.ts#L73-L85)
-- プロバイダー: [SqlDataReader.Close（Cancel を先に呼ぶ）](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqldatareader.close)、[SqlParameter.Value（DBNull）](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqlparameter.value)、[ADO.NET のパラメータの型の推定（DateTime は SqlDbType.DateTime）](https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types)、[Microsoft.Data.Sqlite のパラメータ](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/parameters)、[同・型](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/types)、[Npgsql の基本的な使い方（位置パラメータ）](https://www.npgsql.org/doc/basic-usage.html)、[Npgsql 8.0（NativeAOT）](https://www.npgsql.org/doc/release-notes/8.0.html)、[Npgsql の日付と時刻](https://www.npgsql.org/doc/types/datetime.html)、[MySqlConnector の版の履歴](https://mysqlconnector.net/overview/version-history/)、[SqlClient の CHANGELOG](https://raw.githubusercontent.com/dotnet/SqlClient/main/CHANGELOG.md)、[MySqlConnector の接続の設定（UseAffectedRows）](https://mysqlconnector.net/connection-options/)、[SQLitePCLRaw.lib.e_sqlite3 の脆弱性（GHSA-2m69-gcr7-jv3q）](https://github.com/advisories/GHSA-2m69-gcr7-jv3q)、[ECMA-335 の補遺（モジュールの初期化子の実行の保証）](https://github.com/dotnet/runtime/blob/main/docs/design/specs/Ecma-335-Augments.md#module-initializer)
+- SQLite: [RETURNING](https://www.sqlite.org/lang_returning.html)、[SELECT（LIMIT / OFFSET、複合 SELECT）](https://www.sqlite.org/lang_select.html)、[3.39.0 のリリースノート（RIGHT / FULL JOIN、IS DISTINCT FROM）](https://www.sqlite.org/releaselog/3_39_0.html)、[式（LIKE と ESCAPE）](https://www.sqlite.org/lang_expr.html)、[日付と時刻の関数（CURRENT_TIMESTAMP は UTC）](https://www.sqlite.org/lang_datefunc.html)、[UPSERT](https://www.sqlite.org/lang_upsert.html)、[上限](https://www.sqlite.org/limits.html)、[データ型](https://www.sqlite.org/datatype3.html)、[CREATE TABLE](https://www.sqlite.org/lang_createtable.html)、[AUTOINCREMENT](https://www.sqlite.org/autoinc.html)、[CREATE INDEX](https://www.sqlite.org/lang_createindex.html)、[WITH](https://www.sqlite.org/lang_with.html)、[INSERT（DEFAULT VALUES は一行）](https://www.sqlite.org/lang_insert.html)、[外部キー（既定で無効、親のキーは主キーか UNIQUE）](https://www.sqlite.org/foreignkeys.html)、[日付と時刻の関数（`%f`）](https://www.sqlite.org/lang_datefunc.html)
+- PostgreSQL: [SELECT](https://www.postgresql.org/docs/current/sql-select.html)、[INSERT](https://www.postgresql.org/docs/current/sql-insert.html)、[比較関数](https://www.postgresql.org/docs/current/functions-comparison.html)、[集計関数（min / max の型）](https://www.postgresql.org/docs/current/functions-aggregate.html)、[日付と時刻の関数（CURRENT_TIMESTAMP）](https://www.postgresql.org/docs/current/functions-datetime.html)、[パターン一致（LIKE と ESCAPE）](https://www.postgresql.org/docs/current/functions-matching.html)、[字句の構造](https://www.postgresql.org/docs/current/sql-syntax-lexical.html)、[CREATE TABLE](https://www.postgresql.org/docs/current/sql-createtable.html)、[プロトコルのメッセージ形式](https://www.postgresql.org/docs/current/protocol-message-formats.html)、[バージョンのサポート方針](https://www.postgresql.org/support/versioning/)、[RETURNING](https://www.postgresql.org/docs/15/dml-returning.html)、[WITH の中のデータを変える文（同じスナップショット）](https://www.postgresql.org/docs/15/queries-with.html)、[INSERT（ON CONFLICT、excluded、cardinality violation、行の数）](https://www.postgresql.org/docs/15/sql-insert.html)、[CREATE INDEX（索引の名前とスキーマ）](https://www.postgresql.org/docs/17/sql-createindex.html)、[DROP INDEX](https://www.postgresql.org/docs/17/sql-dropindex.html)、[B-tree の索引の項目の大きさ](https://www.postgresql.org/docs/17/btree.html)、[日付と時刻の関数（AT TIME ZONE）](https://www.postgresql.org/docs/17/functions-datetime.html)
+- MySQL: [SELECT](https://dev.mysql.com/doc/refman/8.0/en/select.html)、[JOIN](https://dev.mysql.com/doc/refman/8.0/en/join.html)、[集合演算](https://dev.mysql.com/doc/refman/8.0/en/set-operations.html)、[INSERT … ON DUPLICATE KEY UPDATE](https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html)、[比較演算子](https://dev.mysql.com/doc/refman/8.0/en/comparison-operators.html)、[識別子](https://dev.mysql.com/doc/refman/8.0/en/identifiers.html)、[文字列関数](https://dev.mysql.com/doc/refman/8.0/en/string-functions.html)、[日付と時刻の関数（NOW）](https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html)、[DATETIME の型](https://dev.mysql.com/doc/refman/8.0/en/datetime.html)、[文字列の比較（LIKE と ESCAPE）](https://dev.mysql.com/doc/refman/8.0/en/string-comparison-functions.html)、[CREATE INDEX](https://dev.mysql.com/doc/refman/8.0/en/create-index.html)、[プレースホルダーの上限（バグ 101630）](https://bugs.mysql.com/bug.php?id=101630)、[GROUP BY の扱い（HAVING から参照できる名前）](https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html)、[HAVING の GROUP BY の式（バグ 24083）](https://bugs.mysql.com/bug.php?id=24083)、[同（バグ 78395）](https://bugs.mysql.com/bug.php?id=78395)、[集計関数（SUM の結果の型）](https://dev.mysql.com/doc/refman/8.4/en/aggregate-functions.html)、[UPDATE（左から順の代入、1093、派生テーブルの併合）](https://dev.mysql.com/doc/refman/8.4/en/update.html)、[DELETE](https://dev.mysql.com/doc/refman/8.4/en/delete.html)、[サブクエリの制限（実体化した派生テーブルの例外）](https://dev.mysql.com/doc/refman/8.4/en/subquery-restrictions.html)、[派生テーブルの最適化（併合を妨げる構文）](https://dev.mysql.com/doc/refman/8.4/en/derived-table-optimization.html)、[INSERT … ON DUPLICATE KEY UPDATE（行の別名、VALUES() の非推奨、行の数、8.4）](https://dev.mysql.com/doc/refman/8.4/en/insert-on-duplicate.html)、[同（8.0.19 と 8.0.20 の版）](https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html)、[暗黙のコミットを起こす文](https://dev.mysql.com/doc/refman/8.4/en/implicit-commit.html)、[データ型の既定値（式の既定値、BLOB と TEXT）](https://dev.mysql.com/doc/refman/8.0/en/data-type-defaults.html)、[データ型の大きさ](https://dev.mysql.com/doc/refman/8.4/en/storage-requirements.html)、[CHAR と VARCHAR（行の大きさの上限）](https://dev.mysql.com/doc/refman/8.4/en/char.html)、[InnoDB の上限（キーの 3072 バイト）](https://dev.mysql.com/doc/refman/8.0/en/innodb-limits.html)、[DROP INDEX](https://dev.mysql.com/doc/refman/8.4/en/drop-index.html)、[文字列のリテラル（バックスラッシュと NO_BACKSLASH_ESCAPES）](https://dev.mysql.com/doc/refman/8.4/en/string-literals.html)、[識別子の修飾（修飾のないテーブルは既定のデータベース）](https://dev.mysql.com/doc/refman/8.4/en/identifier-qualifiers.html)。8.0 のサポート終了は [Percona の記事](https://www.percona.com/blog/mysql-8-0-end-of-life-date/) による（二次資料）
+- MariaDB: [UPDATE（RETURNING は 13.0 から）](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/changing-deleting-data/update)、[10.5.0（INSERT … RETURNING）](https://mariadb.com/docs/release-notes/community-server/old-releases/10.5/10.5.0)、[ON DUPLICATE KEY UPDATE](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/inserting-loading-data/insert-on-duplicate-key-update)、[CREATE INDEX](https://mariadb.com/docs/server/reference/sql-statements/data-definition/create/create-index)、[保守の方針](https://mariadb.org/about/#maintenance-policy)、[sql_mode（SIMULTANEOUS_ASSIGNMENT）](https://mariadb.com/docs/server/server-management/variables-and-modes/sql_mode)、[10.3.5（SIMULTANEOUS_ASSIGNMENT）](https://mariadb.com/docs/release-notes/community-server/old-releases/release-notes-mariadb-10-3-series/mariadb-1035-release-notes)、[10.3.2（同じテーブルを読む UPDATE）](https://mariadb.com/docs/release-notes/community-server/old-releases/release-notes-mariadb-10-3-series/mariadb-1032-release-notes)、[10.3.1（同じテーブルを読む DELETE）](https://mariadb.com/docs/release-notes/community-server/old-releases/release-notes-mariadb-10-3-series/mariadb-1031-release-notes)、[VALUES() / VALUE()（改名と、旧名が通る所）](https://mariadb.com/docs/server/reference/sql-functions/secondary-functions/miscellaneous-functions/values-value)、[INSERT … RETURNING](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/inserting-loading-data/insertreturning)、[CREATE TABLE（式の既定値、長いキーの HASH）](https://mariadb.com/kb/en/create-table/)、[10.2.1（式の既定値、BLOB と TEXT の既定値）](https://mariadb.com/kb/en/mariadb-1021-release-notes/)、[DROP INDEX](https://mariadb.com/kb/en/drop-index/)、[暗黙のコミットを起こす文](https://mariadb.com/kb/en/sql-statements-that-cause-an-implicit-commit/)、[外部キー](https://mariadb.com/kb/en/foreign-keys/)
+- SQL Server: [OUTPUT 句](https://learn.microsoft.com/en-us/sql/t-sql/queries/output-clause-transact-sql)、[UPDATE](https://learn.microsoft.com/en-us/sql/t-sql/queries/update-transact-sql)、[ORDER BY（OFFSET / FETCH）](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-order-by-clause-transact-sql)、[IS DISTINCT FROM](https://learn.microsoft.com/en-us/sql/t-sql/queries/is-distinct-from-transact-sql)、[識別子](https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers)、[CONCAT](https://learn.microsoft.com/en-us/sql/t-sql/functions/concat-transact-sql)、[CONCAT_NULL_YIELDS_NULL](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-concat-null-yields-null-transact-sql)、[比較演算子（真偽値）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/comparison-operators-transact-sql)、[検索条件](https://learn.microsoft.com/en-us/sql/t-sql/queries/search-condition-transact-sql)、[最大容量（パラメータ 2100）](https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server)、[CREATE TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-table-transact-sql)、[DROP TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/drop-table-transact-sql)、[CREATE INDEX](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-index-transact-sql)、[集合演算子](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/set-operators-except-and-intersect-transact-sql)、[MIN](https://learn.microsoft.com/en-us/sql/t-sql/functions/min-transact-sql)、[SUM（real は float を返す）](https://learn.microsoft.com/en-us/sql/t-sql/functions/sum-transact-sql)、[LEN（max の型で bigint）](https://learn.microsoft.com/en-us/sql/t-sql/functions/len-transact-sql)、[テーブル値コンストラクター（1000 行）](https://learn.microsoft.com/en-us/sql/t-sql/queries/table-value-constructor-transact-sql)、[CURRENT_TIMESTAMP](https://learn.microsoft.com/en-us/sql/t-sql/functions/current-timestamp-transact-sql)、[LIKE（ESCAPE）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/like-transact-sql)、[WITH](https://learn.microsoft.com/en-us/sql/t-sql/queries/with-common-table-expression-transact-sql)、[DROP INDEX（IF EXISTS は 2016 から）](https://learn.microsoft.com/en-us/sql/t-sql/statements/drop-index-transact-sql)、[一意制約（NULL は一つ）](https://learn.microsoft.com/en-us/sql/relational-databases/tables/unique-constraints-and-check-constraints)、[フィルター付きの索引](https://learn.microsoft.com/en-us/sql/relational-databases/indexes/create-filtered-indexes)、[nchar と nvarchar](https://learn.microsoft.com/en-us/sql/t-sql/data-types/nchar-and-nvarchar-transact-sql)、[SYSUTCDATETIME](https://learn.microsoft.com/en-us/sql/t-sql/functions/sysutcdatetime-transact-sql)、[SYSDATETIMEOFFSET](https://learn.microsoft.com/en-us/sql/t-sql/functions/sysdatetimeoffset-transact-sql)、[datetime2](https://learn.microsoft.com/en-us/sql/t-sql/data-types/datetime2-transact-sql)、[datetimeoffset](https://learn.microsoft.com/en-us/sql/t-sql/data-types/datetimeoffset-transact-sql)、[time](https://learn.microsoft.com/en-us/sql/t-sql/data-types/time-transact-sql)、[decimal と numeric](https://learn.microsoft.com/en-us/sql/t-sql/data-types/decimal-and-numeric-transact-sql)
+- ほかのライブラリ: [Drizzle ORM の `and()`（`undefined` を飛ばし、一つもなければ `undefined`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/sql/expressions/conditions.ts)、[同・`where` が `undefined` なら WHERE を出さない（`pg-core/dialect.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/dialect.ts)、[同・`TBuilderMode`（`pg-core/query-builders/select.ts`、`select.types.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/select.types.ts)、[同・standalone query builder](https://orm.drizzle.team/docs/goodies)、[Kysely の DummyDriver](https://kysely.dev/docs/recipes/splitting-query-building-and-execution)、[EF Core の SQLite の制限（decimal の比較と並べ替え）](https://learn.microsoft.com/en-us/ef/core/providers/sqlite/limitations)、[EF Core の `QueryableAggregateMethodTranslator`（`float` の `SUM` / `AVG` を `real` に戻す、commit 4dbb574）](https://github.com/dotnet/efcore/blob/4dbb574be1801b9d350649616b4e732e633f5624/src/EFCore.Relational/Query/Internal/QueryableAggregateMethodTranslator.cs)、[jOOQ の `Field.in(Select<? extends Record1<T>>)`（commit 0b0bcfe）](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/Field.java#L905-L914)、[同・MySQL の IN と LIMIT を派生テーブルで包む `Eq`](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/impl/Eq.java#L173-L177)、[同・入れ子の CTE を外に移す issue 3175](https://github.com/jOOQ/jOOQ/issues/3175)、[同・集合演算の ORDER BY](https://www.jooq.org/doc/latest/manual/sql-building/sql-statements/select-statement/order-by-clause/)、[Kysely の選択の中のサブクエリを NULL を許す型にする `select-parser.ts`（commit b506b63）](https://github.com/kysely-org/kysely/blob/b506b6390a06f47410d359bf0f640a13251b28df/src/parser/select-parser.ts#L104-L119)、[同・入れ子の WITH をそのまま出す `default-query-compiler.ts`](https://github.com/kysely-org/kysely/blob/b506b6390a06f47410d359bf0f640a13251b28df/src/query-compiler/default-query-compiler.ts#L156-L177)、[Drizzle ORM の別名のないサブクエリの列を拒む `select.types.ts`](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/query-builders/select.types.ts#L116-L131)、[同・集合演算の被演算子の形を求める `ValidateShape`（`pg-core/query-builders/select.types.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/select.types.ts#L366-L387)、[同・集合演算の後の ORDER BY と LIMIT（`pg-core/dialect.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/dialect.ts#L468-L509)、[EF Core の NULL を含みうる NOT IN の書き換え（`SqlNullabilityProcessor`、commit c0f183b）](https://github.com/dotnet/efcore/blob/c0f183ba1b7dc5ff392c596350a701f6ad206052/src/EFCore.Relational/Query/SqlNullabilityProcessor.cs#L754-L913)、[同・LIMIT のないサブクエリの ORDER BY を消す](https://github.com/dotnet/efcore/blob/c0f183ba1b7dc5ff392c596350a701f6ad206052/src/EFCore.Relational/Query/RelationalQueryableMethodTranslatingExpressionVisitor.cs#L660-L669)、[linq2db の CTE を文の先頭に集める `BasicSqlOptimizer`（commit a987817）](https://github.com/linq2db/linq2db/blob/a987817007fb97817206de66ca24df20e851911f/Source/LinqToDB/Internal/SqlProvider/BasicSqlOptimizer.cs#L733-L763)、[同・MySQL の IN と LIMIT の包みを残す `SelectQueryOptimizerVisitor`](https://github.com/linq2db/linq2db/blob/a987817007fb97817206de66ca24df20e851911f/Source/LinqToDB/Internal/SqlQuery/Visitors/SelectQueryOptimizerVisitor.cs#L2554-L2567)、[Pomelo.EntityFrameworkCore.MySql の `MySqlHavingExpressionVisitor`（HAVING の式をサブクエリと別名に移す、commit 14c2cd5）](https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql/blob/14c2cd558e37c71e7a2fca75e339ef902effdf60/src/EFCore.MySql/Query/ExpressionVisitors/Internal/MySqlHavingExpressionVisitor.cs)、[Dapper の `SqlMapper.cs`（`QueryImpl` の `finally` で `cmd?.Cancel()`、commit eb47546）](https://github.com/DapperLib/Dapper/blob/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/Dapper/SqlMapper.cs)、[jOOQ の MySQL で DML のサブクエリを派生テーブルで包む `SelectQueryImpl`（commit 0b0bcfe）](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/impl/SelectQueryImpl.java#L1528-L1552)、[linq2db の MySQL の UPDATE だけを包む `MySqlSqlOptimizer`（commit a987817）](https://github.com/linq2db/linq2db/blob/a987817007fb97817206de66ca24df20e851911f/Source/LinqToDB/Internal/DataProvider/MySql/MySqlSqlOptimizer.cs#L45-L102)、[Pomelo の 1093 を MySQL の例外として期待するテスト（commit 14c2cd5）](https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql/blob/14c2cd558e37c71e7a2fca75e339ef902effdf60/test/EFCore.MySql.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesMySqlTest.cs#L931-L939)、[Drizzle ORM の空の `values()` の例外（`pg-core/query-builders/insert.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/insert.ts#L86-L90)、[同・MySQL の SET を宣言の順に並べる `mysql-core/dialect.ts`](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/mysql-core/dialect.ts#L149-L172)、[EF Core の SQL Server で全列が既定値の複数行を一行ずつに分ける `SqlServerUpdateSqlGenerator`（commit c0f183b）](https://github.com/dotnet/efcore/blob/c0f183ba1b7dc5ff392c596350a701f6ad206052/src/EFCore.SqlServer/Update/Internal/SqlServerUpdateSqlGenerator.cs#L252-L282)、[Drizzle ORM の `onConflictDoNothing` / `onConflictDoUpdate`（`pg-core/query-builders/insert.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/insert.ts#L323-L388)、[同・`onDuplicateKeyUpdate`（`mysql-core/query-builders/insert.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/mysql-core/query-builders/insert.ts#L250-L280)、[jOOQ の MySQL と MariaDB で `excluded` を書き分ける `Excluded.java`（commit 0b0bcfe）](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/impl/Excluded.java#L107-L116)、[同・MySQL の行の別名 `AS excluded`（`InsertQueryImpl.java`）](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/impl/InsertQueryImpl.java#L584-L612)、[Kysely の `OnConflictBuilder`（commit b506b63）](https://github.com/kysely-org/kysely/blob/b506b6390a06f47410d359bf0f640a13251b28df/src/query-builder/on-conflict-builder.ts#L39-L289)、[Dapper の型ごとの `AddTypeHandler`（`SqlMapper.cs`、commit eb47546）](https://github.com/DapperLib/Dapper/blob/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/Dapper/SqlMapper.cs#L345-L426)、[Dapper.AOT のビルド時の型ごとの宣言 `[module: TypeHandler]`（`docs/gettingstarted.md`、commit 93d99d3）](https://github.com/DapperLib/DapperAOT/blob/93d99d36dd0142a07bf1b00567351f89b8dddb72/docs/gettingstarted.md#L208-L218)、[EF Core の値の変換（生 SQL の制限、NULL）](https://learn.microsoft.com/en-us/ef/core/modeling/value-conversions)、[同・比べる相手の列から型の対応を決める `SqlExpressionFactory`（commit c0f183b）](https://github.com/dotnet/efcore/blob/c0f183ba1b7dc5ff392c596350a701f6ad206052/src/EFCore.Relational/Query/SqlExpressionFactory.cs#L186-L189)、[linq2db の列の変換を重ねる `ColumnDescriptor`（commit a987817）](https://github.com/linq2db/linq2db/blob/a987817007fb97817206de66ca24df20e851911f/Source/LinqToDB/Mapping/ColumnDescriptor.cs#L749-L811)、[jOOQ の forcedTypes](https://www.jooq.org/doc/3.20/manual/code-generation/codegen-advanced/codegen-config-database/codegen-database-forced-types/codegen-database-forced-types-matching/)、[Drizzle ORM の列ごとの `customType`（`pg-core/columns/custom.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/columns/custom.ts#L73-L85)、[EF Core の SQL Server で NULL を許す列の一意の索引に `IS NOT NULL` のフィルターを付ける `SqlServerIndexConvention`（v9.0.0）](https://github.com/dotnet/efcore/blob/v9.0.0/src/EFCore.SqlServer/Metadata/Conventions/SqlServerIndexConvention.cs#L159-L196)、[Pomelo.EntityFrameworkCore.MySql の BLOB と TEXT の既定値を `DEFAULT (…)` にする `MySqlMigrationsSqlGenerator`（9.0.0）](https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql/blob/9.0.0/src/EFCore.MySql/Migrations/MySqlMigrationsSqlGenerator.cs#L1394-L1449)、[EF Core の `EnsureCreated` が CREATE TABLE を外部キーの依存の順に並べる `MigrationsModelDiffer`（v9.0.0）](https://github.com/dotnet/efcore/blob/v9.0.0/src/EFCore.Relational/Migrations/Internal/MigrationsModelDiffer.cs#L257-L318)
+- プロバイダー: [SqlDataReader.Close（Cancel を先に呼ぶ）](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqldatareader.close)、[SqlParameter.Value（DBNull）](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqlparameter.value)、[ADO.NET のパラメータの型の推定（DateTime は SqlDbType.DateTime）](https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types)、[Microsoft.Data.Sqlite のパラメータ](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/parameters)、[同・接続文字列（Foreign Keys）](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/connection-strings#foreign-keys)、[同・型](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/types)、[Npgsql の基本的な使い方（位置パラメータ）](https://www.npgsql.org/doc/basic-usage.html)、[Npgsql 8.0（NativeAOT）](https://www.npgsql.org/doc/release-notes/8.0.html)、[Npgsql の日付と時刻](https://www.npgsql.org/doc/types/datetime.html)、[MySqlConnector の版の履歴](https://mysqlconnector.net/overview/version-history/)、[SqlClient の CHANGELOG](https://raw.githubusercontent.com/dotnet/SqlClient/main/CHANGELOG.md)、[MySqlConnector の接続の設定（UseAffectedRows）](https://mysqlconnector.net/connection-options/)、[SQLitePCLRaw.lib.e_sqlite3 の脆弱性（GHSA-2m69-gcr7-jv3q）](https://github.com/advisories/GHSA-2m69-gcr7-jv3q)、[ECMA-335 の補遺（モジュールの初期化子の実行の保証）](https://github.com/dotnet/runtime/blob/main/docs/design/specs/Ecma-335-Augments.md#module-initializer)
 
 集計の結果の SQL の型（§4.2 の `Sum` と `Avg` の `CAST` の理由）は、行 Q3 の結合テストで各方言の結果を確かめた。
