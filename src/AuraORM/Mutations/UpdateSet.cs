@@ -38,7 +38,7 @@ public sealed class UpdateSet<TDialect, TMode, TColumns>
         ArgumentNullException.ThrowIfNull(condition);
         Condition<PerRow> where = condition(_columns);
         ArgumentNullException.ThrowIfNull(where, nameof(condition));
-        return new(_session, _target, _assignments, where.Node);
+        return new(_session, _target, _columns, _assignments, where.Node);
     }
 
     /// <summary>Not accepted: a condition that may be empty would change every row. Write <see cref="AllRows"/> for that.</summary>
@@ -52,5 +52,5 @@ public sealed class UpdateSet<TDialect, TMode, TColumns>
     /// Changes every row of the table. It adds nothing to the SQL.
     /// </summary>
     /// <returns>The statement.</returns>
-    public UpdateStatement<TDialect, TMode, TColumns> AllRows() => new(_session, _target, _assignments, null);
+    public UpdateStatement<TDialect, TMode, TColumns> AllRows() => new(_session, _target, _columns, _assignments, null);
 }

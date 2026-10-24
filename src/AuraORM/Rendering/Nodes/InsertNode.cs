@@ -10,26 +10,38 @@ namespace AuraORM;
 /// <param name="target">The table.</param>
 /// <param name="columns">The names of the columns that the rows set, in declaration order.</param>
 /// <param name="rows">The values of each row, in the order of <paramref name="columns"/>.</param>
-internal sealed class InsertNode(TableAlias target, ImmutableArray<string> columns, ImmutableArray<ImmutableArray<ParameterNode>> rows) : SqlNode
+/// <param name="returning">The items of <c>Returning</c>, or an empty array (§9).</param>
+internal sealed class InsertNode(
+    TableAlias target,
+    ImmutableArray<string> columns,
+    ImmutableArray<ImmutableArray<ParameterNode>> rows,
+    ImmutableArray<SqlNode> returning
+) : SqlNode
 {
     public override void Render(SqlRenderContext context)
     {
+        context.EnterMutation(target);
         context.Write("INSERT INTO ");
         target.RenderTarget(context);
+        bool output = context.Dialect.ReturnsWithOutput;
         if (columns.IsEmpty)
         {
             if (!context.Dialect.WritesEmptyValueRows)
             {
+                WriteOutput(context, output);
                 context.Write(" DEFAULT VALUES");
-                return;
             }
-
-            context.Write(" () VALUES ");
-            for (int i = 0; i < rows.Length; i++)
+            else
             {
-                context.Write(i == 0 ? "()" : ", ()");
+                context.Write(" () VALUES ");
+                for (int i = 0; i < rows.Length; i++)
+                {
+                    context.Write(i == 0 ? "()" : ", ()");
+                }
             }
 
+            WriteReturning(context, output);
+            context.ExitMutation();
             return;
         }
 
@@ -44,7 +56,9 @@ internal sealed class InsertNode(TableAlias target, ImmutableArray<string> colum
             context.WriteIdentifier(columns[i]);
         }
 
-        context.Write(") VALUES ");
+        context.Write(')');
+        WriteOutput(context, output);
+        context.Write(" VALUES ");
         for (int r = 0; r < rows.Length; r++)
         {
             context.Write(r == 0 ? "(" : ", (");
@@ -60,6 +74,26 @@ internal sealed class InsertNode(TableAlias target, ImmutableArray<string> colum
             }
 
             context.Write(')');
+        }
+
+        WriteReturning(context, output);
+        context.ExitMutation();
+    }
+
+    // §9: SQL Server's OUTPUT goes before VALUES or DEFAULT VALUES; RETURNING goes at the end.
+    private void WriteOutput(SqlRenderContext context, bool output)
+    {
+        if (output)
+        {
+            context.WriteReturning(target, returning, "INSERTED");
+        }
+    }
+
+    private void WriteReturning(SqlRenderContext context, bool output)
+    {
+        if (!output)
+        {
+            context.WriteReturning(target, returning, null);
         }
     }
 }

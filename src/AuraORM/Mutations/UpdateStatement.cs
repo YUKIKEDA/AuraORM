@@ -21,13 +21,19 @@ public sealed class UpdateStatement<TDialect, TMode, TColumns> : MutationStateme
     private readonly ImmutableArray<Assignment> _assignments;
     private readonly SqlNode? _where;
 
-    internal UpdateStatement(IStatementRunner? session, TableAlias target, ImmutableArray<Assignment> assignments, SqlNode? where)
+    internal UpdateStatement(IStatementRunner? session, TableAlias target, TColumns table, ImmutableArray<Assignment> assignments, SqlNode? where)
         : base(session)
     {
         _target = target;
+        Table = table;
         _assignments = assignments;
         _where = where;
     }
 
-    private protected override SqlNode CreateNode() => new UpdateNode(_target, _assignments, _where);
+    /// <summary>
+    /// Gets the columns of the table, which the lambda of <c>Returning</c> gets.
+    /// </summary>
+    internal TColumns Table { get; }
+
+    internal override SqlNode CreateNode(ImmutableArray<SqlNode> returning) => new UpdateNode(_target, _assignments, _where, returning);
 }

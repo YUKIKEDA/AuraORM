@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace AuraORM;
 
 /// <summary>
@@ -18,12 +20,18 @@ public sealed class DeleteStatement<TDialect, TMode, TColumns> : MutationStateme
     private readonly TableAlias _target;
     private readonly SqlNode? _where;
 
-    internal DeleteStatement(IStatementRunner? session, TableAlias target, SqlNode? where)
+    internal DeleteStatement(IStatementRunner? session, TableAlias target, TColumns table, SqlNode? where)
         : base(session)
     {
         _target = target;
+        Table = table;
         _where = where;
     }
 
-    private protected override SqlNode CreateNode() => new DeleteNode(_target, _where);
+    /// <summary>
+    /// Gets the columns of the table, which the lambda of <c>Returning</c> gets.
+    /// </summary>
+    internal TColumns Table { get; }
+
+    internal override SqlNode CreateNode(ImmutableArray<SqlNode> returning) => new DeleteNode(_target, _where, returning);
 }

@@ -599,3 +599,48 @@ public sealed class SqlServerMutationTests : TargetSubqueryMutationTests<SqlServ
 
     public ValueTask DisposeAsync() => _target.DisposeAsync();
 }
+
+/// <summary>
+/// <see cref="UpdateReturningTests{TDialect}"/> on postgresql.
+/// </summary>
+[Collection("postgresql")]
+public sealed class PostgreSqlReturningTests : UpdateReturningTests<PostgreSqlDialect>, IAsyncLifetime
+{
+    private readonly PostgreSqlTarget _target = new();
+
+    private protected override ITestTarget<PostgreSqlDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="ReturningTests{TDialect}"/> on mariadb.
+/// </summary>
+[Collection("mariadb")]
+public sealed class MariaDbReturningTests : ReturningTests<MariaDbDialect>, IAsyncLifetime
+{
+    private readonly MariaDbTarget _target = new();
+
+    private protected override ITestTarget<MariaDbDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="UpdateReturningTests{TDialect}"/> on sqlserver.
+/// </summary>
+[Collection("sqlserver")]
+public sealed class SqlServerReturningTests : UpdateReturningTests<SqlServerDialect>, IAsyncLifetime
+{
+    private readonly SqlServerTarget _target = new();
+
+    private protected override ITestTarget<SqlServerDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
