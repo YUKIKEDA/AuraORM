@@ -57,7 +57,23 @@ internal sealed class SelectNode(SelectState state) : SqlNode
         if (!state.GroupBy.IsEmpty)
         {
             context.Write(" GROUP BY ");
-            context.WriteList(state.GroupBy);
+            for (int i = 0; i < state.GroupBy.Length; i++)
+            {
+                if (i > 0)
+                {
+                    context.Write(", ");
+                }
+
+                // §5.5: SQL Server needs a column in each key, and MySQL reads a key of one value as a column position.
+                int columns = context.ColumnsWritten;
+                state.GroupBy[i].Render(context);
+                if (context.ColumnsWritten == columns)
+                {
+                    throw new InvalidOperationException(
+                        "A GROUP BY key has no column. SQL Server rejects such a key, and MySQL and MariaDB read a key of one value as a column position; group by an expression of a column."
+                    );
+                }
+            }
         }
 
         if (state.Having is not null)
@@ -76,6 +92,14 @@ internal sealed class SelectNode(SelectState state) : SqlNode
                 if (i > 0)
                 {
                     context.Write(", ");
+                }
+
+                // §5.8: MySQL and MariaDB read a key of one value as a column position, and SQL Server rejects it.
+                if (state.OrderBy[i].Node.Unwrapped is ParameterNode)
+                {
+                    throw new InvalidOperationException(
+                        "An ORDER BY key is only a value. MySQL and MariaDB read it as a column position, and SQL Server rejects it; order by an expression of a column."
+                    );
                 }
 
                 state.OrderBy[i].Node.Render(context);

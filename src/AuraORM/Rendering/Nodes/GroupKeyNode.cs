@@ -8,6 +8,8 @@ namespace AuraORM;
 /// </summary>
 internal sealed class GroupKeyNode(SqlNode key) : SqlNode
 {
+    public override SqlNode Unwrapped => key.Unwrapped;
+
     public override void Render(SqlRenderContext context)
     {
         if (context.InHaving && context.Dialect.AggregatesGroupKeysInHaving && key is not ColumnNode)

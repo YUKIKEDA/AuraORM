@@ -206,6 +206,138 @@ public sealed class SelectGroupTests
         );
     }
 
+    /// <summary>
+    /// A <c>GROUP BY</c> key without a column throws when the statement is built, on every dialect; a key with a column or a
+    /// raw SQL fragment does not (design §5.5, §14.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/>.
+    ///
+    /// Steps:
+    /// - Build a statement grouped by <c>Value(2)</c>, by <c>Add(Value(1), Value(2))</c>, by <c>CurrentTimestamp()</c>, and by
+    ///   the tuple <c>(a.Status, Value(2))</c>, on each dialect; then by <c>Raw&lt;int&gt;($"1")</c> and by
+    ///   <c>Add(a.LoginCount, 1)</c>.
+    ///
+    /// Expected:
+    /// - The first four throw <see cref="InvalidOperationException"/> on every dialect; the last two render.
+    /// </remarks>
+    /// <param name="form">The key.</param>
+    [Theory]
+    [InlineData(KeyForm.Value)]
+    [InlineData(KeyForm.ValueExpression)]
+    [InlineData(KeyForm.CurrentTimestamp)]
+    [InlineData(KeyForm.ColumnAndValue)]
+    public void GroupBy_KeyWithoutColumn_Throws(KeyForm form)
+    {
+        var query = new KeyOnlyValues(form);
+        Assert.Throws<InvalidOperationException>(() => query.Build(new Database<SqliteDialect>(new FakeConnection())));
+        Assert.Throws<InvalidOperationException>(() => query.Build(new Database<PostgreSqlDialect>(new FakeConnection())));
+        Assert.Throws<InvalidOperationException>(() => query.Build(new Database<MySqlDialect>(new FakeConnection())));
+        Assert.Throws<InvalidOperationException>(() => query.Build(new Database<MariaDbDialect>(new FakeConnection())));
+        Assert.Throws<InvalidOperationException>(() => query.Build(new Database<SqlServerDialect>(new FakeConnection())));
+    }
+
+    /// <inheritdoc cref="GroupBy_KeyWithoutColumn_Throws"/>
+    [Fact]
+    public void GroupBy_KeyWithColumnOrRawSql_Renders()
+    {
+        SqlAssert.Statement(
+            new KeyOnlyValues(KeyForm.Raw),
+            new(
+                "SELECT COUNT(*) FROM \"accounts\" GROUP BY 1",
+                "SELECT COUNT(*) FROM \"accounts\" GROUP BY 1",
+                "SELECT COUNT(*) FROM `accounts` GROUP BY 1",
+                "SELECT COUNT_BIG(*) FROM [accounts] GROUP BY 1"
+            )
+        );
+        SqlAssert.Statement(
+            new KeyOnlyValues(KeyForm.ColumnExpression),
+            new(
+                "SELECT COUNT(*) FROM \"accounts\" GROUP BY (\"accounts\".\"login_count\" + @p0)",
+                "SELECT COUNT(*) FROM \"accounts\" GROUP BY (\"accounts\".\"login_count\" + $1)",
+                "SELECT COUNT(*) FROM `accounts` GROUP BY (`accounts`.`login_count` + @p0)",
+                "SELECT COUNT_BIG(*) FROM [accounts] GROUP BY ([accounts].[login_count] + @p0)"
+            ),
+            1
+        );
+    }
+
+    /// <summary>
+    /// An <c>ORDER BY</c> key that is only a value throws when the statement is built, on every dialect and for a decimal
+    /// value too; an expression of values, a function, and a raw SQL fragment do not (design §5.8, §14.3). After
+    /// <c>GROUP BY</c> a value cannot be a key at all, because <c>Value</c> is <see cref="PerRow"/>.
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/>.
+    ///
+    /// Steps:
+    /// - Build a statement ordered by <c>Desc(Value(1))</c> on each dialect, and one ordered by <c>Asc(Value(1.5m))</c> on
+    ///   PostgreSQL, where a decimal key is allowed.
+    /// - Render statements ordered by <c>Add(Value(1), Value(0))</c>, by <c>CurrentTimestamp()</c>, and by
+    ///   <c>Raw&lt;int&gt;($"{1}")</c>.
+    ///
+    /// Expected:
+    /// - The first two throw <see cref="InvalidOperationException"/>; the others render.
+    /// </remarks>
+    [Fact]
+    public void OrderBy_KeyThatIsOnlyAValue_Throws()
+    {
+        var query = new OrderByValue();
+        Assert.Throws<InvalidOperationException>(() => query.Build(new Database<SqliteDialect>(new FakeConnection())));
+        Assert.Throws<InvalidOperationException>(() => query.Build(new Database<PostgreSqlDialect>(new FakeConnection())));
+        Assert.Throws<InvalidOperationException>(() => query.Build(new Database<MySqlDialect>(new FakeConnection())));
+        Assert.Throws<InvalidOperationException>(() => query.Build(new Database<MariaDbDialect>(new FakeConnection())));
+        Assert.Throws<InvalidOperationException>(() => query.Build(new Database<SqlServerDialect>(new FakeConnection())));
+
+        var pg = new Database<PostgreSqlDialect>(new FakeConnection());
+        Assert.Throws<InvalidOperationException>(() => pg.From(Account.Table).Select(a => a.Id).OrderBy(a => [Asc(Value(1.5m))]).ToSql());
+        Assert.Equal(
+            "SELECT \"accounts\".\"id\" FROM \"accounts\" ORDER BY ($1 + $2) DESC",
+            pg.From(Account.Table).Select(a => a.Id).OrderBy(a => [Desc(Add(Value(1), Value(0)))]).ToSql().Text
+        );
+        Assert.Equal(
+            "SELECT \"accounts\".\"id\" FROM \"accounts\" ORDER BY CURRENT_TIMESTAMP DESC",
+            pg.From(Account.Table).Select(a => a.Id).OrderBy(a => [Desc(CurrentTimestamp())]).ToSql().Text
+        );
+        Assert.Equal(
+            "SELECT \"accounts\".\"id\" FROM \"accounts\" ORDER BY $1 ASC",
+            pg.From(Account.Table).Select(a => a.Id).OrderBy(a => [Asc(Raw<int>($"{1}"))]).ToSql().Text
+        );
+    }
+
+    public enum KeyForm
+    {
+        Value,
+        ValueExpression,
+        CurrentTimestamp,
+        ColumnAndValue,
+        Raw,
+        ColumnExpression,
+    }
+
+    private sealed class KeyOnlyValues(KeyForm form) : IQueryCase
+    {
+        public SqlStatement Build<TDialect>(Database<TDialect> db)
+            where TDialect : IDialect =>
+            form switch
+            {
+                KeyForm.Value => db.From(Account.Table).GroupBy(a => Value(2)).Select((k, a) => (k, Count())).ToSql(),
+                KeyForm.ValueExpression => db.From(Account.Table).GroupBy(a => Add(Value(1), Value(2))).Select((k, a) => Count()).ToSql(),
+                KeyForm.CurrentTimestamp => db.From(Account.Table).GroupBy(a => CurrentTimestamp()).Select((k, a) => Count()).ToSql(),
+                KeyForm.ColumnAndValue => db.From(Account.Table).GroupBy(a => (a.Status, Value(2))).Select((k, a) => (k.Item1, Count())).ToSql(),
+                KeyForm.Raw => db.From(Account.Table).GroupBy(a => Raw<int>($"1")).Select((k, a) => Count()).ToSql(),
+                _ => db.From(Account.Table).GroupBy(a => Add(a.LoginCount, 1)).Select((k, a) => Count()).ToSql(),
+            };
+    }
+
+    private sealed class OrderByValue : IQueryCase
+    {
+        public SqlStatement Build<TDialect>(Database<TDialect> db)
+            where TDialect : IDialect => db.From(Account.Table).Select(a => a.Id).OrderBy(a => [Desc(Value(1))]).ToSql();
+    }
+
     private sealed class OneKey : IQueryCase
     {
         public SqlStatement Build<TDialect>(Database<TDialect> db)

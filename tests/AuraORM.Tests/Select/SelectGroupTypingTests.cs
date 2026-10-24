@@ -65,8 +65,8 @@ public sealed class SelectGroupTypingTests
     ///
     /// Steps:
     /// - Compile a column that is not a key in the select list (alone, beside <c>Count()</c>, and as the whole row), a row
-    ///   value in <c>Having</c> and in <c>OrderBy</c>, an aggregate as a key, an aggregate of the key, and <c>k.Item1</c> on a
-    ///   single key.
+    ///   value in <c>Having</c> and in <c>OrderBy</c>, an aggregate as a key, an aggregate of the key, <c>k.Item1</c> on a
+    ///   single key, and a value (<see cref="PerRow"/>) in <c>OrderBy</c>.
     ///
     /// Expected:
     /// - Each fails with the diagnostics named in the test case, and nothing else.
@@ -80,6 +80,11 @@ public sealed class SelectGroupTypingTests
     [InlineData("var q = sqlite.From(Account.Table).GroupBy(a => Count());", "CS0266", "CS1662")]
     [InlineData("var q = sqlite.From(Account.Table).GroupBy(a => a.Status).Select((k, a) => Count(k));", "CS1503")]
     [InlineData("var q = sqlite.From(Account.Table).GroupBy(a => a.Status).Select((k, a) => k.Item1);", "CS1061")]
+    [InlineData(
+        "var q = sqlite.From(Account.Table).GroupBy(a => a.Status).Select((k, a) => k).OrderBy((k, a) => [Asc(Value(1))]);",
+        "CS0029",
+        "CS1662"
+    )]
     public void GroupBy_RowValuesAfterGrouping_DoNotCompile(string body, params string[] ids)
     {
         CompileAssert.Fails(body, ids);

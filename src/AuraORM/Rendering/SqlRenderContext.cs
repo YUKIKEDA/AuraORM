@@ -44,6 +44,16 @@ internal sealed class SqlRenderContext : IDisposable
     public bool InHaving { get; set; }
 
     /// <summary>
+    /// Gets the number of columns written so far, and of raw SQL texts, which may name columns (§5.5).
+    /// </summary>
+    public int ColumnsWritten { get; private set; }
+
+    /// <summary>
+    /// Counts a raw SQL text in <see cref="ColumnsWritten"/>, because it may name a column.
+    /// </summary>
+    public void CountOpaqueSql() => ColumnsWritten++;
+
+    /// <summary>
     /// Enters the <c>FROM</c> of a statement: until <see cref="ExitScope"/>, a column must belong to one of these tables or
     /// to a table of an enclosing statement (§14.3).
     /// </summary>
@@ -63,6 +73,7 @@ internal sealed class SqlRenderContext : IDisposable
     /// <param name="column">The name of the column.</param>
     public void CheckInScope(TableAlias table, string column)
     {
+        ColumnsWritten++;
         if (_scopes.Count == 0)
         {
             return;

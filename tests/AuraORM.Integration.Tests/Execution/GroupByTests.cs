@@ -356,6 +356,33 @@ public abstract class GroupByTests<TDialect>
     }
 
     /// <summary>
+    /// An expression of values and a function as <c>ORDER BY</c> keys are expressions on every database, not column
+    /// positions, so the next key decides the order (design §5.8).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="SeedPeopleAsync"/>: ids 1 to 4.
+    ///
+    /// Steps:
+    /// - Select the ids ordered by <c>Add(Value(1), Value(0))</c>, then <c>CurrentTimestamp()</c>, then the id descending.
+    ///
+    /// Expected:
+    /// - 4, 3, 2, 1. A key read as column position 1 would order by the id ascending.
+    /// </remarks>
+    [Fact]
+    public async Task OrderBy_ValueExpressionAndFunction_AreNotColumnPositions()
+    {
+        Database<TDialect> db = await SeedPeopleAsync();
+
+        List<long> ids = await db.From(Person.Table)
+            .Select(p => p.Id)
+            .OrderBy(p => [Asc(Add(Value(1), Value(0))), Asc(CurrentTimestamp()), Desc(p.Id)])
+            .ToListAsync(Ct);
+
+        Assert.Equal([4L, 3L, 2L, 1L], ids);
+    }
+
+    /// <summary>
     /// On an empty table, an aggregate projection without <c>GroupBy</c> returns one row (a count of 0, null for the
     /// others), and a grouped statement returns no row (design §4.5).
     /// </summary>

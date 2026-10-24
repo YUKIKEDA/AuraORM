@@ -10,6 +10,8 @@ internal sealed class DecimalOrderingNode(SqlNode inner, string operation) : Sql
 {
     public SqlNode Inner { get; } = inner;
 
+    public override SqlNode Unwrapped => Inner.Unwrapped;
+
     public override void Render(SqlRenderContext context)
     {
         context.Dialect.CheckDecimalOrdering(operation);
