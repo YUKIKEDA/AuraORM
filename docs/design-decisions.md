@@ -168,9 +168,10 @@
 
 ## D1-28 グループの段階のサブクエリ
 
-- **Decision**: `GroupScalar` / `GroupExists` は `PerGroup` の式と条件を作る。その中で外側の列は `k` を通してだけ使え、ほかは組み立て時の例外にする。`Scalar` / `Exists` は `PerRow` のまま（§5.11）。
+- **Decision**: `GroupScalar` / `GroupExists` は `PerGroup` の式と条件を作る。その中で外側の列は `Outer(k)`（列のキーだけ）を通してだけ使え、ほかは組み立て時の例外にする。`Scalar` / `Exists` は `PerRow` のまま（§5.11）。
 - **Reason**: `HAVING COUNT(*) > (SELECT …)` は全方言で正しいので書けなければならない。HAVING に外側の行の列を書く誤りは SQLite が報告しないので止める。C# の型は戻り値で多重定義できず、二つの段階を実装する型は推論に失敗する。Issue #35 の Grill で所有者が決めた。
 - **Rejected**: `PerRow` だけにする案（正しいクエリが生 SQL でしか書けない）。段階を型引数で明示する案（C# は型引数を一部だけ推論できないので、四つすべてを書くことになる）。
+- **Outer(k)**: Grill の後、`k` が `PerGroup` なのでサブクエリの `Where`（`PerRow`）に書けないことが #37 の実装で分かった。所有者が `Outer(k)` を足すと決めた。キーを `PerRow` にしたラムダの引数で渡す案（タプルのキーごとに型が要る）と、相関なしだけにする案（正しいクエリが書けない）は採らなかった。`Outer` を列のキーに限るのは、列でないキーの参照が方言によって `MIN` の有無で通ったり失敗したりし（PostgreSQL、MySQL、MariaDB は `MIN` が要り、SQLite は `MIN` を拒む）、外側の集計の参照は SQLite が拒むためである。
 
 ## D1-29 WITH の位置
 
