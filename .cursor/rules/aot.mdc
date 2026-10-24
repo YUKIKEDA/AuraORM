@@ -28,6 +28,8 @@ dotnet publish samples/<Sample> -c Release -r win-x64 -o <scratch>
 <scratch>/<Sample>.exe
 ```
 
+The first line is required: without the Visual Studio Installer folder on `PATH`, the link step fails with MSB3073 (`'vswhere.exe' is not recognized`) after ILC has run. The Bash tool's `PATH` lacks it too, so publish from PowerShell with the lines above.
+
 A second publish into the same output reuses the ILC result and does not report its warnings again, so a local check after a change starts from a clean `obj/` (CI always does).
 
 A size that grew is split by what added it before the PR says so: publish with `-p:IlcGenerateMapFile=true` and compare the map files.
