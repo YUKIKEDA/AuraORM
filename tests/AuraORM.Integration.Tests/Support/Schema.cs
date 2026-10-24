@@ -61,6 +61,13 @@ public sealed partial record TypedRow(
 public sealed partial record Pet([PrimaryKey] long Id, long? OwnerId, [MaxLength(50)] string Name);
 
 /// <summary>
+/// A note, whose key the database assigns and whose other columns may be left out of an insert: the table of the insert
+/// tests (design §6).
+/// </summary>
+[Table("notes", Naming = ColumnNaming.SnakeCase)]
+public sealed partial record Note([PrimaryKey, AutoIncrement] long Id, string? Body, [Default(0)] int Priority);
+
+/// <summary>
 /// The number of pets of an owner, for the derived tables and CTEs of the tests (design §3.5, §5.11).
 /// </summary>
 [QueryResult]

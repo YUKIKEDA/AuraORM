@@ -14,6 +14,8 @@ internal sealed class SqlRenderContext : IDisposable
     private int _statementDepth;
     private int _groupBoundary = -1;
     private int _keyDepth;
+    private TableAlias? _mutationTarget;
+    private HashSet<string>? _assignedBefore;
 
     public SqlRenderContext(DialectRenderer dialect)
     {
@@ -168,6 +170,64 @@ internal sealed class SqlRenderContext : IDisposable
     }
 
     /// <summary>
+    /// Starts an <c>UPDATE</c> or <c>DELETE</c>: its columns are in scope, and a subquery inside it is an inner statement
+    /// (§5.11, §7).
+    /// </summary>
+    /// <param name="target">The table that the statement changes.</param>
+    public void EnterMutation(TableAlias target)
+    {
+        EnterStatement();
+        EnterScope([target]);
+        _mutationTarget = target;
+    }
+
+    /// <summary>
+    /// Ends the statement that <see cref="EnterMutation"/> started.
+    /// </summary>
+    public void ExitMutation()
+    {
+        _mutationTarget = null;
+        ExitScope();
+        ExitStatement();
+    }
+
+    /// <summary>
+    /// Writes the value of an assignment. On MySQL and MariaDB, which assign from left to right, the value cannot read a
+    /// column of the target assigned before it (§7).
+    /// </summary>
+    /// <param name="value">The value.</param>
+    /// <param name="assignedBefore">The columns assigned before this one, or <see langword="null"/> when the dialect assigns
+    /// all at once.</param>
+    public void WriteAssignedValue(SqlNode value, HashSet<string>? assignedBefore)
+    {
+        _assignedBefore = assignedBefore;
+        value.Render(this);
+        _assignedBefore = null;
+    }
+
+    /// <summary>
+    /// Throws when a table in a <c>FROM</c> or a join inside an <c>UPDATE</c> or <c>DELETE</c> is the table that the
+    /// statement changes, on a dialect that rejects it (MySQL, error 1093, §7).
+    /// </summary>
+    /// <param name="table">The table's occurrence.</param>
+    public void CheckTargetRead(TableAlias table)
+    {
+        if (
+            _mutationTarget is not null
+            && Dialect.RejectsTargetInMutationSubquery
+            && table.Table == _mutationTarget.Table
+            && table.Schema == _mutationTarget.Schema
+        )
+        {
+            throw new InvalidOperationException(
+                "A subquery reads "
+                    + table.Table
+                    + ", the table that the statement changes, which MySQL rejects (error 1093); a derived table avoids it only when the optimizer materializes it. Read the values with a SELECT first and pass them to In(column, values)."
+            );
+        }
+    }
+
+    /// <summary>
     /// Writes a CTE of the outermost statement's <c>WITH</c>: <c>"t" AS (SELECT …)</c>. From then on, a reference to the named
     /// query writes its name (§5.11).
     /// </summary>
@@ -303,6 +363,21 @@ internal sealed class SqlRenderContext : IDisposable
     public void CheckInScope(TableAlias table, string column)
     {
         ColumnsWritten++;
+        if (_assignedBefore is not null && ReferenceEquals(table, _mutationTarget) && _assignedBefore.Contains(column))
+        {
+            throw new InvalidOperationException(
+                "The value of an assignment reads the column "
+                    + column
+                    + ", which the same UPDATE assigns before it. "
+                    + Dialect.Name
+                    + " assigns from left to right, so the value would read the new "
+                    + column
+                    + " where other databases read the old one. Assign "
+                    + column
+                    + " after this column, or split the statement."
+            );
+        }
+
         if (_scopes.Count == 0)
         {
             return;

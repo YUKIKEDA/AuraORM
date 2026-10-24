@@ -22,7 +22,7 @@
 | Q4 | SELECT: サブクエリ（`In` / `NotIn` / `Exists` / `Scalar`、`GroupScalar` / `GroupExists`、相関）（§5.11、§14） | #37 | done |
 | Q5 | SELECT: 集合演算と、その後の `OrderBy` / `Limit` / `Offset`（§5.10） | #44 | done |
 | Q6 | SELECT: 派生テーブル、CTE、`[QueryResult]` の型の `Columns`（§3.5、§5.11） | #51 | done |
-| M1 | INSERT / UPDATE / DELETE と RETURNING、SQLite の最小版（3.39）の結合テスト（§6〜§9、§17） | - | planned |
+| M1 | INSERT / UPDATE / DELETE と RETURNING、SQLite の最小版（3.39）の結合テスト（§6〜§9、§17） | #60、#61 | planned |
 | M2 | UPSERT（§10） | - | planned |
 | V1 | 値コンバーター（§3.6） | - | planned |
 | S1 | DDL（§13） | - | planned |

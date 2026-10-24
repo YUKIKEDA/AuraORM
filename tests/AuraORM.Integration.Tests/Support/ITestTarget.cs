@@ -9,7 +9,7 @@ public interface ITestTarget<TDialect> : IAsyncDisposable
     where TDialect : IDialect
 {
     /// <summary>
-    /// Gets a database whose <c>people</c>, <c>typed_values</c>, and <c>pets</c> tables exist and are empty. On SQLite each call gives a new
+    /// Gets a database whose <c>people</c>, <c>typed_values</c>, <c>pets</c>, and <c>notes</c> tables exist and are empty. On SQLite each call gives a new
     /// database; on a server each call drops and creates the tables again, which empties the databases of earlier calls, so
     /// the tests of one server run one at a time (an xUnit collection).
     /// </summary>

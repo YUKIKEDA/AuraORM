@@ -28,6 +28,29 @@ internal abstract class DialectRenderer
     public virtual int MaxSetOperands => int.MaxValue;
 
     /// <summary>
+    /// Gets the largest number of rows that one <c>INSERT … VALUES</c> may have (§6.2). The default has no limit.
+    /// </summary>
+    public virtual int MaxInsertRows => int.MaxValue;
+
+    /// <summary>
+    /// Gets a value indicating whether rows that set no column are written <c>() VALUES (), ()</c>, which allows several of
+    /// them (MySQL and MariaDB). The other dialects write <c>DEFAULT VALUES</c>, which is one row (§6.2).
+    /// </summary>
+    public virtual bool WritesEmptyValueRows => false;
+
+    /// <summary>
+    /// Gets a value indicating whether the assignments of a single-table <c>UPDATE</c> are evaluated from left to right, so
+    /// that a value reads the new value of a column assigned before it (MySQL and MariaDB, §7).
+    /// </summary>
+    public virtual bool AssignsLeftToRight => false;
+
+    /// <summary>
+    /// Gets a value indicating whether a subquery of an <c>UPDATE</c> or <c>DELETE</c> cannot read the table that the
+    /// statement changes (MySQL, error 1093, §7).
+    /// </summary>
+    public virtual bool RejectsTargetInMutationSubquery => false;
+
+    /// <summary>
     /// Gets a value indicating whether parameters are unnamed and bound by position (PostgreSQL, §5.12).
     /// </summary>
     public virtual bool UsesPositionalParameters => false;

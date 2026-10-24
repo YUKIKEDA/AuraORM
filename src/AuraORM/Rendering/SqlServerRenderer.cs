@@ -10,6 +10,9 @@ internal sealed class SqlServerRenderer : DialectRenderer
     // An RPC request carries at most 2100 parameters.
     public override int MaxParameters => 2100;
 
+    // §6.2: a table value constructor in INSERT … VALUES has at most 1000 rows (error 10738).
+    public override int MaxInsertRows => 1000;
+
     // §4.2: LEN returns bigint for the max types (nvarchar(max) is the default string column), so the result is cast to the
     // int that Length reads on every dialect.
     public override void RenderLength(SqlRenderContext context, SqlNode argument)

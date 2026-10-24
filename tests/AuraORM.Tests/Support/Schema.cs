@@ -49,3 +49,17 @@ public sealed partial record NameTotal(string Name, decimal? Total);
 /// </summary>
 [QueryResult]
 public sealed partial record EmailCount(string Email, long Count);
+
+/// <summary>
+/// A table whose columns all have a value without being set: an auto-increment key, a nullable column, and a default, for
+/// an <c>INSERT</c> that sets no column (design §6.2).
+/// </summary>
+[Table("notes")]
+public sealed partial record Note([PrimaryKey, AutoIncrement] long Id, string? Body, [Default(0)] int Priority);
+
+/// <summary>
+/// A table with the name of <see cref="Account"/>'s table in another schema, which a check on the table being changed must
+/// tell apart from it (design §7).
+/// </summary>
+[Table("accounts", Schema = "archive", Naming = ColumnNaming.SnakeCase)]
+public sealed partial record ArchivedAccount([PrimaryKey] long Id, [MaxLength(200)] string Email);
