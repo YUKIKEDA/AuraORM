@@ -80,10 +80,7 @@ List<(int?, long)> keyed = await db.From(Book.Table)
 checks.SameItems("group by a key with a value", [((int?)413, 1L)], keyed);
 
 // Subqueries: IN, a correlated EXISTS and scalar, and a group subquery correlated through Outer(k).
-List<string> lent = await db.From(Book.Table)
-    .Where(b => In(b.Id, db.From(Loan.Table).Select(l => l.BookId)))
-    .Select(b => b.Title)
-    .ToListAsync();
+List<string> lent = await db.From(Book.Table).Where(b => In(b.Id, db.From(Loan.Table).Select(l => l.BookId))).Select(b => b.Title).ToListAsync();
 checks.SameItems("in subquery", ["Cosmos"], lent);
 List<(string, string?)> borrowers = await db.From(Book.Table)
     .Where(b => Exists(db.From(Loan.Table).Where(l => Eq(l.BookId, b.Id)).Select(l => l.Id)))
