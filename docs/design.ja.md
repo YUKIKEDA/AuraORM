@@ -143,6 +143,7 @@ flowchart LR
 | `IUnorderedLimitDialect` | ORDER BY のない LIMIT | ✓ | ✓ | ✓ | ✓ | |
 | `IOffsetWithoutLimitDialect` | `ORDER BY` の後の、LIMIT のない OFFSET | | ✓ | | | ✓ |
 | `IUnorderedOffsetDialect` | `ORDER BY` も LIMIT もない OFFSET | | ✓ | | | |
+| `ILimitInSubqueryDialect` | `IN` / `NOT IN` のサブクエリの LIMIT（§5.11） | ✓ | ✓ | | | ✓ |
 | `IOnConflictDialect` | `ON CONFLICT` による UPSERT | ✓ | ✓ | | | |
 | `IOnDuplicateKeyDialect` | `ON DUPLICATE KEY UPDATE` による UPSERT | | | ✓ | ✓ | |
 | `ICreateTableIfNotExistsDialect` | `CREATE TABLE IF NOT EXISTS` | ✓ | ✓ | ✓ | ✓ | |
@@ -447,6 +448,8 @@ SQL の三値論理はそのまま残す。そのうえで、次の二つはア�
 
 `IN` の値の一覧に `null` が入っていても NULL の行には一致しないので、`In` の値の型が nullable なら同じく AURA0202 にする。
 
+- **AURA0203**: `NotIn(a, sub)` のサブクエリの結果の型が NULL を許す（`int?`、`string?`）。サブクエリが一行でも NULL を返すと `NOT IN` はどの行にも一致しない（全方言で確かめた。§5.11）。直し方として、`Not(Exists(…))` で書くか、NULL を除いた式（`Coalesce`）を選ぶことを示す。値型も参照型もアナライザーで判断する（制約だけが違う多重定義は C# で書けないので、値型も型では止めない）。
+
 ### 4.5 評価の段階: 行とグループ
 
 集計を含むクエリでは、`SELECT`、`HAVING`、`ORDER BY` に、`GROUP BY` のキーか集計の結果しか書けない。SQLite はこの誤りを報告せず、グループの中の任意の行の値を返す。AuraORM はこれを型で防ぐ。
@@ -495,6 +498,11 @@ stateDiagram-v2
     Limited --> Offset: Offset
     Selected --> Offset: Offset（IUnorderedOffsetDialect）
     Ordered --> Offset: Offset（IOffsetWithoutLimitDialect）
+    Selected --> Combined: Union / UnionAll / Intersect / Except
+    Combined --> Combined: 同じ演算子
+    Combined --> Ordered: OrderBy（位置の番号）
+    Combined --> Limited: Limit（IUnorderedLimitDialect）
+    Combined --> [*]: 実行 / ToSql
     Selected --> [*]: 実行 / ToSql
     Ordered --> [*]: 実行 / ToSql
     Limited --> [*]: 実行 / ToSql
@@ -563,7 +571,7 @@ db.From(Order.Table)
 - 後の段階のラムダは、最初の引数にキー（`k`）を、続いて各テーブルの列の集合を受け取る。キーが一つの式なら `k` はその式（`PerGroup`）で、タプルなら `k.Item1` から順に `PerGroup` の式である（`GroupBy(o => o.Customer).Select((k, o) => (k, Count()))`）。
 - キーにパラメータを含む式（`Add(o.Price, 1)`）を書いてもよい。キーの式を SELECT や HAVING で使うと、同じパラメータが使われる（§5.12）。
 - MySQL と MariaDB では、列ではないキー（`Add(o.Price, 1)` など）を `HAVING` に書くと `MIN(キー)` と出力する（``HAVING MIN((`orders`.`Price` + @p0)) > @p1``）。この二つは `HAVING` の中の式を `GROUP BY` の式と照らし合わせず、`Unknown column` で失敗するためである（MySQL のバグ 24083 と 78395、MariaDB 12 でも同じことを確かめた）。キーはグループの中で一つの値（NULL を含む）なので、`MIN` を付けても結果は変わらない。列のキー、SELECT、ORDER BY ではそのまま出す。
-- キーの式には列が一つ以上なければならない。列を含まないキー（`Value(2)`、`Add(Value(1), Value(2))`、`CurrentTimestamp()`）は、文を組み立てるときに `InvalidOperationException` になる（§14.3）。SQL Server は GROUP BY の式ごとに列を求め、メッセージ 164 で失敗する。MySQL と MariaDB では値が SQL に埋め込まれるので、値一つのキーが `GROUP BY 2` と列の位置として読まれ、`Can't group on 'COUNT(*)'` で失敗する（どちらも SQL Server 2025、MySQL 9、MariaDB 12、MySqlConnector 2.6.2 で確かめた）。SQLite と PostgreSQL では通るが、表全体を一つのグループにするだけの文である。生 SQL の断片（`Raw<T>`）は中を見ないので、列を含むものとして通す。
+- キーの式には列が一つ以上なければならない。列を含まないキー（`Value(2)`、`Add(Value(1), Value(2))`、`CurrentTimestamp()`）は、文を組み立てるときに `InvalidOperationException` になる（§14.3）。SQL Server は GROUP BY の式ごとに列を求め、メッセージ 164 で失敗する。MySQL と MariaDB では値が SQL に埋め込まれるので、値一つのキーが `GROUP BY 2` と列の位置として読まれ、`Can't group on 'COUNT(*)'` で失敗する（どちらも SQL Server 2025、MySQL 9、MariaDB 12、MySqlConnector 2.6.2 で確かめた）。SQLite と PostgreSQL では通るが、表全体を一つのグループにするだけの文である。生 SQL の断片（`Raw<T>`）は中を見ないので、列を含むものとして通す。サブクエリ（`Scalar`）を含むキーも、同じく組み立てるときに `InvalidOperationException` になる（SQL Server はメッセージ 144、MySQL は相関していればメッセージ 1055 で失敗する）。
 - 列の集合は集計関数の引数にだけ使える（§4.5）。
 
 ### 5.6 射影
@@ -635,14 +643,53 @@ var q = db.From(User.Table).Select(u => u.Name)
 - `Union`、`UnionAll`、`Intersect`、`Except` は、`Selected` の段階（`OrderBy` の前）どうしで、結果の型と方言が同じものだけを結べる。
 - 被演算子をかっこで囲まない（SQLite が受け付けないため）。そのため、被演算子に `ORDER BY` と `LIMIT` は書けない（型でそうなっている）。
 - 一つの連鎖には同じ演算子しか書けない（`a.Union(b).Union(c)` は書けるが、`a.Union(b).Intersect(c)` は CS1061）。標準 SQL（PostgreSQL、MySQL、MariaDB、SQL Server）は `INTERSECT` を `UNION` / `EXCEPT` より強く結ぶが、SQLite は複合 SELECT を左から順に評価するので、かっこのない混在は同じ SQL で方言によって違う行を返す（SQLite 3.40 で `SELECT 1 UNION SELECT 2 INTERSECT SELECT 2` は `2` だけを返した）。演算子を混ぜるときは、先の集合演算を派生テーブル（§5.11）にして、その外側で次の演算子を書く。
-- 集合演算の結果は実行するか、派生テーブル（§5.11）として外側のクエリで並べ替える。
+- 集合演算の後に `OrderBy`、`Limit`、`Offset` を書ける（行 Q5）。これらは複合 SELECT 全体にかかる（`… UNION … ORDER BY 1 ASC LIMIT @p0`）。`OrderBy` のラムダは結果の項目を受け取り、キーは項目の位置の番号になる。項目がどのテーブルの列かは被演算子ごとに違うので、`SelectDistinct` の `OrderBy`（§5.7、D1-16）と同じ形にする。射影が一つの式か式のタプルのときだけ `OrderBy` があり、行全体と結果の型の射影には `OrderBy` がない（派生テーブル（§5.11）にして外側で並べ替える）。`Limit` と `Offset` を書ける段階は §5.9 の方言の規則と同じである。全方言で `… UNION … ORDER BY 1 … LIMIT` が通ることを確かめた（SQLite 3.40、PostgreSQL 18、MySQL 9、MariaDB 12、SQL Server 2025）。Drizzle ORM、Kysely、jOOQ も、集合演算の後の `orderBy` / `limit` を許す（§19）。
 
 ### 5.11 サブクエリ、派生テーブル、CTE
 
-- `In(a, subquery)`、`Exists(subquery)`、`Scalar(subquery)` は、サブクエリをかっこで囲んで展開する。`Scalar` の結果は、射影の `T` を NULL を許す型にした `PerRow` の式である（行がなければ NULL）。
-- 外側のクエリのラムダの引数を内側のラムダで使えば、相関サブクエリになる。
-- 派生テーブル: 結果の型の射影を持つクエリに `As("名前")` を付けると、テーブル参照になる。`db.From(sub.As("t"))` は `FROM (SELECT … ) AS "t"` を出し、ラムダには `UserOrderTotal.Columns` が渡る。
-- CTE: `var t = db.Cte("t", sub);` で名前付きのテーブル参照を作り、`db.With(t).From(t)` と書く。`WITH "t" AS (SELECT …) SELECT … FROM "t"` を出す。再帰 CTE は §18 の別行にする。
+この節の振る舞いは、SQLite 3.40、PostgreSQL 18、MySQL 9、MariaDB 12、SQL Server 2025 で確かめた。
+
+**サブクエリ**（行 Q4）
+
+```csharp
+db.From(User.Table).Where(u => In(u.Id, db.From(Order.Table).Select(o => o.UserId)))
+// WHERE "users"."Id" IN (SELECT "orders"."UserId" FROM "orders")
+
+db.From(User.Table).Where(u => Exists(db.From(Order.Table).Where(o => Eq(o.UserId, u.Id)).Select(o => o.Id)))
+// WHERE EXISTS (SELECT "orders"."Id" FROM "orders" WHERE "orders"."UserId" = "users"."Id")
+
+db.From(User.Table).Select(u => (u.Name, Scalar(db.From(Order.Table).Where(o => Eq(o.UserId, u.Id)).Select(o => Max(o.Amount)))))
+// SELECT "users"."Name", (SELECT MAX("orders"."Amount") FROM "orders" WHERE "orders"."UserId" = "users"."Id") FROM "users"
+
+db.From(Order.Table).GroupBy(o => o.UserId)
+  .Having((k, o) => Gt(Sum(o.Amount), GroupScalar(db.From(Quota.Table).Where(q => Eq(q.UserId, k)).Select(q => q.Amount))))
+// HAVING SUM("orders"."Amount") > (SELECT "quotas"."Amount" FROM "quotas" WHERE "quotas"."UserId" = "orders"."UserId")
+```
+
+- `In(a, sub)` / `NotIn(a, sub)` は、サブクエリの結果の型 `T` が `a` の型と合うものだけを受け取る（`a` が `IExpr<T?, …>` なら、値の一覧の `In` と同じく `T` のサブクエリも受け取る）。タプルの射影の結果の型はタプル、行全体と結果の型の射影は行の型なので、型が合えばサブクエリの項目は一つに決まる。新しい段階の型は作らない。jOOQ の `in(Select<? extends Record1<T>>)` と EF Core の `Contains<T>` も、結果の型で一つの列を求める（§19）。条件の段階は `a` の段階である。
+- `Exists(sub)` は、射影のあるどのサブクエリも受け取る。`PerRow` の条件である。
+- `Scalar(sub)` は、一つの式の射影のサブクエリから、その `T` を NULL を許す型にした `PerRow` の式を作る（行がなければ NULL）。Kysely も、選択の中のサブクエリを NULL を許す型にする（§19）。
+- `GroupScalar(sub)` / `GroupExists(sub)` は、`PerGroup` の式と条件を作る。`Having`、`GroupBy` の後の `Select` と `OrderBy` で使う。その中では、外側の文の列を `k`（GROUP BY のキー）を通してだけ使える。ほかの外側の列を使うと、文を組み立てるときに `InvalidOperationException` になる（§14.3）。HAVING には GROUP BY のキーと集計しか書けず、SQLite はこの誤りを報告しないためである（§4.5）。C# の型は戻り値で多重定義できず、二つの段階を実装する型は推論に失敗する（CS0411）ので、名前を分けた。
+- 外側のクエリのラムダの引数を内側のラムダで使えば、相関サブクエリになる。内側の列を外側の文で使うと、文の外の列として例外になる（§14.3）。
+- サブクエリにできるのは射影のある段階である: `Select` / `SelectDistinct` の後、`GroupBy` の後の射影、`Limit` / `Offset` の後、集合演算（行 Q5）。`OrderBy` の後で `Limit` も `Offset` もない段階は置けない（CS1503）。その並び順は外側では保証されず、SQL Server はメッセージ 1033 で失敗する。EF Core はこの `ORDER BY` を黙って消し、jOOQ は `TOP` を足すが、どちらも書いたものと違う SQL になる（§19）。
+- MySQL と MariaDB では、`Limit` の後のサブクエリを `In` / `NotIn` に渡すとコンパイルエラーになる（CS0311、`ILimitInSubqueryDialect`）。この二つはメッセージ 1235（`LIMIT & IN/ALL/ANY/SOME subquery`）で失敗する。jOOQ と linq2db はサブクエリを派生テーブルで包むが、見えないサブクエリが増えるのでそうしない（§19）。`Exists` と `Scalar` は `Limit` 付きでも全方言で通る。
+- `NotIn(a, sub)` のサブクエリが NULL を返しうるときは AURA0203 になる（§4.4）。EF Core は `NOT EXISTS` などに書き換えるが、AuraORM は書いた SQL を変えない（§19）。
+- 外側の文と方言の違うサブクエリ（`SqlBuilder<SqliteDialect>` で作ったものを SQL Server の文に入れる）は、文を組み立てるときに `InvalidOperationException` になる（§14.3）。式の型は方言を持たないので型では止められず、サブクエリの方言ごとの規則（§5.9）を素通りさせないためである。
+- 2 行以上を返す `Scalar` は、SQLite だけ黙って 1 行目を返し、ほかはエラーになる（§14.2）。
+
+**派生テーブル**（行 Q6）
+
+- 結果の型の射影か、一つのテーブルの行全体を射影にしたクエリに `As("名前")` を付けると、テーブル参照になる。`db.From(sub.As("t"))` は `FROM (SELECT … ) AS "t"` を出し、ラムダには `UserOrderTotal.Columns`（行全体なら `Account.Columns`）が渡り、その列は `"t"."列名"` を指す。結合の相手にもできる。
+- 派生テーブルの中の SELECT の項目には `AS "列名"` を付ける（結果の型ではメンバー名、行全体では列名）。一番外側の SELECT には今までどおり付けない（§5.12）。集合演算を派生テーブルにするときは、最初の被演算子の別名が列の名前になる（全方言で確かめた）。
+- 一つの式や式のタプルの射影は、列に名前がないので派生テーブルにできない。Drizzle ORM と Kysely も、名前のない式には別名を求める（§19）。
+- 派生テーブルにできる段階は、サブクエリと同じである（`OrderBy` だけの段階は置けない）。
+
+**CTE**（行 Q6）
+
+- `var t = db.Cte("t", sub);` で名前付きのテーブル参照を作り、`db.With(t).From(t)` と書く。`WITH "t" AS (SELECT …) SELECT … FROM "t"` を出す。`sub` の条件は派生テーブルと同じである。
+- `db.With(a, b)` で複数を順に書ける。後の CTE は前の CTE を参照できる（`WITH "a" AS (…), "b" AS (… FROM "a" …)`）。
+- WITH は一番外側の文にだけ書ける。`With` を持つ文をサブクエリ、派生テーブル、CTE の本体にすると、文を組み立てるときに `InvalidOperationException` になる（§14.3）。SQL Server は入れ子の WITH をメッセージ 156 で拒む。先頭で宣言した CTE は、内側のサブクエリと派生テーブルから参照できる（全方言で確かめた）。Drizzle ORM と Kysely は入れ子の WITH をそのまま出し（SQL Server で失敗する）、linq2db は外側に移す（書いた位置と出る位置が違い、パラメータの番号も入れ替わる。jOOQ の issue 3175 が同じ問題を挙げる）（§19）。
+- 再帰 CTE は §18 の C2 にする。
 
 ### 5.12 SQL の書式
 
@@ -967,6 +1014,9 @@ CREATE TABLE "users" (
 | 集合演算の演算子の混在 | 段階の型（§5.10） | CS1061 |
 | `SelectDistinct` の後の `OrderBy` に選んでいない式を書く | `OrderBy` が選んだ項目だけを受け取る（§5.7） | CS1503 / CS1061 |
 | UPDATE / DELETE の `Where` に「条件なし」になりうる条件を渡す | `Where` が `Condition<PerRow>` だけを受け取る（§4.2） | CS1503 |
+| MySQL、MariaDB で `Limit` の後のサブクエリを `In` / `NotIn` に渡す（§5.11） | 方言のインターフェースの制約（`ILimitInSubqueryDialect`） | CS0311 |
+| `OrderBy` の後で `Limit` も `Offset` もない段階をサブクエリ、派生テーブル、CTE にする（§5.11） | 受け取る段階の型 | CS1503 |
+| `NotIn` のサブクエリが NULL を返しうる（§5.11） | アナライザー | AURA0203 |
 | `SqlBuilder` から作った文を実行する | 実行のメソッドは `Executable` の文にだけある（§12.3） | CS1929 |
 | 文字列の SQL を断片に入れる | 補間文字列ハンドラーだけを受け取る | CS1503 |
 | 生 SQL の穴に書式指定か幅の指定を書く | ハンドラーにその `AppendFormatted` がない | CS1739 |
@@ -979,6 +1029,7 @@ CREATE TABLE "users" (
 - 生 SQL 断片（§11）の中身。
 - データベースのスキーマが、C# の定義と一致していること。AuraORM は実行時にスキーマを調べない。
 - データベースの照合順序、タイムゾーン、数値の精度による結果の違い。
+- `Scalar` / `GroupScalar` のサブクエリが 2 行以上を返すこと。SQLite は黙って 1 行目を返し、ほかの方言はエラーになる（§5.11）。行の数はデータで決まるので、型でも組み立て時にも止められない。
 - 参照型（`string`、`byte[]`、行全体）の NULL 可否の誤り（外部結合の NULL 化した側を NULL を許さない型で読む、など）。これは C# の null 許容の警告（CS8600、CS8619 など）が知らせるもので、利用者のプロジェクトで null 許容参照型が有効で（`<Nullable>enable</Nullable>`）、その警告をエラーにしているときだけコンパイルエラーになる。`#nullable disable` の文脈や、警告を抑止した文脈では何も出ない。値型の誤りは常にコンパイルエラーである。
 
 ### 14.3 実行前の検査
@@ -1000,6 +1051,10 @@ CREATE TABLE "users" (
 | `OrderBy` に空の配列を返した（§5.8） | `ArgumentException` |
 | `GroupBy` のキーに列が一つもない（§5.5） | `InvalidOperationException` |
 | `OrderBy` のキーが値だけ（§5.8） | `InvalidOperationException` |
+| `GroupBy` のキーにサブクエリがある（§5.5。SQL Server はメッセージ 144、MySQL は相関していればメッセージ 1055 で失敗する） | `InvalidOperationException` |
+| 外側の文と方言の違うサブクエリ、派生テーブル、CTE を使った（§5.11） | `InvalidOperationException` |
+| `GroupScalar` / `GroupExists` の中で、外側の文の列を `k` を通さずに使った（§5.11） | `InvalidOperationException` |
+| `With` を持つ文を、サブクエリ、派生テーブル、CTE の本体にした（§5.11） | `InvalidOperationException` |
 
 ## 15. 診断 ID
 
@@ -1020,6 +1075,7 @@ CREATE TABLE "users" (
 | AURA0113 | ジェネレーター | `[Default]` の定数が列の型に暗黙に変換できない |
 | AURA0201 | アナライザー | 比較の値に `null` リテラルを書いた |
 | AURA0202 | アナライザー | 比較の値の型が nullable である |
+| AURA0203 | アナライザー | `NotIn` のサブクエリの結果の型が nullable である |
 | AURA0301 | アナライザー | 生 SQL の穴の値の型が使えない |
 
 メッセージは英語の一文で、何が誤りかと、代わりに何を書くかを示す（`.agents/skills/english-writing/SKILL.md`）。診断はすべてエラーである。
@@ -1088,7 +1144,7 @@ v0.1 に入れるものと、その順序は [roadmap.md](./roadmap.md) にあ�
 - MySQL: [SELECT](https://dev.mysql.com/doc/refman/8.0/en/select.html)、[JOIN](https://dev.mysql.com/doc/refman/8.0/en/join.html)、[集合演算](https://dev.mysql.com/doc/refman/8.0/en/set-operations.html)、[INSERT … ON DUPLICATE KEY UPDATE](https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html)、[比較演算子](https://dev.mysql.com/doc/refman/8.0/en/comparison-operators.html)、[識別子](https://dev.mysql.com/doc/refman/8.0/en/identifiers.html)、[文字列関数](https://dev.mysql.com/doc/refman/8.0/en/string-functions.html)、[日付と時刻の関数（NOW）](https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html)、[DATETIME の型](https://dev.mysql.com/doc/refman/8.0/en/datetime.html)、[文字列の比較（LIKE と ESCAPE）](https://dev.mysql.com/doc/refman/8.0/en/string-comparison-functions.html)、[CREATE INDEX](https://dev.mysql.com/doc/refman/8.0/en/create-index.html)、[プレースホルダーの上限（バグ 101630）](https://bugs.mysql.com/bug.php?id=101630)、[GROUP BY の扱い（HAVING から参照できる名前）](https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html)、[HAVING の GROUP BY の式（バグ 24083）](https://bugs.mysql.com/bug.php?id=24083)、[同（バグ 78395）](https://bugs.mysql.com/bug.php?id=78395)、[集計関数（SUM の結果の型）](https://dev.mysql.com/doc/refman/8.4/en/aggregate-functions.html)。8.0 のサポート終了は [Percona の記事](https://www.percona.com/blog/mysql-8-0-end-of-life-date/) による（二次資料）
 - MariaDB: [UPDATE（RETURNING は 13.0 から）](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/changing-deleting-data/update)、[10.5.0（INSERT … RETURNING）](https://mariadb.com/docs/release-notes/community-server/old-releases/10.5/10.5.0)、[ON DUPLICATE KEY UPDATE](https://mariadb.com/docs/server/reference/sql-statements/data-manipulation/inserting-loading-data/insert-on-duplicate-key-update)、[CREATE INDEX](https://mariadb.com/docs/server/reference/sql-statements/data-definition/create/create-index)、[保守の方針](https://mariadb.org/about/#maintenance-policy)
 - SQL Server: [OUTPUT 句](https://learn.microsoft.com/en-us/sql/t-sql/queries/output-clause-transact-sql)、[UPDATE](https://learn.microsoft.com/en-us/sql/t-sql/queries/update-transact-sql)、[ORDER BY（OFFSET / FETCH）](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-order-by-clause-transact-sql)、[IS DISTINCT FROM](https://learn.microsoft.com/en-us/sql/t-sql/queries/is-distinct-from-transact-sql)、[識別子](https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers)、[CONCAT](https://learn.microsoft.com/en-us/sql/t-sql/functions/concat-transact-sql)、[CONCAT_NULL_YIELDS_NULL](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-concat-null-yields-null-transact-sql)、[比較演算子（真偽値）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/comparison-operators-transact-sql)、[検索条件](https://learn.microsoft.com/en-us/sql/t-sql/queries/search-condition-transact-sql)、[最大容量（パラメータ 2100）](https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server)、[CREATE TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-table-transact-sql)、[DROP TABLE](https://learn.microsoft.com/en-us/sql/t-sql/statements/drop-table-transact-sql)、[CREATE INDEX](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-index-transact-sql)、[集合演算子](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/set-operators-except-and-intersect-transact-sql)、[MIN](https://learn.microsoft.com/en-us/sql/t-sql/functions/min-transact-sql)、[SUM（real は float を返す）](https://learn.microsoft.com/en-us/sql/t-sql/functions/sum-transact-sql)、[LEN（max の型で bigint）](https://learn.microsoft.com/en-us/sql/t-sql/functions/len-transact-sql)、[テーブル値コンストラクター（1000 行）](https://learn.microsoft.com/en-us/sql/t-sql/queries/table-value-constructor-transact-sql)、[CURRENT_TIMESTAMP](https://learn.microsoft.com/en-us/sql/t-sql/functions/current-timestamp-transact-sql)、[LIKE（ESCAPE）](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/like-transact-sql)、[WITH](https://learn.microsoft.com/en-us/sql/t-sql/queries/with-common-table-expression-transact-sql)
-- ほかのライブラリ: [Drizzle ORM の `and()`（`undefined` を飛ばし、一つもなければ `undefined`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/sql/expressions/conditions.ts)、[同・`where` が `undefined` なら WHERE を出さない（`pg-core/dialect.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/dialect.ts)、[同・`TBuilderMode`（`pg-core/query-builders/select.ts`、`select.types.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/select.types.ts)、[同・standalone query builder](https://orm.drizzle.team/docs/goodies)、[Kysely の DummyDriver](https://kysely.dev/docs/recipes/splitting-query-building-and-execution)、[EF Core の SQLite の制限（decimal の比較と並べ替え）](https://learn.microsoft.com/en-us/ef/core/providers/sqlite/limitations)、[EF Core の `QueryableAggregateMethodTranslator`（`float` の `SUM` / `AVG` を `real` に戻す、commit 4dbb574）](https://github.com/dotnet/efcore/blob/4dbb574be1801b9d350649616b4e732e633f5624/src/EFCore.Relational/Query/Internal/QueryableAggregateMethodTranslator.cs)、[Pomelo.EntityFrameworkCore.MySql の `MySqlHavingExpressionVisitor`（HAVING の式をサブクエリと別名に移す、commit 14c2cd5）](https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql/blob/14c2cd558e37c71e7a2fca75e339ef902effdf60/src/EFCore.MySql/Query/ExpressionVisitors/Internal/MySqlHavingExpressionVisitor.cs)、[Dapper の `SqlMapper.cs`（`QueryImpl` の `finally` で `cmd?.Cancel()`、commit eb47546）](https://github.com/DapperLib/Dapper/blob/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/Dapper/SqlMapper.cs)
+- ほかのライブラリ: [Drizzle ORM の `and()`（`undefined` を飛ばし、一つもなければ `undefined`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/sql/expressions/conditions.ts)、[同・`where` が `undefined` なら WHERE を出さない（`pg-core/dialect.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/dialect.ts)、[同・`TBuilderMode`（`pg-core/query-builders/select.ts`、`select.types.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/query-builders/select.types.ts)、[同・standalone query builder](https://orm.drizzle.team/docs/goodies)、[Kysely の DummyDriver](https://kysely.dev/docs/recipes/splitting-query-building-and-execution)、[EF Core の SQLite の制限（decimal の比較と並べ替え）](https://learn.microsoft.com/en-us/ef/core/providers/sqlite/limitations)、[EF Core の `QueryableAggregateMethodTranslator`（`float` の `SUM` / `AVG` を `real` に戻す、commit 4dbb574）](https://github.com/dotnet/efcore/blob/4dbb574be1801b9d350649616b4e732e633f5624/src/EFCore.Relational/Query/Internal/QueryableAggregateMethodTranslator.cs)、[jOOQ の `Field.in(Select<? extends Record1<T>>)`（commit 0b0bcfe）](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/Field.java#L905-L914)、[同・MySQL の IN と LIMIT を派生テーブルで包む `Eq`](https://github.com/jOOQ/jOOQ/blob/0b0bcfefc8a65dfcaa13693423b7a35e460ac397/jOOQ/src/main/java/org/jooq/impl/Eq.java#L173-L177)、[同・入れ子の CTE を外に移す issue 3175](https://github.com/jOOQ/jOOQ/issues/3175)、[同・集合演算の ORDER BY](https://www.jooq.org/doc/latest/manual/sql-building/sql-statements/select-statement/order-by-clause/)、[Kysely の選択の中のサブクエリを NULL を許す型にする `select-parser.ts`（commit b506b63）](https://github.com/kysely-org/kysely/blob/b506b6390a06f47410d359bf0f640a13251b28df/src/parser/select-parser.ts#L104-L119)、[同・入れ子の WITH をそのまま出す `default-query-compiler.ts`](https://github.com/kysely-org/kysely/blob/b506b6390a06f47410d359bf0f640a13251b28df/src/query-compiler/default-query-compiler.ts#L156-L177)、[Drizzle ORM の別名のないサブクエリの列を拒む `select.types.ts`](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/query-builders/select.types.ts#L116-L131)、[同・集合演算の後の ORDER BY と LIMIT（`pg-core/dialect.ts`）](https://github.com/drizzle-team/drizzle-orm/blob/eab8bedbb65d5429c54e612ddbd88aa23091d398/drizzle-orm/src/pg-core/dialect.ts#L468-L509)、[EF Core の NULL を含みうる NOT IN の書き換え（`SqlNullabilityProcessor`、commit c0f183b）](https://github.com/dotnet/efcore/blob/c0f183ba1b7dc5ff392c596350a701f6ad206052/src/EFCore.Relational/Query/SqlNullabilityProcessor.cs#L754-L913)、[同・LIMIT のないサブクエリの ORDER BY を消す](https://github.com/dotnet/efcore/blob/c0f183ba1b7dc5ff392c596350a701f6ad206052/src/EFCore.Relational/Query/RelationalQueryableMethodTranslatingExpressionVisitor.cs#L660-L669)、[linq2db の CTE を文の先頭に集める `BasicSqlOptimizer`（commit a987817）](https://github.com/linq2db/linq2db/blob/a987817007fb97817206de66ca24df20e851911f/Source/LinqToDB/Internal/SqlProvider/BasicSqlOptimizer.cs#L733-L763)、[同・MySQL の IN と LIMIT の包みを残す `SelectQueryOptimizerVisitor`](https://github.com/linq2db/linq2db/blob/a987817007fb97817206de66ca24df20e851911f/Source/LinqToDB/Internal/SqlQuery/Visitors/SelectQueryOptimizerVisitor.cs#L2554-L2567)、[Pomelo.EntityFrameworkCore.MySql の `MySqlHavingExpressionVisitor`（HAVING の式をサブクエリと別名に移す、commit 14c2cd5）](https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql/blob/14c2cd558e37c71e7a2fca75e339ef902effdf60/src/EFCore.MySql/Query/ExpressionVisitors/Internal/MySqlHavingExpressionVisitor.cs)、[Dapper の `SqlMapper.cs`（`QueryImpl` の `finally` で `cmd?.Cancel()`、commit eb47546）](https://github.com/DapperLib/Dapper/blob/eb47546a408bbf6c178bda4f04dc205bc51ffbfe/Dapper/SqlMapper.cs)
 - プロバイダー: [SqlDataReader.Close（Cancel を先に呼ぶ）](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqldatareader.close)、[SqlParameter.Value（DBNull）](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqlparameter.value)、[ADO.NET のパラメータの型の推定（DateTime は SqlDbType.DateTime）](https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types)、[Microsoft.Data.Sqlite のパラメータ](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/parameters)、[同・型](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/types)、[Npgsql の基本的な使い方（位置パラメータ）](https://www.npgsql.org/doc/basic-usage.html)、[Npgsql 8.0（NativeAOT）](https://www.npgsql.org/doc/release-notes/8.0.html)、[Npgsql の日付と時刻](https://www.npgsql.org/doc/types/datetime.html)、[MySqlConnector の版の履歴](https://mysqlconnector.net/overview/version-history/)、[SqlClient の CHANGELOG](https://raw.githubusercontent.com/dotnet/SqlClient/main/CHANGELOG.md)
 
 集計の結果の SQL の型（§4.2 の `Sum` と `Avg` の `CAST` の理由）は、行 Q3 の結合テストで各方言の結果を確かめた。
