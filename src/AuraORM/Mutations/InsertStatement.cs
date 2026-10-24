@@ -37,5 +37,24 @@ public sealed class InsertStatement<TDialect, TMode, TColumns> : MutationStateme
     /// </summary>
     internal TColumns Table { get; }
 
-    internal override SqlNode CreateNode(ImmutableArray<SqlNode> returning) => new InsertNode(_target, _columns, _rows, returning);
+    /// <summary>
+    /// Gets the table, for the clauses that follow.
+    /// </summary>
+    internal TableAlias Target => _target;
+
+    /// <summary>
+    /// Gets a value indicating whether the rows set no column (§6.2), which SQLite's upsert does not accept (§10.1).
+    /// </summary>
+    internal bool SetsNoColumn => _columns.IsEmpty;
+
+    internal override SqlNode CreateNode(ImmutableArray<SqlNode> returning) => CreateNode(returning, null);
+
+    /// <summary>
+    /// Creates the node of the statement with the clause that handles a conflict.
+    /// </summary>
+    /// <param name="returning">The items of <c>Returning</c>, or an empty array.</param>
+    /// <param name="upsert">The clause, or <see langword="null"/>.</param>
+    /// <returns>The node.</returns>
+    internal SqlNode CreateNode(ImmutableArray<SqlNode> returning, UpsertClause? upsert) =>
+        new InsertNode(_target, _columns, _rows, returning, upsert);
 }

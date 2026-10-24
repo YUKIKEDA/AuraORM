@@ -27,6 +27,24 @@ public sealed class TableAlias
     }
 
     /// <summary>
+    /// The name of the row proposed for insertion in an upsert: PostgreSQL's and SQLite's <c>excluded</c>, and the row alias
+    /// that AuraORM gives it on MySQL (§10).
+    /// </summary>
+    internal const string ExcludedName = "excluded";
+
+    /// <summary>
+    /// Gets a value indicating whether this occurrence is the row proposed for insertion in an upsert, whose columns are
+    /// written <c>"excluded"."a"</c>, or <c>VALUE(`a`)</c> on MariaDB (§10).
+    /// </summary>
+    internal bool IsExcluded { get; private init; }
+
+    /// <summary>
+    /// Creates the occurrence of the row proposed for insertion in an upsert.
+    /// </summary>
+    /// <returns>The occurrence.</returns>
+    internal static TableAlias Excluded() => new(null, ExcludedName, null) { IsExcluded = true };
+
+    /// <summary>
     /// Gets the named query that this occurrence names, or <see langword="null"/> for a table (§5.11).
     /// </summary>
     internal NamedQueryDefinition? Query { get; }
