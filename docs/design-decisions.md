@@ -112,3 +112,15 @@
 - **Reason**: `Select` の、一つの式とタプルの射影の形とそろう。Issue #28 の Grill で決めた。
 - **Rejected**: 一つのキーでも `k.Item1` と書く案（要素一つの入れ物で冗長）。
 
+## D1-19 MySQL と MariaDB の HAVING の、列ではないキー
+
+- **Decision**: MySQL と MariaDB では、列ではない GROUP BY のキーを HAVING に書くと `MIN(キー)` と出力する（§5.5）。
+- **Reason**: この二つは HAVING の式を GROUP BY の式と照らし合わせず、正しいクエリが `Unknown column` で失敗する（MySQL のバグ 24083、78395）。キーはグループの中で一つの値なので、`MIN` で結果は変わらない。SQL は固定で `ToSql()` に見える。Issue #30 の実装中に結合テストで見つかり、所有者が決めた。
+- **Rejected**: Pomelo.EntityFrameworkCore.MySql のように文をサブクエリに移し、条件を別名つきで射影に足す案（見えないサブクエリと列が増え、予測できる SQL に反する）。MySQL と MariaDB で実行時に例外にする案（正しいクエリが二つの方言で失敗する。型は方言ごとに列のキーと式のキーを見分けられない）。
+
+## D1-20 SQL Server の `float` の `Sum`
+
+- **Decision**: SQL Server では `Sum(float)` を `CAST(SUM(a) AS real)` と出力し、`float?` で読む（§4.2）。
+- **Reason**: SQL Server の `SUM` は `real` に `float`（`double`）を返し、型付きの取得メソッドで `float` として読めない（§12）。EF Core も同じ `CAST` を入れる。Issue #30 の実装中に結合テストで見つかり、所有者が決めた。
+- **Rejected**: 全方言で `double?` を返す案（.NET の `Sum(float)` と EF Core が `float` を返すのと違い、PostgreSQL にも `CAST` が要る）。読み取りで `double` を `float` に変える案（§12 の、広げも狭めもしない読み取りに反する）。
+
