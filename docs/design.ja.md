@@ -640,10 +640,11 @@ var q = db.From(User.Table).Select(u => u.Name)
 // SELECT "users"."Name" FROM "users" UNION SELECT "admins"."Name" FROM "admins"
 ```
 
-- `Union`、`UnionAll`、`Intersect`、`Except` は、`Selected` の段階（`OrderBy` の前）どうしで、結果の型と方言が同じものだけを結べる。`int` と `int?` のように NULL 可否だけが違う結果も結べない（SQL では結べて結果は NULL を許すが、合わせる側で `Coalesce` などを書く）。Drizzle ORM も形が同じものだけを許す（`ValidateShape`、§19）。
+- `Union`、`UnionAll`、`Intersect`、`Except` は、`Selected` の段階（`OrderBy` の前）どうしで、結果の型と方言が同じものだけを結べる。値型で NULL 可否だけが違う結果（`int` と `int?`）も結べない（CS1503。SQL では結べて結果は NULL を許すが、合わせる側で `Coalesce` などを書く）。参照型の NULL 可否（`string` と `string?`）は実行時に同じ型なので型では止められず、null 許容の警告 CS8620 になるだけで、結果の型は最初の被演算子の型になる（`string` を先に書くと、NULL が入りうる結果が `string` として返る）。外部結合の NULL 化（§5.3、§14.2）と同じである。Drizzle ORM も形が同じものだけを許す（`ValidateShape`、§19）。
+- SQLite は一つの複合 SELECT に被演算子を 500 までしか結べない（既定の上限 `SQLITE_MAX_COMPOUND_SELECT`。501 で `too many terms in compound SELECT`）。超えると、文を組み立てるときに `ArgumentException` になる（パラメータの数の上限（§12.4）と同じ扱い、§14.3）。MySQL 9、MariaDB 12、SQL Server 2025 は 10000 でも通り、PostgreSQL 18 は 2000 で通って 10000 で `stack depth limit exceeded` になった（`max_stack_depth` の設定で決まるので、§14.2 にする）。
 - 集合演算の段階（と、その後の `Limit` / `Offset`）はサブクエリにできる（§5.11）。`OrderBy` だけで `Limit` のない段階は置けず（CS0619）、MySQL / MariaDB の `In` / `NotIn` に `Limit` の後の段階は渡せない（CS0311）のも、ほかの段階と同じである。
 - 被演算子をかっこで囲まない（SQLite が受け付けないため）。そのため、被演算子に `ORDER BY` と `LIMIT` は書けない（型でそうなっている）。
-- 一つの連鎖には同じ演算子しか書けない（`a.Union(b).Union(c)` は書けるが、`a.Union(b).Intersect(c)` は CS1061）。標準 SQL（PostgreSQL、MySQL、MariaDB、SQL Server）は `INTERSECT` を `UNION` / `EXCEPT` より強く結ぶが、SQLite は複合 SELECT を左から順に評価するので、かっこのない混在は同じ SQL で方言によって違う行を返す（SQLite 3.40 で `SELECT 1 UNION SELECT 2 INTERSECT SELECT 2` は `2` だけを返した）。演算子を混ぜるときは、先の集合演算を派生テーブル（§5.11）にして、その外側で次の演算子を書く。
+- 一つの連鎖には同じ演算子しか書けない（`a.Union(b).Union(c)` は書けるが、`a.Union(b).Intersect(c)` は CS0619 と「先の集合演算を派生テーブルにしてから結ぶ」というメッセージ）。`OrderBy` / `Limit` / `Offset` の後に `Union` などを書いても、CS0619 と「並べ替えと件数の制限は集合演算の結果にかける」というメッセージになる。どちらも、その形を受け取る `[Obsolete(error: true)]` のメソッドを置いて、CS1061（その名前のメソッドがない）の代わりに直し方を示す（D1-25）。標準 SQL（PostgreSQL、MySQL、MariaDB、SQL Server）は `INTERSECT` を `UNION` / `EXCEPT` より強く結ぶが、SQLite は複合 SELECT を左から順に評価するので、かっこのない混在は同じ SQL で方言によって違う行を返す（SQLite 3.40 で `SELECT 1 UNION SELECT 2 INTERSECT SELECT 2` は `2` だけを返した）。演算子を混ぜるときは、先の集合演算を派生テーブル（§5.11）にして、その外側で次の演算子を書く。
 - 集合演算の後に `OrderBy`、`Limit`、`Offset` を書ける（行 Q5）。これらは複合 SELECT 全体にかかる（`… UNION … ORDER BY 1 ASC LIMIT @p0`）。`OrderBy` のラムダは結果の項目を受け取り、キーは項目の位置の番号になる。項目がどのテーブルの列かは被演算子ごとに違うので、`SelectDistinct` の `OrderBy`（§5.7、D1-16）と同じ形にする。ラムダには結果の型の要素ごとの項目（一つの式なら `SetItem<T, TLevel>`、タプルなら `(SetItem<T1, TLevel>, SetItem<T2, TLevel>, …)`。`TLevel` は最初の被演算子の射影の段階）が渡る（`.OrderBy(s => [Asc(s.Item1)])`）。今の `Select` は式のタプルと行全体を含むタプルで同じ段階の型を返すので、射影に行全体か結果の型があるかは型では分からない。そのときの `OrderBy` は、文を組み立てるときに `InvalidOperationException` になる（行は複数の列に展開されるので、項目の位置が決まらない。§14.3）。派生テーブル（§5.11）にして外側で並べ替える。`Limit` と `Offset` を書ける段階は §5.9 の方言の規則と同じである。全方言で `… UNION … ORDER BY 1 … LIMIT` が通ることを確かめた（SQLite 3.40、PostgreSQL 18、MySQL 9、MariaDB 12、SQL Server 2025）。Drizzle ORM、Kysely、jOOQ も、集合演算の後の `orderBy` / `limit` を許す（§19）。
 
 ### 5.11 サブクエリ、派生テーブル、CTE
@@ -926,7 +927,7 @@ SqlStatement s = sql.From(User.Table).Where(u => Gt(u.Age, 20)).Select(u => u.Na
 
 - パラメータは `DbCommand.CreateParameter()` で作り、名前（PostgreSQL では名前なし）と `Value` だけを設定する。`DbType` は設定しない。型の推定はプロバイダーに任せる。
 - NULL は `DBNull.Value` として渡す。NULL の `byte[]` だけは `DbType.Binary` を設定する。SqlClient は型のない `DBNull` を `nvarchar` と推定し、`nvarchar` から `varbinary` へは暗黙に変換できないので、`varbinary` の列への代入が失敗するためである。SQL Server では `DateTime` に `DbType.DateTime2` を設定する。SqlClient は型を指定しない `DateTime` を旧来の `datetime`（1/300 秒の精度）と推定し、`datetime2` の列（§3.3）に入れても値が丸められるためである（0.1234560 秒が 0.1233333 秒になることを結合テストで確かめた）。ほかの型とその NULL は、各方言の結合テスト（型ごとの値と NULL の往復）で確かめる。
-- 一つの文のパラメータの数の上限は、SQLite 32766（3.32.0 以降の既定）、PostgreSQL 65535、MySQL と MariaDB 65535、SQL Server 2100 である。超えると実行の前に `ArgumentException` になる。SQLite の上限は接続ごとに下げられるが、AuraORM は既定値で検査する。SQL Server の複数行の INSERT は、行の数も 1000 までに検査する（§6.2）。
+- 一つの文のパラメータの数の上限は、SQLite 32766（3.32.0 以降の既定）、PostgreSQL 65535、MySQL と MariaDB 65535、SQL Server 2100 である。超えると実行の前に `ArgumentException` になる。SQLite の上限は接続ごとに下げられるが、AuraORM は既定値で検査する。SQL Server の複数行の INSERT は、行の数も 1000 までに検査する（§6.2）。SQLite の集合演算は、被演算子の数も 500 までに検査する（§5.10）。
 
 ### 12.5 トランザクション
 
@@ -1014,7 +1015,7 @@ CREATE TABLE "users" (
 | 方言にない機能（§2.4 の表） | 方言のインターフェースの制約 | CS0311 / CS1061 |
 | SQL Server で `ORDER BY` のない `Limit` | 同上 | CS0311 |
 | SQLite、MySQL、MariaDB で `Limit` のない `Offset`、SQL Server で `ORDER BY` のない `Offset` | 同上（`IOffsetWithoutLimitDialect` / `IUnorderedOffsetDialect`） | CS0311 |
-| 集合演算の演算子の混在 | 段階の型（§5.10） | CS1061 |
+| 集合演算の演算子の混在、`OrderBy` / `Limit` / `Offset` の後の集合演算 | その形を受け取る `[Obsolete(error: true)]` のメソッド（§5.10） | CS0619（直し方のメッセージ付き） |
 | `SelectDistinct` の後の `OrderBy` に選んでいない式を書く | `OrderBy` が選んだ項目だけを受け取る（§5.7） | CS1503 / CS1061 |
 | UPDATE / DELETE の `Where` に「条件なし」になりうる条件を渡す | `Where` が `Condition<PerRow>` だけを受け取る（§4.2） | CS1503 |
 | MySQL、MariaDB で `Limit` の後のサブクエリを `In` / `NotIn` に渡す（§5.11） | 方言のインターフェースの制約（`ILimitInSubqueryDialect`） | CS0311 |
@@ -1032,6 +1033,7 @@ CREATE TABLE "users" (
 - 生 SQL 断片（§11）の中身。
 - データベースのスキーマが、C# の定義と一致していること。AuraORM は実行時にスキーマを調べない。
 - データベースの照合順序、タイムゾーン、数値の精度による結果の違い。
+- PostgreSQL で集合演算の被演算子が多すぎること（`max_stack_depth` の設定で上限が決まる。既定の 2048kB で、2000 は通り 10000 は失敗した。§5.10）。
 - `GroupBy` のない集計だけのサブクエリ（`Exists(db.From(T).Select(x => Count()))`）の `Exists` が常に真になること。集計は行がなくても一行を返す。型は `GroupBy` の有無を区別しない（`PerGroup` の射影は同じ）ので止められない。全方言で同じ結果になる。
 - `Scalar` / `GroupScalar` のサブクエリが 2 行以上を返すこと。SQLite は黙って 1 行目を返し、ほかの方言はエラーになる（§5.11）。行の数はデータで決まるので、型でも組み立て時にも止められない。
 - 参照型（`string`、`byte[]`、行全体）の NULL 可否の誤り（外部結合の NULL 化した側を NULL を許さない型で読む、など）。これは C# の null 許容の警告（CS8600、CS8619 など）が知らせるもので、利用者のプロジェクトで null 許容参照型が有効で（`<Nullable>enable</Nullable>`）、その警告をエラーにしているときだけコンパイルエラーになる。`#nullable disable` の文脈や、警告を抑止した文脈では何も出ない。値型の誤りは常にコンパイルエラーである。
@@ -1056,6 +1058,7 @@ CREATE TABLE "users" (
 | `GroupBy` のキーに列が一つもない（§5.5） | `InvalidOperationException` |
 | `OrderBy` のキーが値だけ（§5.8） | `InvalidOperationException` |
 | 射影に行全体か結果の型がある集合演算の後で `OrderBy` を書いた（§5.10） | `InvalidOperationException` |
+| SQLite の集合演算の被演算子が 500 を超えた（§5.10） | `ArgumentException` |
 | `GroupBy` のキーにサブクエリがある（§5.5。SQL Server はメッセージ 144、MySQL は相関していればメッセージ 1055 で失敗する） | `InvalidOperationException` |
 | 外側の文と方言の違うサブクエリ、派生テーブル、CTE を使った（§5.11） | `InvalidOperationException` |
 | 内側の文の `FROM` のテーブルが、内側で列を使う外側の文のテーブルと同じ名前（別名）である（§5.11） | `InvalidOperationException` |
