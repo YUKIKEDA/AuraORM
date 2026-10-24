@@ -8,6 +8,8 @@ internal sealed class SqlRenderContext : IDisposable
     private readonly List<SqlStatementParameter> _parameters = [];
     private readonly Dictionary<ParameterNode, string> _names = new(ReferenceEqualityComparer.Instance);
     private readonly List<IReadOnlyList<TableAlias>> _scopes = [];
+    private int _groupBoundary = -1;
+    private int _keyDepth;
 
     public SqlRenderContext(DialectRenderer dialect)
     {
@@ -54,6 +56,62 @@ internal sealed class SqlRenderContext : IDisposable
     public void CountOpaqueSql() => ColumnsWritten++;
 
     /// <summary>
+    /// Gets the number of subqueries written so far (§5.5: a <c>GROUP BY</c> key cannot hold one).
+    /// </summary>
+    public int SubqueriesWritten { get; private set; }
+
+    /// <summary>
+    /// Counts a subquery in <see cref="SubqueriesWritten"/>.
+    /// </summary>
+    public void CountSubquery() => SubqueriesWritten++;
+
+    /// <summary>
+    /// Writes a subquery of <c>GroupScalar</c> or <c>GroupExists</c>: inside it, a column of the statements around it can be
+    /// used only through a <c>GROUP BY</c> key (§5.11).
+    /// </summary>
+    /// <param name="subquery">The subquery.</param>
+    public void WriteGroupSubquery(SqlNode subquery)
+    {
+        int boundary = _groupBoundary;
+        int keys = _keyDepth;
+        _groupBoundary = _scopes.Count;
+        _keyDepth = 0;
+        subquery.Render(this);
+        _groupBoundary = boundary;
+        _keyDepth = keys;
+    }
+
+    /// <summary>
+    /// Writes a <c>GROUP BY</c> key, inside which the columns of the grouped statement may be used (§5.11).
+    /// </summary>
+    /// <param name="key">The key.</param>
+    public void WriteGroupKey(SqlNode key)
+    {
+        _keyDepth++;
+        key.Render(this);
+        _keyDepth--;
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether a subquery of <c>GroupScalar</c> or <c>GroupExists</c> is being written.
+    /// </summary>
+    public bool InGroupSubquery => _groupBoundary >= 0;
+
+    private void CheckGroupSubquery(int depth, TableAlias table, string column)
+    {
+        if (depth < _groupBoundary && _keyDepth == 0)
+        {
+            throw new InvalidOperationException(
+                "The column "
+                    + table.Reference
+                    + "."
+                    + column
+                    + " of the grouped statement is used inside GroupScalar or GroupExists. Only the GROUP BY keys (k) of the grouped statement can be used there."
+            );
+        }
+    }
+
+    /// <summary>
     /// Enters the <c>FROM</c> of a statement: until <see cref="ExitScope"/>, a column must belong to one of these tables or
     /// to a table of an enclosing statement (§14.3).
     /// </summary>
@@ -79,13 +137,14 @@ internal sealed class SqlRenderContext : IDisposable
             return;
         }
 
-        foreach (IReadOnlyList<TableAlias> scope in _scopes)
+        for (int depth = 0; depth < _scopes.Count; depth++)
         {
-            foreach (TableAlias candidate in scope)
+            foreach (TableAlias candidate in _scopes[depth])
             {
                 // The same occurrence, not the same name: a column of another statement on the same table is out of scope too.
                 if (ReferenceEquals(candidate, table))
                 {
+                    CheckGroupSubquery(depth, table, column);
                     return;
                 }
             }

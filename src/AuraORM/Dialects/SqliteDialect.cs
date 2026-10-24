@@ -5,6 +5,7 @@ namespace AuraORM;
 /// </summary>
 public sealed class SqliteDialect
     : IFullJoinDialect,
+        ILimitInSubqueryDialect,
         IInsertReturningDialect,
         IUpdateReturningDialect,
         IDeleteReturningDialect,

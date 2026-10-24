@@ -26,6 +26,11 @@ internal sealed record SelectState(
     /// </summary>
     public SqlNode? Having { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether the projection is one expression, which a scalar subquery needs (§5.11).
+    /// </summary>
+    public bool SingleExpression { get; init; }
+
     public static SelectState From(TableAlias table) =>
         new(
             [new SelectSourceState(table, JoinKind.From, null)],
@@ -73,7 +78,7 @@ internal sealed record SelectState(
         ArgumentNullException.ThrowIfNull(projection);
         var items = new List<SqlNode>();
         projection.CollectSelectItems(items);
-        return this with { Items = [.. items], Distinct = distinct };
+        return this with { Items = [.. items], Distinct = distinct, SingleExpression = projection is IExpr<T, TLevel> };
     }
 
     public SelectState WithOrderBy<TLevel>(Ordering<TLevel>[] orderings)
