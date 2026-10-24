@@ -19,12 +19,17 @@ internal sealed class DecimalOrderingNode(SqlNode inner, string operation) : Sql
     }
 
     /// <summary>
-    /// Wraps the node when <typeparamref name="T"/> is <see cref="decimal"/> or <see cref="decimal"/>?.
+    /// Wraps the node when <typeparamref name="T"/> is <see cref="decimal"/> or <see cref="decimal"/>?, or a type whose value
+    /// converter stores a <see cref="decimal"/> (§3.6).
     /// </summary>
     /// <typeparam name="T">The type of the ordered or aggregated values.</typeparam>
     /// <param name="node">The node.</param>
     /// <param name="operation">What the node does, for the message.</param>
     /// <returns>The node, wrapped or not.</returns>
     public static SqlNode For<T>(SqlNode node, string operation) =>
-        typeof(T) == typeof(decimal) || typeof(T) == typeof(decimal?) ? new DecimalOrderingNode(node, operation) : node;
+        typeof(T) == typeof(decimal)
+        || typeof(T) == typeof(decimal?)
+        || (!ColumnValue<T>.IsBuiltIn && ValueConversion<T>.ProviderType == typeof(decimal))
+            ? new DecimalOrderingNode(node, operation)
+            : node;
 }

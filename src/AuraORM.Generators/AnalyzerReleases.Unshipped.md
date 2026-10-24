@@ -9,6 +9,7 @@ AURA0101 | AuraORM | Error | Diagnostics
 AURA0102 | AuraORM | Error | Diagnostics
 AURA0103 | AuraORM | Error | Diagnostics
 AURA0104 | AuraORM | Error | Diagnostics
+AURA0105 | AuraORM | Error | Diagnostics
 AURA0106 | AuraORM | Error | Diagnostics
 AURA0107 | AuraORM | Error | Diagnostics
 AURA0108 | AuraORM | Error | Diagnostics
@@ -18,6 +19,8 @@ AURA0111 | AuraORM | Error | Diagnostics
 AURA0112 | AuraORM | Error | Diagnostics
 AURA0113 | AuraORM | Error | Diagnostics
 AURA0114 | AuraORM | Error | Diagnostics
+AURA0115 | AuraORM | Error | Diagnostics
+AURA0116 | AuraORM | Error | Diagnostics
 AURA0201 | AuraORM | Error | Diagnostics
 AURA0202 | AuraORM | Error | Diagnostics
 AURA0203 | AuraORM | Error | Diagnostics

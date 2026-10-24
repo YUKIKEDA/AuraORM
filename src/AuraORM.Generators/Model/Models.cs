@@ -40,6 +40,24 @@ internal sealed record MemberModel(
 );
 
 /// <summary>
+/// A value converter (<c>docs/design.ja.md</c> §3.6), with fully qualified names.
+/// </summary>
+/// <param name="ModelType">The user's type, not nullable.</param>
+/// <param name="ProviderType">The stored type.</param>
+/// <param name="ConverterType">The converter.</param>
+/// <param name="IsValueType">A value indicating whether the user's type is a value type.</param>
+/// <param name="ProviderColumnType">The <c>AuraORM.ColumnType</c> member of the stored type.</param>
+/// <param name="IsAccessible">A value indicating whether generated code in this compilation can name the types.</param>
+internal sealed record ConverterModel(
+    string ModelType,
+    string ProviderType,
+    string ConverterType,
+    bool IsValueType,
+    string ProviderColumnType,
+    bool IsAccessible
+);
+
+/// <summary>
 /// A column of a table.
 /// </summary>
 internal sealed record ColumnModel(
@@ -53,7 +71,8 @@ internal sealed record ColumnModel(
     int Precision,
     int Scale,
     string? DefaultCode,
-    string? ReferenceCode
+    string? ReferenceCode,
+    ConverterModel? Converter = null
 )
 {
     /// <summary>
@@ -82,7 +101,7 @@ internal sealed record TableModel(
 /// <summary>
 /// A member of a <c>[QueryResult]</c> type and the column name a raw query reads it from.
 /// </summary>
-internal sealed record ResultMemberModel(MemberModel Member, string ColumnName);
+internal sealed record ResultMemberModel(MemberModel Member, string ColumnName, ConverterModel? Converter = null);
 
 /// <summary>
 /// A <c>[QueryResult]</c> type.

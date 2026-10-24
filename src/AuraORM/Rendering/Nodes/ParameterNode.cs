@@ -31,13 +31,20 @@ internal abstract class ParameterNode : SqlNode
 /// <typeparam name="T">The type of the value.</typeparam>
 internal sealed class ParameterNode<T>(T value) : ParameterNode
 {
-    public override object? ProviderValue => ToProviderValue(value);
+    // §3.6: a type outside §3.3 is stored through its value converter.
+    public override object? ProviderValue => ColumnValue<T>.IsBuiltIn ? ToProviderValue(value) : ValueConversion<T>.ToProvider(value);
 
-    public override Type ValueType => Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+    public override Type ValueType =>
+        ColumnValue<T>.IsBuiltIn ? Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T) : ValueConversion<T>.ProviderType ?? typeof(T);
 
     public override bool IsNull => value is null;
 
-    private static object? ToProviderValue(T value)
+    /// <summary>
+    /// Returns the value given to the provider for a value of a column type of §3.3.
+    /// </summary>
+    /// <param name="value">The value.</param>
+    /// <returns>The value, the underlying integer of an enum, or <see langword="null"/>.</returns>
+    internal static object? ToProviderValue(T value)
     {
         if (value is null)
         {

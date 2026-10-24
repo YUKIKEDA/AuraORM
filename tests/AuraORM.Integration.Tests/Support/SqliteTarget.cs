@@ -51,6 +51,8 @@ public sealed class SqliteTarget : ITestTarget<SqliteDialect>
 
     public const string CreateNotes = "CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, body TEXT, priority INTEGER NOT NULL DEFAULT 0)";
 
+    public const string CreateOrders = "CREATE TABLE orders (id INTEGER PRIMARY KEY, parent_id INTEGER, link TEXT, total TEXT)";
+
     private readonly List<SqliteConnection> _connections = [];
 
     public async Task<Database<SqliteDialect>> CreateDatabaseAsync()
@@ -58,7 +60,7 @@ public sealed class SqliteTarget : ITestTarget<SqliteDialect>
         var connection = new SqliteConnection("Data Source=:memory:");
         _connections.Add(connection);
         await connection.OpenAsync();
-        foreach (string ddl in (string[])[CreatePeople, CreateTypedValues, CreatePets, CreateNotes])
+        foreach (string ddl in (string[])[CreatePeople, CreateTypedValues, CreatePets, CreateNotes, CreateOrders])
         {
             await using SqliteCommand create = connection.CreateCommand();
             create.CommandText = ddl;

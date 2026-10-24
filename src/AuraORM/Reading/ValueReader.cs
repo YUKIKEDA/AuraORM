@@ -167,10 +167,9 @@ internal static class ValueReader<T>
             return CreateEnum(Enum.GetUnderlyingType(enumType), nullable: true);
         }
 
-        return static (_, _) =>
-            throw new NotSupportedException(
-                string.Format(CultureInfo.InvariantCulture, "{0} is not a column type that AuraORM reads.", typeof(T).FullName)
-            );
+        // §3.6: any other type is read through its value converter, looked up at each read, since the module initializer
+        // that registers it may run after this reader was created.
+        return static (r, i) => ValueConversion<T>.Read(r, i);
     }
 
     // An enum and its underlying integer have the same layout, and so do their nullable forms, so the integer that the
