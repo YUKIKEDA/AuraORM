@@ -21,6 +21,7 @@ internal sealed class SelectNode(SelectState state, ImmutableArray<string> colum
                 );
             }
 
+            context.ListCtes(state.Ctes);
             context.Write("WITH ");
             for (int i = 0; i < state.Ctes.Length; i++)
             {

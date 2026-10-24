@@ -20,7 +20,7 @@ version has been published to NuGet.
 - `SqlStatement`: the SQL text and parameters of a statement.
 - The source generator, shipped inside the package: `[Table]` records and classes get `Table`, `Columns`,
   `NullableColumns`, and `Insert`; `[QueryResult]` types get `RowProjection` and `GroupProjection`. Schema errors are
-  reported as AURA0101 to AURA0111.
+  reported as AURA0101 to AURA0114.
 - `Database<TDialect>` on a `DbDataSource` or a `DbConnection`, and `Transaction<TDialect>` (`BeginTransactionAsync`,
   `InTransactionAsync`).
 - Raw SQL through interpolated strings, where values become parameters: fragments (`Raw`, `Raw<T>`, `RawAggregate<T>`,
@@ -65,7 +65,9 @@ version has been published to NuGet.
   each type) names it; `db.From(t)` and joins write it as a derived table, and `db.With(t, …).From(…)` writes it as a CTE.
   The items inside are named after the members or columns, `t.As("t2")` references it again, and `[QueryResult]` types
   get `Columns` and `NullableColumns`. `As` on expressions or tuples fails with CS0619; a nested `With`, a table with the
-  name of a CTE, and a named query of another dialect throw when the statement is built.
+  name of a CTE, a CTE that reads one listed after it, a named query that uses an outer column, and a named query of
+  another dialect throw when the statement is built. A generated `As` class whose name another type of the namespace has
+  is AURA0114.
 - Analyzers in the package: a comparison with a typed null constant (AURA0201) or with a value that may be null
   (AURA0202), which matches no row in SQL, a `NotIn` whose subquery may return null (AURA0203), and a raw SQL hole whose value is not a column type (AURA0301).
 - On SQLite, ordering, comparing by size, and `Min` / `Max` / `Sum` / `Avg` of decimals throw when the statement is

@@ -495,6 +495,7 @@ internal static class SchemaReader
             isPublic &= outer.DeclaredAccessibility == Accessibility.Public;
         }
 
+        CheckNamedQueriesName(type, flatName, diagnostics);
         return new TypeTarget(
             ns,
             Equatable(containers),
@@ -504,6 +505,51 @@ internal static class SchemaReader
             flatName,
             isPublic
         );
+    }
+
+    // §3.5: the class of As goes at the namespace level as {FlatName}NamedQueries, so a type of that name in the namespace,
+    // or another [Table] or [QueryResult] type with the same flat name (Outer.Item and OuterItem), would make it CS0101.
+    private static void CheckNamedQueriesName(INamedTypeSymbol type, string flatName, List<DiagnosticInfo> diagnostics)
+    {
+        string generated = flatName + "NamedQueries";
+        bool collides = type.ContainingNamespace.GetTypeMembers(generated).Length > 0;
+        foreach (INamedTypeSymbol other in AllTypes(type.ContainingNamespace))
+        {
+            collides |=
+                !SymbolEqualityComparer.Default.Equals(other, type)
+                && FlatName(other) == flatName
+                && other.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() is TableAttribute or QueryResultAttribute);
+        }
+
+        if (collides)
+        {
+            diagnostics.Add(DiagnosticInfo.Create(Diagnostics.NamedQueriesCollision, type.Locations.FirstOrDefault(), generated, type.Name));
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> AllTypes(INamespaceSymbol ns)
+    {
+        var pending = new Stack<INamedTypeSymbol>(ns.GetTypeMembers());
+        while (pending.Count > 0)
+        {
+            INamedTypeSymbol next = pending.Pop();
+            yield return next;
+            foreach (INamedTypeSymbol nested in next.GetTypeMembers())
+            {
+                pending.Push(nested);
+            }
+        }
+    }
+
+    private static string FlatName(INamedTypeSymbol type)
+    {
+        string name = type.Name;
+        for (INamedTypeSymbol? outer = type.ContainingType; outer is not null; outer = outer.ContainingType)
+        {
+            name = outer.Name + name;
+        }
+
+        return name;
     }
 
     private static string? Declaration(INamedTypeSymbol type)

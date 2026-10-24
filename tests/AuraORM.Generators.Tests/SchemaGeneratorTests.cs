@@ -164,6 +164,32 @@ public sealed class SchemaGeneratorTests
     }
 
     /// <summary>
+    /// Types of the same name in different namespaces get <c>As</c> classes of the same name in their own namespaces, which do
+    /// not collide (AURA0114 is only for one namespace, design §3.5).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - A result type <c>Item</c> in the namespaces <c>A</c> and <c>B</c>.
+    ///
+    /// Steps:
+    /// - Run the generator and compile.
+    ///
+    /// Expected:
+    /// - No diagnostic.
+    /// </remarks>
+    [Fact]
+    public void Generate_SameNameInTwoNamespaces_Compiles()
+    {
+        GeneratorHarness.Compiles(
+            Usings
+                + """
+                namespace A { [QueryResult] public sealed partial record Item(int Value); }
+                namespace B { [QueryResult] public sealed partial record Item(int Value); }
+                """
+        );
+    }
+
+    /// <summary>
     /// A class with settable properties is a table too, read with its parameterless constructor.
     /// </summary>
     /// <remarks>
@@ -353,6 +379,12 @@ public sealed class SchemaGeneratorTests
     [InlineData("AURA0104", """[QueryResult] public sealed partial record T(int Columns);""")]
     [InlineData("AURA0104", """[QueryResult] public sealed partial record T(int NullableColumns);""")]
     [InlineData("AURA0104", """[QueryResult] public sealed partial record T(int ReadRow);""")]
+    [InlineData(
+        "AURA0114",
+        """public static partial class Outer { [QueryResult] public sealed partial record Item(int A); } [QueryResult] public sealed partial record OuterItem(int A);"""
+    )]
+    [InlineData("AURA0114", """[QueryResult] public sealed partial record Item(int A); public static class ItemNamedQueries { }""")]
+    [InlineData("AURA0114", """[Table("t")] public sealed partial record T([PrimaryKey] long Id); public sealed class TNamedQueries { }""")]
     [InlineData("AURA0106", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Column("id")] long Other);""")]
     [InlineData("AURA0107", """[Table("t")] public sealed partial record T([PrimaryKey, AutoIncrement, MaxLength(10)] string Id);""")]
     [InlineData("AURA0107", """[Table("t")] public sealed partial record T([AutoIncrement] long Id);""")]

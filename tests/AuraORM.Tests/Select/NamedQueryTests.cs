@@ -129,8 +129,9 @@ public sealed class NamedQueryTests
     /// <summary>
     /// The checks that the types cannot make throw when the statement is built: a <c>With</c> statement used as a named query
     /// or a subquery, a table with the name of a CTE, a second reference without an alias, a named query of another dialect,
-    /// a named query that uses a column of the statement around it (a derived table is a statement of its own), an aliased
-    /// reference in <c>With</c>, and two CTEs of the same name (design §5.11, §14.3).
+    /// a named query that uses a column of the statement around it (a derived table is a statement of its own), a CTE that
+    /// reads one listed after it, an aliased reference in <c>With</c>, and two CTEs of the same name (design §5.11, §14.3,
+    /// D1-40, D1-41).
     /// </summary>
     /// <remarks>
     /// Preconditions:
@@ -140,8 +141,8 @@ public sealed class NamedQueryTests
     /// - Build each statement.
     ///
     /// Expected:
-    /// - <see cref="InvalidOperationException"/> for the first six (the sixth names the outer column), <see cref="ArgumentException"/>
-    ///   for the last two.
+    /// - <see cref="InvalidOperationException"/> for the first seven (the sixth names the outer column, the seventh says which to
+    ///   list first), <see cref="ArgumentException"/> for the last two.
     /// </remarks>
     [Fact]
     public void NamedQuery_ChecksTheTypesCannotMake_Throw()
@@ -165,6 +166,9 @@ public sealed class NamedQueryTests
                 .ToSql()
         );
         Assert.Contains("accounts.id", correlated.Message, StringComparison.Ordinal);
+        var later = db.From(t).Select(x => x).As("later");
+        var order = Assert.Throws<InvalidOperationException>(() => db.With(later, t).From(later).Select(x => x.Role).ToSql());
+        Assert.Contains("List t before later", order.Message, StringComparison.Ordinal);
         Assert.Throws<ArgumentException>(() => db.With(t.As("t2")));
         Assert.Throws<ArgumentException>(() => db.With(t, db.From(Account.Table).Select(a => a).As("t")));
     }

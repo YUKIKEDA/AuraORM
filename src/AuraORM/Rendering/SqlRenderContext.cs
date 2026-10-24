@@ -9,6 +9,8 @@ internal sealed class SqlRenderContext : IDisposable
     private readonly Dictionary<ParameterNode, string> _names = new(ReferenceEqualityComparer.Instance);
     private readonly List<IReadOnlyList<TableAlias>> _scopes = [];
     private readonly List<NamedQueryDefinition> _ctes = [];
+    private IReadOnlyList<NamedQueryDefinition> _listedCtes = [];
+    private string? _writingCte;
     private int _statementDepth;
     private int _groupBoundary = -1;
     private int _keyDepth;
@@ -161,6 +163,7 @@ internal sealed class SqlRenderContext : IDisposable
         if (--_statementDepth == 0)
         {
             _ctes.Clear();
+            _listedCtes = [];
         }
     }
 
@@ -173,10 +176,19 @@ internal sealed class SqlRenderContext : IDisposable
     {
         WriteIdentifier(query.Name);
         Write(" AS (");
+        _writingCte = query.Name;
         WriteNamedQueryBody(query);
+        _writingCte = null;
         Write(')');
         _ctes.Add(query);
     }
+
+    /// <summary>
+    /// Starts the <c>WITH</c> of the outermost statement with all its CTEs, so that a CTE that reads one listed after it can
+    /// be found (§5.11).
+    /// </summary>
+    /// <param name="ctes">The CTEs, in order.</param>
+    public void ListCtes(IReadOnlyList<NamedQueryDefinition> ctes) => _listedCtes = ctes;
 
     /// <summary>
     /// Writes an occurrence of a named query in <c>FROM</c> or a join: its name (with the alias) when the statement lists it
@@ -198,6 +210,25 @@ internal sealed class SqlRenderContext : IDisposable
                 }
 
                 return;
+            }
+        }
+
+        foreach (NamedQueryDefinition listed in _listedCtes)
+        {
+            if (ReferenceEquals(listed, query))
+            {
+                // §5.11, D1-41: a CTE reads only the CTEs before it.
+                throw new InvalidOperationException(
+                    "The CTE "
+                        + _writingCte
+                        + " reads "
+                        + query.Name
+                        + ", which With lists after it. List "
+                        + query.Name
+                        + " before "
+                        + _writingCte
+                        + "."
+                );
             }
         }
 
