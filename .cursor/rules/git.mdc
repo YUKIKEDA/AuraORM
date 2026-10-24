@@ -13,6 +13,7 @@ When asked about such an operation, answer with the current `HEAD` SHA, the targ
 
 - Finished work goes to a PR in the same turn, without waiting for an ask: commit on the Issue's branch, push it, and open the PR. The owner reviews on the PR, from wherever they are; uncommitted changes on this machine cannot be reviewed. Do not stop at "may I commit?".
 - Long work runs in an agent worktree (`git worktree add .dev/<branch> <branch>`), not in the main working tree: the owner may switch that tree to another branch to review, and edits made after the switch land on the wrong branch.
+- A scratch worktree (to build an earlier commit, to measure) is removed without `--force`: delete its build output (`bin/`, `obj/`) first, then `git worktree remove <path>`. If git still refuses, the worktree holds changes; look at them before anything else.
 - When the PR's branch is checked out in the owner's tree, git does not let a worktree check it out too. Work on a temporary branch in the worktree and push it to the PR's branch (`git push origin tmp/16-select:feat/16-select`). Do not switch or reset the owner's tree; say in the reply that its branch is behind until the owner pulls.
 
 ```text

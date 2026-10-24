@@ -21,6 +21,7 @@ Correctness comes first. A performance claim comes with a measurement in the sam
 - A call shorter than the clock's resolution is repeated inside one sample until the sample is long enough.
 - A figure that moved is explained from the data, not from a guess (`.cursor/rules/open-ends.mdc`).
 - A target names what it measures before it gets a number.
+- A measurement exercises the cost that the change adds. A change that adds stage types for two to eight tables is measured with statements that join two to eight tables; a single-table statement uses none of the new types and shows no difference whatever they cost. When the code before the change cannot express the measured case, say so and compare the new cases with each other.
 - A gain inside the spread is reverted, not shipped with other changes. A change tried for speed and not kept is reported with its measurement, so that it is not tried again.
 - A design that names a technique for its speed is measured before the design PR says so. A prototype in a scratch project is enough.
 - Before a comparison, check each compared library's latest stable release on NuGet and use it; the results name the versions.
