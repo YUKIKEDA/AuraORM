@@ -7,6 +7,8 @@ internal sealed class SqliteRenderer : DialectRenderer
 {
     public override string Name => "SQLite";
 
+    public override DdlRenderer Ddl => field ??= new SqliteDdlRenderer(this);
+
     // SQLITE_MAX_VARIABLE_NUMBER defaults to 32766 from SQLite 3.32.0 (https://www.sqlite.org/limits.html).
     public override int MaxParameters => 32766;
 

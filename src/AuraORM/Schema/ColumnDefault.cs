@@ -35,9 +35,9 @@ public sealed class ColumnDefault
     /// <summary>
     /// Creates a constant default.
     /// </summary>
-    /// <param name="value">A number, a string, or a Boolean.</param>
+    /// <param name="value">A number, a string, a Boolean, or <see langword="null"/> for <c>DEFAULT NULL</c>.</param>
     /// <returns>The default.</returns>
-    public static ColumnDefault FromConstant(object value) => new(null, value, null);
+    public static ColumnDefault FromConstant(object? value) => new(null, value, null);
 
     /// <summary>
     /// Creates a default written in SQL.

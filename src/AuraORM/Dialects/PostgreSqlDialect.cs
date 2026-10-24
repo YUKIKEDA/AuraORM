@@ -14,7 +14,9 @@ public sealed class PostgreSqlDialect
         IUnorderedOffsetDialect,
         IOnConflictDialect,
         ICreateTableIfNotExistsDialect,
-        ICreateIndexIfNotExistsDialect
+        ICreateIndexIfNotExistsDialect,
+        IDropIndexIfExistsDialect,
+        ITransactionalDdlDialect
 {
     private PostgreSqlDialect() { }
 }

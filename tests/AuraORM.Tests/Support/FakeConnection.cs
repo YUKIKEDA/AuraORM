@@ -7,11 +7,16 @@ namespace AuraORM.Tests;
 
 /// <summary>
 /// An open connection that records the commands it creates and answers them with <see cref="Rows"/>. Its transactions can be
-/// told to fail on rollback.
+/// told to fail on rollback, and a command to fail when it runs.
 /// </summary>
 internal sealed class FakeConnection : DbConnection
 {
     public bool FailRollback { get; init; }
+
+    /// <summary>
+    /// Gets the text of a command that fails with a <see cref="DbException"/> when it runs, or null.
+    /// </summary>
+    public string? FailingCommand { get; init; }
 
     public int RollbackCount { get; private set; }
 
@@ -109,7 +114,7 @@ internal sealed class FakeCommand(FakeConnection connection) : DbCommand
 
     public override void Cancel() => CancelCount++;
 
-    public override int ExecuteNonQuery() => 1;
+    public override int ExecuteNonQuery() => CommandText == connection.FailingCommand ? throw new FakeDbException() : 1;
 
     public override object? ExecuteScalar() => connection.Rows.Count > 0 ? connection.Rows[0] : null;
 
@@ -220,4 +225,13 @@ internal sealed class FakeParameterCollection : DbParameterCollection
     protected override void SetParameter(int index, DbParameter value) => Items[index] = (FakeParameter)value;
 
     protected override void SetParameter(string parameterName, DbParameter value) => Items[IndexOf(parameterName)] = (FakeParameter)value;
+}
+
+/// <summary>
+/// The error of <see cref="FakeConnection.FailingCommand"/>.
+/// </summary>
+internal sealed class FakeDbException : DbException
+{
+    public FakeDbException()
+        : base("The fake command failed.") { }
 }

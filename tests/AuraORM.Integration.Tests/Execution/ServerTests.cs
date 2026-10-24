@@ -800,3 +800,121 @@ public sealed class SqlServerValueConverterTests : ValueConverterTests<SqlServer
 
     public ValueTask DisposeAsync() => _target.DisposeAsync();
 }
+
+/// <summary>
+/// <see cref="DdlTests{TDialect}"/> on postgresql.
+/// </summary>
+[Collection("postgresql")]
+public sealed class PostgreSqlDdlTests : DdlTests<PostgreSqlDialect>, IAsyncLifetime
+{
+    private readonly PostgreSqlTarget _target = new();
+
+    private protected override ITestTarget<PostgreSqlDialect> Target => _target;
+
+    private protected override Func<Database<PostgreSqlDialect>, Task>? CreateUsersIfNotExists =>
+        db => db.CreateTable(DdlUser.Table).IfNotExists().ExecuteAsync(Ct);
+
+    private protected override Func<Database<PostgreSqlDialect>, Task>? CreateOrderIndexesIfNotExists =>
+        db => db.CreateIndexes(DdlOrder.Table).IfNotExists().ExecuteAsync(Ct);
+
+    private protected override Func<Database<PostgreSqlDialect>, Task>? DropOrderIndexesIfExists =>
+        db => db.DropIndexes(DdlOrder.Table).IfExists().ExecuteAsync(Ct);
+
+    private protected override Func<Transaction<PostgreSqlDialect>, Task>? CreateUsersInTransaction =>
+        tx => tx.CreateTable(DdlUser.Table).ExecuteAsync(Ct);
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+
+    private protected override Task CreateSchemaAsync(Database<PostgreSqlDialect> db) =>
+#if NET10_0_OR_GREATER
+        db.ExecuteAsync($"CREATE SCHEMA IF NOT EXISTS aura_ddl10", Ct);
+#else
+        db.ExecuteAsync($"CREATE SCHEMA IF NOT EXISTS aura_ddl8", Ct);
+#endif
+}
+
+/// <summary>
+/// <see cref="DdlTests{TDialect}"/> on mysql.
+/// </summary>
+[Collection("mysql")]
+public sealed class MySqlDdlTests : DdlTests<MySqlDialect>, IAsyncLifetime
+{
+    private readonly MySqlTarget _target = new();
+
+    private protected override ITestTarget<MySqlDialect> Target => _target;
+
+    private protected override Func<Database<MySqlDialect>, Task>? CreateUsersIfNotExists =>
+        db => db.CreateTable(DdlUser.Table).IfNotExists().ExecuteAsync(Ct);
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+
+    private protected override Task CreateSchemaAsync(Database<MySqlDialect> db) =>
+#if NET10_0_OR_GREATER
+        db.ExecuteAsync($"CREATE DATABASE IF NOT EXISTS aura_ddl10", Ct);
+#else
+        db.ExecuteAsync($"CREATE DATABASE IF NOT EXISTS aura_ddl8", Ct);
+#endif
+}
+
+/// <summary>
+/// <see cref="DdlTests{TDialect}"/> on mariadb.
+/// </summary>
+[Collection("mariadb")]
+public sealed class MariaDbDdlTests : DdlTests<MariaDbDialect>, IAsyncLifetime
+{
+    private readonly MariaDbTarget _target = new();
+
+    private protected override ITestTarget<MariaDbDialect> Target => _target;
+
+    private protected override Func<Database<MariaDbDialect>, Task>? CreateUsersIfNotExists =>
+        db => db.CreateTable(DdlUser.Table).IfNotExists().ExecuteAsync(Ct);
+
+    private protected override Func<Database<MariaDbDialect>, Task>? CreateOrderIndexesIfNotExists =>
+        db => db.CreateIndexes(DdlOrder.Table).IfNotExists().ExecuteAsync(Ct);
+
+    private protected override Func<Database<MariaDbDialect>, Task>? DropOrderIndexesIfExists =>
+        db => db.DropIndexes(DdlOrder.Table).IfExists().ExecuteAsync(Ct);
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+
+    private protected override Task CreateSchemaAsync(Database<MariaDbDialect> db) =>
+#if NET10_0_OR_GREATER
+        db.ExecuteAsync($"CREATE DATABASE IF NOT EXISTS aura_ddl10", Ct);
+#else
+        db.ExecuteAsync($"CREATE DATABASE IF NOT EXISTS aura_ddl8", Ct);
+#endif
+}
+
+/// <summary>
+/// <see cref="DdlTests{TDialect}"/> on sqlserver.
+/// </summary>
+[Collection("sqlserver")]
+public sealed class SqlServerDdlTests : DdlTests<SqlServerDialect>, IAsyncLifetime
+{
+    private readonly SqlServerTarget _target = new();
+
+    private protected override ITestTarget<SqlServerDialect> Target => _target;
+
+    private protected override Func<Database<SqlServerDialect>, Task>? DropOrderIndexesIfExists =>
+        db => db.DropIndexes(DdlOrder.Table).IfExists().ExecuteAsync(Ct);
+
+    private protected override Func<Transaction<SqlServerDialect>, Task>? CreateUsersInTransaction =>
+        tx => tx.CreateTable(DdlUser.Table).ExecuteAsync(Ct);
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+
+    private protected override Task CreateSchemaAsync(Database<SqlServerDialect> db) =>
+#if NET10_0_OR_GREATER
+        db.ExecuteAsync($"IF SCHEMA_ID(N'aura_ddl10') IS NULL EXEC(N'CREATE SCHEMA aura_ddl10')", Ct);
+#else
+        db.ExecuteAsync($"IF SCHEMA_ID(N'aura_ddl8') IS NULL EXEC(N'CREATE SCHEMA aura_ddl8')", Ct);
+#endif
+}

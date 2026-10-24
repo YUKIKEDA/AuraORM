@@ -10,17 +10,18 @@ public sealed class DefaultAttribute : Attribute
     /// Initializes a new instance of the <see cref="DefaultAttribute"/> class.
     /// </summary>
     /// <param name="value">
-    /// A <see cref="SqlDefault"/> value, or a constant (a number, a string, or a Boolean) that DDL writes as a literal. There is
+    /// A <see cref="SqlDefault"/> value, a constant (a number, a string, or a Boolean) that DDL writes as a literal, or
+    /// <see langword="null"/> on a column that allows null (design §13.3). There is
     /// one constructor only: with an overload that takes <see cref="SqlDefault"/>, the literal <c>0</c> would convert to the
     /// enum and mean <see cref="SqlDefault.CurrentTimestamp"/>.
     /// </param>
-    public DefaultAttribute(object value)
+    public DefaultAttribute(object? value)
     {
         Value = value;
     }
 
     /// <summary>
-    /// Gets the default: a <see cref="SqlDefault"/> or a constant.
+    /// Gets the default: a <see cref="SqlDefault"/>, a constant, or <see langword="null"/>.
     /// </summary>
-    public object Value { get; }
+    public object? Value { get; }
 }

@@ -10,6 +10,8 @@ internal sealed class MySqlRenderer(bool isMariaDb) : DialectRenderer
 
     public override string Name => IsMariaDb ? "MariaDB" : "MySQL";
 
+    public override DdlRenderer Ddl => field ??= new MySqlDdlRenderer(this, IsMariaDb);
+
     // ER_PS_MANY_PARAM: a prepared statement has at most 65535 placeholders.
     public override int MaxParameters => 65535;
 

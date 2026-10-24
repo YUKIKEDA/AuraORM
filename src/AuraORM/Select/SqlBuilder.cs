@@ -92,4 +92,70 @@ public sealed class SqlBuilder<TDialect>
         where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
         where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
         where TInsert : InsertModel => MutationStart.Delete<TDialect, SqlOnly, TRow, TColumns, TNullable, TInsert>(session: null, table);
+
+    /// <summary>
+    /// Starts a <c>CREATE TABLE</c> (design §13.2).
+    /// </summary>
+    /// <typeparam name="TRow">The row type of the table.</typeparam>
+    /// <typeparam name="TColumns">The columns of the table.</typeparam>
+    /// <typeparam name="TNullable">The nullable columns of the table.</typeparam>
+    /// <typeparam name="TInsert">The insert model of the table.</typeparam>
+    /// <param name="table">The table, without an alias.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException"><paramref name="table"/> has an alias.</exception>
+    public CreateTableStatement<TDialect, SqlOnly> CreateTable<TRow, TColumns, TNullable, TInsert>(Table<TRow, TColumns, TNullable, TInsert> table)
+        where TRow : class
+        where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
+        where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
+        where TInsert : InsertModel => new(session: null, DdlStart.Table(table), ifNotExists: false);
+
+    /// <summary>
+    /// Starts the <c>CREATE INDEX</c> statements of the table's <see cref="IndexAttribute"/> indexes (design §13.4).
+    /// </summary>
+    /// <typeparam name="TRow">The row type of the table.</typeparam>
+    /// <typeparam name="TColumns">The columns of the table.</typeparam>
+    /// <typeparam name="TNullable">The nullable columns of the table.</typeparam>
+    /// <typeparam name="TInsert">The insert model of the table.</typeparam>
+    /// <param name="table">The table, without an alias.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException"><paramref name="table"/> has an alias.</exception>
+    public CreateIndexesStatement<TDialect, SqlOnly> CreateIndexes<TRow, TColumns, TNullable, TInsert>(
+        Table<TRow, TColumns, TNullable, TInsert> table
+    )
+        where TRow : class
+        where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
+        where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
+        where TInsert : InsertModel => new(session: null, DdlStart.Table(table), ifNotExists: false);
+
+    /// <summary>
+    /// Starts the <c>DROP INDEX</c> statements of the table's <see cref="IndexAttribute"/> indexes (design §13.4).
+    /// </summary>
+    /// <typeparam name="TRow">The row type of the table.</typeparam>
+    /// <typeparam name="TColumns">The columns of the table.</typeparam>
+    /// <typeparam name="TNullable">The nullable columns of the table.</typeparam>
+    /// <typeparam name="TInsert">The insert model of the table.</typeparam>
+    /// <param name="table">The table, without an alias.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException"><paramref name="table"/> has an alias.</exception>
+    public DropIndexesStatement<TDialect, SqlOnly> DropIndexes<TRow, TColumns, TNullable, TInsert>(Table<TRow, TColumns, TNullable, TInsert> table)
+        where TRow : class
+        where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
+        where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
+        where TInsert : InsertModel => new(session: null, DdlStart.Table(table), ifExists: false);
+
+    /// <summary>
+    /// Starts a <c>DROP TABLE</c> (design §13.8).
+    /// </summary>
+    /// <typeparam name="TRow">The row type of the table.</typeparam>
+    /// <typeparam name="TColumns">The columns of the table.</typeparam>
+    /// <typeparam name="TNullable">The nullable columns of the table.</typeparam>
+    /// <typeparam name="TInsert">The insert model of the table.</typeparam>
+    /// <param name="table">The table, without an alias.</param>
+    /// <returns>The statement.</returns>
+    /// <exception cref="ArgumentException"><paramref name="table"/> has an alias.</exception>
+    public DropTableStatement<TDialect, SqlOnly> DropTable<TRow, TColumns, TNullable, TInsert>(Table<TRow, TColumns, TNullable, TInsert> table)
+        where TRow : class
+        where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
+        where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
+        where TInsert : InsertModel => new(session: null, DdlStart.Table(table), ifExists: false);
 }

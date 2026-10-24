@@ -84,6 +84,7 @@ internal static class SchemaReader
         CheckDuplicateNames(columns, type, diagnostics);
         CheckAutoIncrement(columns, members, diagnostics);
         List<IndexModel> indexes = ReadIndexes(type, columns, diagnostics);
+        CheckIndexNames(type, schema, context.SemanticModel.Compilation, diagnostics);
         CheckMaxLength(columns, members, indexes, diagnostics);
 
         TableModel? model =
@@ -196,11 +197,27 @@ internal static class SchemaReader
 
         string name =
             member.Attribute(ColumnAttribute)?.ConstructorArguments[0].Value as string ?? (snakeCase ? Naming.ToSnakeCase(member.Name) : member.Name);
-        int maxLength = member.Attribute(MaxLengthAttribute)?.ConstructorArguments[0].Value as int? ?? -1;
+        AttributeData? length = member.Attribute(MaxLengthAttribute);
+        int maxLength = length?.ConstructorArguments[0].Value as int? ?? -1;
         AttributeData? precision = member.Attribute(PrecisionAttribute);
         if (precision is null && columnType == "Decimal")
         {
             diagnostics.Add(DiagnosticInfo.Create(Diagnostics.MissingPrecision, member.Location, member.Name));
+        }
+
+        // §13.7: the limits that every dialect has; the dialects' upper limits are checked when the DDL is built.
+        if (length is not null && maxLength < 1)
+        {
+            diagnostics.Add(DiagnosticInfo.Create(Diagnostics.InvalidSize, member.Location, member.Name, $"[MaxLength({maxLength})]"));
+        }
+
+        if (
+            precision?.ConstructorArguments[0].Value is int p
+            && precision.ConstructorArguments[1].Value is int scale
+            && (p < 1 || scale < 0 || scale > p)
+        )
+        {
+            diagnostics.Add(DiagnosticInfo.Create(Diagnostics.InvalidSize, member.Location, member.Name, $"[Precision({p}, {scale})]"));
         }
 
         return new ColumnModel(
@@ -248,33 +265,64 @@ internal static class SchemaReader
         }
 
         TypedConstant value = attribute.ConstructorArguments[0];
+        ITypeSymbol column = Underlying(member.Type);
         if (value.Kind == TypedConstantKind.Enum && value.Type?.ToDisplayString() == "AuraORM.SqlDefault")
         {
+            // §13.3: the current time in UTC is written for DateTime and DateTimeOffset columns only.
+            if (column.SpecialType != SpecialType.System_DateTime && column.ToDisplayString() != "System.DateTimeOffset")
+            {
+                diagnostics.Add(DiagnosticInfo.Create(Diagnostics.CurrentTimestampType, member.Location, member.Name, member.Type.ToDisplayString()));
+                return null;
+            }
+
             return "global::AuraORM.ColumnDefault.CurrentTimestamp";
         }
 
-        // The constant is converted to the column type, as C# would convert it in an assignment ([Default(0)] on a long).
-        ITypeSymbol column = Underlying(member.Type);
-        bool converts = value.Type is null
-            ? member.Type.IsReferenceType || !SymbolEqualityComparer.Default.Equals(column, member.Type)
-            : compilation.ClassifyConversion(value.Type, column).IsImplicit || IsImplicitConstantConversion(value.Value, column);
-        if (!converts)
+        if (InvalidConstant(member, value, column, compilation) is { } reason)
         {
-            diagnostics.Add(
-                DiagnosticInfo.Create(
-                    Diagnostics.DefaultTypeMismatch,
-                    member.Location,
-                    member.Name,
-                    value.Type?.ToDisplayString() ?? "null",
-                    member.Type.ToDisplayString()
-                )
-            );
+            diagnostics.Add(DiagnosticInfo.Create(Diagnostics.DefaultTypeMismatch, member.Location, member.Name, reason));
             return null;
+        }
+
+        // §13.3: DEFAULT NULL; a cast of null to a value type ((int)(null)) would not compile.
+        if (value.IsNull)
+        {
+            return "global::AuraORM.ColumnDefault.FromConstant(null)";
         }
 
         // The literal is in parentheses: (T)-1 is read as a subtraction from a value named T, not as a cast (CS0075).
         string type = column.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         return "global::AuraORM.ColumnDefault.FromConstant((" + type + ")(" + Literal(value.Value) + "))";
+    }
+
+    // §13.3: the reason a [Default] constant cannot be the default of the column, or null when it can.
+    private static string? InvalidConstant(Member member, TypedConstant value, ITypeSymbol column, Compilation compilation)
+    {
+        if (value.Kind == TypedConstantKind.Array)
+        {
+            return "an array cannot be written as a constant default; use [DefaultSql]";
+        }
+
+        if (value.IsNull)
+        {
+            return member.Model.IsNullable
+                ? null
+                : $"null is the default of a column that does not allow null; make '{member.Type.ToDisplayString()}' nullable, or write a value";
+        }
+
+        if (
+            (value.Value is double d && (double.IsNaN(d) || double.IsInfinity(d)))
+            || (value.Value is float f && (float.IsNaN(f) || float.IsInfinity(f)))
+        )
+        {
+            return "a number that is not finite has no SQL literal; write a finite number";
+        }
+
+        // The constant is converted to the column type, as C# would convert it in an assignment ([Default(0)] on a long).
+        bool converts = compilation.ClassifyConversion(value.Type!, column).IsImplicit || IsImplicitConstantConversion(value.Value, column);
+        return converts
+            ? null
+            : $"it is of type '{value.Type!.ToDisplayString()}', which does not convert implicitly to the column type '{member.Type.ToDisplayString()}'; write a value of the column type, or use [DefaultSql]";
     }
 
     private static string? ReadReference(Member member, List<DiagnosticInfo> diagnostics)
@@ -327,6 +375,26 @@ internal static class SchemaReader
             return null;
         }
 
+        // §13.5: every dialect needs the referenced column to be the primary key or unique.
+        bool isKey =
+            targetMember.Attribute(UniqueAttribute) is not null
+            || (
+                targetMember.Attribute(PrimaryKeyAttribute) is not null
+                && ReadMembers(target, [], CancellationToken.None).Count(m => m.Attribute(PrimaryKeyAttribute) is not null) == 1
+            );
+        if (!isKey)
+        {
+            diagnostics.Add(
+                DiagnosticInfo.Create(
+                    Diagnostics.InvalidReference,
+                    member.Location,
+                    member.Name,
+                    $"'{target.Name}.{memberName}' is neither the single primary key of '{target.Name}' nor a [Unique] column"
+                )
+            );
+            return null;
+        }
+
         bool targetSnakeCase = NamedInt(targetTable, "Naming") == 1;
         string columnName =
             targetMember.Attribute(ColumnAttribute)?.ConstructorArguments[0].Value as string
@@ -363,6 +431,47 @@ internal static class SchemaReader
 
         return indexes;
     }
+
+    // §13.4: PostgreSQL and SQLite need an index name that is unique in its schema; the generator sees the tables of this
+    // compilation only.
+    private static void CheckIndexNames(INamedTypeSymbol type, string? schema, Compilation compilation, List<DiagnosticInfo> diagnostics)
+    {
+        List<AttributeData> own = IndexAttributes(type).ToList();
+        if (own.Count == 0)
+        {
+            return;
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (AttributeData attribute in own)
+        {
+            string name = attribute.ConstructorArguments[0].Value as string ?? string.Empty;
+            Location? location = attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
+            if (!seen.Add(name))
+            {
+                diagnostics.Add(DiagnosticInfo.Create(Diagnostics.DuplicateIndexName, location, name, type.Name, type.Name));
+                continue;
+            }
+
+            foreach (INamedTypeSymbol other in AllTypes(compilation.Assembly.GlobalNamespace))
+            {
+                if (
+                    SymbolEqualityComparer.Default.Equals(other, type)
+                    || other.GetAttributes().FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == TableAttribute) is not { } table
+                    || NamedString(table, "Schema") != schema
+                    || !IndexAttributes(other).Any(a => a.ConstructorArguments[0].Value as string == name)
+                )
+                {
+                    continue;
+                }
+
+                diagnostics.Add(DiagnosticInfo.Create(Diagnostics.DuplicateIndexName, location, name, type.Name, other.Name));
+            }
+        }
+    }
+
+    private static IEnumerable<AttributeData> IndexAttributes(INamedTypeSymbol type) =>
+        type.GetAttributes().Where(a => a.AttributeClass?.ToDisplayString() == IndexAttribute);
 
     private static void CheckMaxLength(List<ColumnModel> columns, List<Member> members, List<IndexModel> indexes, List<DiagnosticInfo> diagnostics)
     {

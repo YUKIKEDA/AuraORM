@@ -160,7 +160,7 @@ catch (InvalidOperationException) { }
 checks.Equal("rollback", 3L, await db.QueryScalarAsync<long>($"SELECT {Count()} FROM {Book.Table}"));
 
 // Value converters (design §3.6): registered by the generated module initializer, converted without reflection.
-await db.ExecuteAsync($"CREATE TABLE {Shelf.Table} (id INTEGER PRIMARY KEY, parent_id INTEGER)");
+await db.CreateTable(Shelf.Table).ExecuteAsync();
 await db.Insert(Shelf.Table)
     .Values([new Shelf.Insert { Id = new ShelfId(1), ParentId = null }, new Shelf.Insert { Id = new ShelfId(2), ParentId = new ShelfId(1) }])
     .ExecuteAsync();
@@ -170,6 +170,16 @@ List<(ShelfId, ShelfId?)> shelves = await db.From(Shelf.Table)
     .OrderBy(s => [Asc(s.Id)])
     .ToListAsync();
 checks.SameItems("value converters", [(new ShelfId(1), (ShelfId?)null), (new ShelfId(2), new ShelfId(1))], shelves);
+
+// DDL (design §13): a table with a foreign key, defaults, and an index is created, used, and dropped.
+await db.CreateTable(Lamp.Table).IfNotExists().ExecuteAsync();
+await db.CreateIndexes(Lamp.Table).ExecuteAsync();
+await db.Insert(Lamp.Table).Values(new Lamp.Insert { ShelfId = new ShelfId(1) }).ExecuteAsync();
+Lamp lamp = await db.From(Lamp.Table).Select(l => l).FirstAsync();
+checks.Equal("ddl defaults", (60, "warm", true), (lamp.Watts, lamp.Tone, lamp.Added.Year >= 2026));
+await db.DropIndexes(Lamp.Table).IfExists().ExecuteAsync();
+await db.DropTable(Lamp.Table).ExecuteAsync();
+checks.Equal("ddl drop", 0L, await db.QueryScalarAsync<long>($"SELECT COUNT(*) FROM sqlite_master WHERE name LIKE {"%lamps%"}"));
 
 return checks.Report();
 
@@ -272,6 +282,19 @@ namespace AuraORM.Samples.Sqlite
     /// </summary>
     [Table("shelves", Naming = ColumnNaming.SnakeCase)]
     public sealed partial record Shelf([PrimaryKey] ShelfId Id, ShelfId? ParentId);
+
+    /// <summary>
+    /// A lamp on a shelf, created and dropped by DDL (design §13).
+    /// </summary>
+    [Table("lamps", Naming = ColumnNaming.SnakeCase)]
+    [Index("ix_lamps_shelf", nameof(ShelfId))]
+    public sealed partial record Lamp(
+        [PrimaryKey, AutoIncrement] long Id,
+        [References(typeof(Shelf), nameof(Shelf.Id))] ShelfId ShelfId,
+        [Default(60)] int Watts,
+        [Default("warm")] string Tone,
+        [Default(SqlDefault.CurrentTimestamp)] DateTime Added
+    );
 
     /// <summary>
     /// A result type read by column name from a raw query.

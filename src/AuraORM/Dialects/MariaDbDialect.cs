@@ -9,7 +9,8 @@ public sealed class MariaDbDialect
         IUnorderedLimitDialect,
         IOnDuplicateKeyDialect,
         ICreateTableIfNotExistsDialect,
-        ICreateIndexIfNotExistsDialect
+        ICreateIndexIfNotExistsDialect,
+        IDropIndexIfExistsDialect
 {
     private MariaDbDialect() { }
 }

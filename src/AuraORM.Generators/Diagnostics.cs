@@ -51,6 +51,24 @@ internal static class Diagnostics
         "The type 'AuraORM.Generated.__AuraValueConverters' has the name of the class that AuraORM generates to register value converters; rename it"
     );
 
+    public static readonly DiagnosticDescriptor CurrentTimestampType = Error(
+        "AURA0117",
+        "SqlDefault.CurrentTimestamp is on a column that is not DateTime or DateTimeOffset",
+        "The default SqlDefault.CurrentTimestamp of '{0}' needs a DateTime or DateTimeOffset column, and '{0}' is of type '{1}'; write the dialect's expression with [DefaultSql]"
+    );
+
+    public static readonly DiagnosticDescriptor DuplicateIndexName = Error(
+        "AURA0118",
+        "Two indexes in one schema have the same name",
+        "The index name '{0}' of '{1}' is also the name of an index of '{2}' in the same schema; PostgreSQL and SQLite need an index name that is unique in its schema, so rename one of them"
+    );
+
+    public static readonly DiagnosticDescriptor InvalidSize = Error(
+        "AURA0119",
+        "[MaxLength] or [Precision] is out of range",
+        "'{0}' has {1}; a length and a precision are 1 or more, and a scale is from 0 to the precision"
+    );
+
     public static readonly DiagnosticDescriptor DuplicateColumn = Error(
         "AURA0106",
         "Two columns have the same name",
@@ -95,8 +113,8 @@ internal static class Diagnostics
 
     public static readonly DiagnosticDescriptor DefaultTypeMismatch = Error(
         "AURA0113",
-        "The [Default] value does not have the type of the column",
-        "The [Default] value of '{0}' is of type '{1}', which does not convert implicitly to the column type '{2}'; write a value of the column type, or use [DefaultSql]"
+        "The [Default] value cannot be the default of the column",
+        "The [Default] value of '{0}' is not valid: {1}"
     );
 
     public static readonly DiagnosticDescriptor NamedQueriesCollision = Error(
@@ -147,6 +165,9 @@ internal static class Diagnostics
         NamedQueriesCollision,
         DuplicateConverter,
         RegistrationCollision,
+        CurrentTimestampType,
+        DuplicateIndexName,
+        InvalidSize,
     ];
 
     public static DiagnosticDescriptor ById(string id) => All.First(d => d.Id == id);
