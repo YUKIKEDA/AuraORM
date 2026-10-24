@@ -44,6 +44,8 @@ version has been published to NuGet.
   tuple) and the column sets, and accept only keys and aggregates, so a column that is not a key does not compile.
 - The same expression written more than once in a statement is one parameter: a key with a value in the select list,
   `GROUP BY`, `HAVING`, and `ORDER BY`, and the SQL Server expansion of `IsDistinctFrom` / `IsNotDistinctFrom`.
+- On MySQL and MariaDB, a key that is not a column is written as `MIN(key)` inside `HAVING`, because they do not match
+  an expression there with the `GROUP BY` key. On SQL Server, `Sum` of `float` is cast back to `real`.
 - Analyzers in the package: a comparison with a typed null constant (AURA0201) or with a value that may be null
   (AURA0202), which matches no row in SQL, and a raw SQL hole whose value is not a column type (AURA0301).
 - On SQLite, ordering, comparing by size, and `Min` / `Max` / `Sum` / `Avg` of decimals throw when the statement is

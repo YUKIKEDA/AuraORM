@@ -80,6 +80,8 @@ public sealed class SelectGroupTests
     ///
     /// Expected:
     /// - <c>("accounts"."login_count" + @p0)</c> at all four places; the <c>HAVING</c> value is <c>@p1</c>.
+    /// - On MySQL and MariaDB, the key inside <c>HAVING</c> is <c>MIN(…)</c>, because they do not match an expression there
+    ///   with the <c>GROUP BY</c> key (design §5.5); the other places are the same.
     /// - The parameters: 1, 3.
     /// </remarks>
     [Fact]
@@ -90,11 +92,41 @@ public sealed class SelectGroupTests
             new(
                 "SELECT (\"accounts\".\"login_count\" + @p0), COUNT(*) FROM \"accounts\" GROUP BY (\"accounts\".\"login_count\" + @p0) HAVING (\"accounts\".\"login_count\" + @p0) > @p1 ORDER BY (\"accounts\".\"login_count\" + @p0) ASC",
                 "SELECT (\"accounts\".\"login_count\" + $1), COUNT(*) FROM \"accounts\" GROUP BY (\"accounts\".\"login_count\" + $1) HAVING (\"accounts\".\"login_count\" + $1) > $2 ORDER BY (\"accounts\".\"login_count\" + $1) ASC",
-                "SELECT (`accounts`.`login_count` + @p0), COUNT(*) FROM `accounts` GROUP BY (`accounts`.`login_count` + @p0) HAVING (`accounts`.`login_count` + @p0) > @p1 ORDER BY (`accounts`.`login_count` + @p0) ASC",
+                "SELECT (`accounts`.`login_count` + @p0), COUNT(*) FROM `accounts` GROUP BY (`accounts`.`login_count` + @p0) HAVING MIN((`accounts`.`login_count` + @p0)) > @p1 ORDER BY (`accounts`.`login_count` + @p0) ASC",
                 "SELECT ([accounts].[login_count] + @p0), COUNT_BIG(*) FROM [accounts] GROUP BY ([accounts].[login_count] + @p0) HAVING ([accounts].[login_count] + @p0) > @p1 ORDER BY ([accounts].[login_count] + @p0) ASC"
             ),
             1,
             3
+        );
+    }
+
+    /// <summary>
+    /// A column key inside <c>HAVING</c> is the column on every dialect, MySQL and MariaDB included; only a key that is not a
+    /// column gets <c>MIN</c> there (design §5.5).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/>, grouped by <c>a.LoginCount</c>.
+    ///
+    /// Steps:
+    /// - Render <c>Having((k, a) =&gt; Gt(Add(k, 1), 5))</c>, which has the key inside an expression, and select the key.
+    ///
+    /// Expected:
+    /// - <c>HAVING ("accounts"."login_count" + @p0) &gt; @p1</c> on every dialect, with no <c>MIN</c>.
+    /// </remarks>
+    [Fact]
+    public void Having_ColumnKey_IsWrittenAsTheColumn()
+    {
+        SqlAssert.Statement(
+            new ColumnKeyHaving(),
+            new(
+                "SELECT \"accounts\".\"login_count\" FROM \"accounts\" GROUP BY \"accounts\".\"login_count\" HAVING (\"accounts\".\"login_count\" + @p0) > @p1",
+                "SELECT \"accounts\".\"login_count\" FROM \"accounts\" GROUP BY \"accounts\".\"login_count\" HAVING (\"accounts\".\"login_count\" + $1) > $2",
+                "SELECT `accounts`.`login_count` FROM `accounts` GROUP BY `accounts`.`login_count` HAVING (`accounts`.`login_count` + @p0) > @p1",
+                "SELECT [accounts].[login_count] FROM [accounts] GROUP BY [accounts].[login_count] HAVING ([accounts].[login_count] + @p0) > @p1"
+            ),
+            1,
+            5
         );
     }
 
@@ -204,6 +236,13 @@ public sealed class SelectGroupTests
                 .Select((k, a) => (k, Count()))
                 .OrderBy((k, a) => [Asc(k)])
                 .ToSql();
+    }
+
+    private sealed class ColumnKeyHaving : IQueryCase
+    {
+        public SqlStatement Build<TDialect>(Database<TDialect> db)
+            where TDialect : IDialect =>
+            db.From(Account.Table).GroupBy(a => a.LoginCount).Having((k, a) => Gt(Add(k, 1), 5)).Select((k, a) => k).ToSql();
     }
 
     private sealed class OptionalHaving(bool withCondition) : IQueryCase

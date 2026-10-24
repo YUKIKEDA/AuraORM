@@ -15,7 +15,10 @@ internal sealed class SelectNode(SelectState state) : SqlNode
         }
 
         context.EnterScope(tables);
+        bool inHaving = context.InHaving;
+        context.InHaving = false;
         RenderClauses(context);
+        context.InHaving = inHaving;
         context.ExitScope();
     }
 
@@ -60,7 +63,9 @@ internal sealed class SelectNode(SelectState state) : SqlNode
         if (state.Having is not null)
         {
             context.Write(" HAVING ");
+            context.InHaving = true;
             state.Having.Render(context);
+            context.InHaving = false;
         }
 
         if (!state.OrderBy.IsEmpty)

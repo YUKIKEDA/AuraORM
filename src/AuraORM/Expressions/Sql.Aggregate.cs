@@ -74,10 +74,10 @@ public static partial class Sql
     public static IExpr<double?, PerGroup> Sum(IExpr<double?, PerRow> value) => Aggregate<double?>(AggregateFunction.Sum, value.Node);
 
     /// <inheritdoc cref="Sum(IExpr{decimal, PerRow})"/>
-    public static IExpr<float?, PerGroup> Sum(IExpr<float, PerRow> value) => Aggregate<float?>(AggregateFunction.Sum, value.Node);
+    public static IExpr<float?, PerGroup> Sum(IExpr<float, PerRow> value) => Aggregate<float?>(AggregateFunction.SumSingle, value.Node);
 
     /// <inheritdoc cref="Sum(IExpr{decimal, PerRow})"/>
-    public static IExpr<float?, PerGroup> Sum(IExpr<float?, PerRow> value) => Aggregate<float?>(AggregateFunction.Sum, value.Node);
+    public static IExpr<float?, PerGroup> Sum(IExpr<float?, PerRow> value) => Aggregate<float?>(AggregateFunction.SumSingle, value.Node);
 
     /// <summary>
     /// Averages numbers as a double: <c>AVG(a)</c> on SQLite, <c>AVG(CAST(a AS double precision))</c> on PostgreSQL,

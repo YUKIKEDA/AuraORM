@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Reflection;
+using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -47,6 +49,50 @@ internal static class CompileAssert
         Assert.Contains(diagnostics, d => d.Id == id && d.Severity == DiagnosticSeverity.Warning);
     }
 
+    /// <summary>
+    /// Compiles the snippet, asserts that it has no error and no warning, runs it, and returns the string it returns.
+    /// </summary>
+    /// <param name="body">Statements of a method body that end with <c>return</c> of a string.</param>
+    /// <returns>The value the snippet returned.</returns>
+    public static string Evaluate(string body)
+    {
+        CSharpCompilation compilation = Compilation(
+            $$"""
+            using System;
+            using System.Collections.Generic;
+            using AuraORM;
+            using AuraORM.Tests;
+            using static AuraORM.Sql;
+
+            namespace Consumer;
+
+            public static class Snippet
+            {
+                public static string Run()
+                {
+            {{body}}
+                }
+            }
+            """
+        );
+        using var image = new MemoryStream();
+        Microsoft.CodeAnalysis.Emit.EmitResult result = compilation.Emit(image);
+        ImmutableArray<Diagnostic> diagnostics = [.. result.Diagnostics.Where(d => d.Severity >= DiagnosticSeverity.Warning)];
+        Assert.True(result.Success && diagnostics.IsEmpty, "Unexpected diagnostics:\n" + string.Join("\n", diagnostics));
+        image.Position = 0;
+        var context = new AssemblyLoadContext("Snippet", isCollectible: true);
+        try
+        {
+            Assembly assembly = context.LoadFromStream(image);
+            MethodInfo run = assembly.GetType("Consumer.Snippet", throwOnError: true)!.GetMethod("Run")!;
+            return (string)run.Invoke(null, null)!;
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
     private static ImmutableArray<Diagnostic> Compile(string body)
     {
         string source = $$"""
@@ -67,15 +113,16 @@ internal static class CompileAssert
                 }
             }
             """;
-        var options = new CSharpParseOptions(LanguageVersion.CSharp12);
-        CSharpCompilation compilation = CSharpCompilation.Create(
+        return Compilation(source).GetDiagnostics().Where(d => d.Severity >= DiagnosticSeverity.Warning).ToImmutableArray();
+    }
+
+    private static CSharpCompilation Compilation(string source) =>
+        CSharpCompilation.Create(
             "Consumer",
-            [CSharpSyntaxTree.ParseText(source, options)],
+            [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12))],
             References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable)
         );
-        return compilation.GetDiagnostics().Where(d => d.Severity >= DiagnosticSeverity.Warning).ToImmutableArray();
-    }
 
     private static ImmutableArray<MetadataReference> LoadReferences()
     {

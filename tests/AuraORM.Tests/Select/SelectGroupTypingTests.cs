@@ -3,16 +3,16 @@ namespace AuraORM.Tests;
 public sealed class SelectGroupTypingTests
 {
     // The key columns, in order, with their types: key i of a statement is column i of table ((i - 1) % tables) + 1.
-    private static readonly (string Column, string Type)[] KeyColumns =
+    private static readonly (string Column, string Type, string Sql)[] KeyColumns =
     [
-        ("Email", "string"),
-        ("Id", "long"),
-        ("LoginCount", "int"),
-        ("Status", "AccountStatus"),
-        ("DisplayName", "string?"),
-        ("CreatedAt", "DateTime"),
-        ("Balance", "decimal?"),
-        ("Email", "string"),
+        ("Email", "string", "email"),
+        ("Id", "long", "id"),
+        ("LoginCount", "int", "login_count"),
+        ("Status", "AccountStatus", "status"),
+        ("DisplayName", "string?", "display_name"),
+        ("CreatedAt", "DateTime", "created_at"),
+        ("Balance", "decimal?", "balance"),
+        ("Email", "string", "email"),
     ];
 
     /// <summary>
@@ -128,9 +128,12 @@ public sealed class SelectGroupTypingTests
     /// - Group by <paramref name="keys"/> keys, add <c>Having</c> on a count of the last table, select every key, and order
     ///   by the first key; select the keys with <c>SelectDistinct</c> and order by the first item; select a result type's
     ///   group projection (and a count for each other key) with <c>SelectDistinct</c>. Assign each stage to its exact type.
+    /// - Run the snippet and render the three statements on PostgreSQL.
     ///
     /// Expected:
     /// - No error and no warning; a key of the wrong type or a stage of the wrong type would be CS0029 or CS0266.
+    /// - The SQL has every table, the keys in order in <c>GROUP BY</c> and in the select list, <c>DISTINCT</c> only where
+    ///   <c>SelectDistinct</c> was called, and the <c>HAVING</c> and <c>ORDER BY</c> of each statement.
     /// </remarks>
     /// <param name="tables">The number of tables, 1 to 8.</param>
     /// <param name="keys">The number of keys, 1 to 8.</param>
@@ -139,7 +142,7 @@ public sealed class SelectGroupTypingTests
     public void GroupBy_EveryTableAndKeyCount_HasItsStages(int tables, int keys)
     {
         string chain =
-            "sqlite.From(Account.Table.As(\"t1\"))"
+            "new SqlBuilder<PostgreSqlDialect>().From(Account.Table.As(\"t1\"))"
             + string.Concat(Enumerable.Range(2, tables - 1).Select(i => $".CrossJoin(Account.Table.As(\"t{i}\"))"));
         string views = string.Join(", ", Enumerable.Repeat("Account.Columns", tables));
         string lambda = "(k, " + string.Join(", ", Enumerable.Range(1, tables).Select(i => $"t{i}")) + ")";
@@ -156,16 +159,31 @@ public sealed class SelectGroupTypingTests
         string projection = $"new NameTotal.GroupProjection {{ Name = {keyRefs[0]}, Total = Sum(t1.Balance) }}";
         string rows = keys == 1 ? projection : "(" + projection + ", " + string.Join(", ", Enumerable.Repeat("Count()", keys - 1)) + ")";
 
-        CompileAssert.Compiles(
+        string from =
+            "FROM \"accounts\" AS \"t1\"" + string.Concat(Enumerable.Range(2, tables - 1).Select(i => $" CROSS JOIN \"accounts\" AS \"t{i}\""));
+        string[] keySql = [.. Enumerable.Range(0, keys).Select(i => $"\"t{(i % tables) + 1}\".\"{KeyColumns[i].Sql}\"")];
+        string keyList = string.Join(", ", keySql);
+        string counts = string.Concat(Enumerable.Repeat(", COUNT(*)", keys - 1));
+        string[] expected =
+        [
+            $"SELECT {keyList} {from} GROUP BY {keyList} HAVING COUNT(\"t{tables}\".\"id\") > $1 ORDER BY {keySql[0]} ASC",
+            $"SELECT DISTINCT {keyList} {from} GROUP BY {keyList} ORDER BY 1 ASC",
+            $"SELECT DISTINCT {keySql[0]}, SUM(\"t1\".\"balance\"){counts} {from} GROUP BY {keyList}",
+        ];
+
+        string sql = CompileAssert.Evaluate(
             $"""
-            SelectGrouped<SqliteDialect, Executable, {keyType}, {views}> g = {chain}.GroupBy({rowLambda} => {groupBy});
-            SelectHaving<SqliteDialect, Executable, {keyType}, {views}> h = g.Having({lambda} => Gt(Count(t{tables}.Id), 0L));
-            SelectGroupedProjected<SqliteDialect, Executable, {result}, {keyType}, {views}> p = h.Select({lambda} => {selected});
-            SelectOrdered<SqliteDialect, Executable, {result}> o = p.OrderBy({lambda} => [Asc({keyRefs[0]})]);
-            SelectOrdered<SqliteDialect, Executable, {result}> d = g.SelectDistinct({lambda} => {selected}).OrderBy(s => [Asc({distinctFirst})]);
-            SelectDistinctRows<SqliteDialect, Executable, {rowsResult}, PerGroup> r = g.SelectDistinct({lambda} => {rows});
+            SelectGrouped<PostgreSqlDialect, SqlOnly, {keyType}, {views}> g = {chain}.GroupBy({rowLambda} => {groupBy});
+            SelectHaving<PostgreSqlDialect, SqlOnly, {keyType}, {views}> h = g.Having({lambda} => Gt(Count(t{tables}.Id), 0L));
+            SelectGroupedProjected<PostgreSqlDialect, SqlOnly, {result}, {keyType}, {views}> p = h.Select({lambda} => {selected});
+            SelectOrdered<PostgreSqlDialect, SqlOnly, {result}> o = p.OrderBy({lambda} => [Asc({keyRefs[0]})]);
+            SelectOrdered<PostgreSqlDialect, SqlOnly, {result}> d = g.SelectDistinct({lambda} => {selected}).OrderBy(s => [Asc({distinctFirst})]);
+            SelectDistinctRows<PostgreSqlDialect, SqlOnly, {rowsResult}, PerGroup> r = g.SelectDistinct({lambda} => {rows});
+            return o.ToSql().Text + "|" + d.ToSql().Text + "|" + r.ToSql().Text;
             """
         );
+
+        Assert.Equal(expected, sql.Split('|'));
     }
 
     public static TheoryData<int, int> ArityCases()

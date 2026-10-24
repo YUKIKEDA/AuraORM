@@ -16,6 +16,6 @@ internal static class GroupKey
     public static IExpr<T, PerGroup> Of<T>(IExpr<T, PerRow> key)
     {
         ArgumentNullException.ThrowIfNull(key);
-        return new SqlExpr<T, PerGroup>(key.Node);
+        return new SqlExpr<T, PerGroup>(new GroupKeyNode(key.Node));
     }
 }

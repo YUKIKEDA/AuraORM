@@ -305,6 +305,12 @@ public sealed class FunctionRenderingTests
                 []
             },
             {
+                "Sum of floats",
+                () => Sum(Weight),
+                new($"SUM({U}.\"Weight\")", $"SUM({U}.\"Weight\")", $"SUM({B}.`Weight`)", $"CAST(SUM({S}.[Weight]) AS real)"),
+                []
+            },
+            {
                 "Avg of integers",
                 () => Avg(Age),
                 new(

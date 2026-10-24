@@ -11,6 +11,7 @@ internal enum AggregateFunction
     CountDistinct,
     SumInteger,
     Sum,
+    SumSingle,
     AverageAsDouble,
     Average,
     Min,

@@ -38,6 +38,12 @@ internal sealed class SqlRenderContext : IDisposable
     public bool UnqualifiedColumns { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the <c>HAVING</c> of the statement being rendered is written now, where a
+    /// <see cref="GroupKeyNode"/> may need an aggregate (§5.5).
+    /// </summary>
+    public bool InHaving { get; set; }
+
+    /// <summary>
     /// Enters the <c>FROM</c> of a statement: until <see cref="ExitScope"/>, a column must belong to one of these tables or
     /// to a table of an enclosing statement (§14.3).
     /// </summary>
