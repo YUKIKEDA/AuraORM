@@ -255,8 +255,8 @@
 
 ## D1-42 MySQL で UPDATE / DELETE のサブクエリが対象のテーブルを読む
 
-- **Decision**: MySQL では、UPDATE / DELETE の文の中のサブクエリが対象のテーブルを読むと（派生テーブルを通しても）、組み立て時の例外にする（§7、§14.3）。
-- **Reason**: MySQL はこの文をエラー 1093 で拒む。派生テーブルを通して通るのは実体化されたときだけで、既定は併合であり、どちらになるかを資料は保証しない（8.4 の `update.html`）。#56 の Grill で所有者が決めた。
+- **Decision**: MySQL では、UPDATE / DELETE の文の中と、`OnDuplicateKeyUpdate` の値の中のサブクエリが対象のテーブルを読むと（派生テーブルを通しても）、組み立て時の例外にする（§7、§10.2、§14.3）。
+- **Reason**: MySQL はこの文をエラー 1093 で拒む。派生テーブルを通して通るのは実体化されたときだけで、既定は併合であり、どちらになるかを資料は保証しない（8.4 の `update.html`）。#56 の Grill で所有者が決めた。`OnDuplicateKeyUpdate` への拡張は #71 のレビューで決めた。MySQL 8.4 と 9.7 は、`ON DUPLICATE KEY UPDATE` の値でも、別名のないテーブルと派生テーブルを通した形を 1093 で拒み、別名を付けた形だけを通した。その理由は資料になく、別名の有無で規則を分けない。
 - **Rejected**: jOOQ のように `SELECT * FROM (…) AS t` で自動で包む案（書いたものと SQL が変わり、包んでも通る保証がない）。そのまま送る案（EF Core / Pomelo。MySQL でだけ実行時に失敗する）。
 
 ## D1-43 MySQL と MariaDB の左から順の代入
@@ -324,3 +324,63 @@
 - **Decision**: `Returning` の文を最後まで読まずに閉じるとき、`DbCommand.Cancel()` を呼ばず、残りの行をプロバイダーに読み捨てさせる（§9、§12.2）。
 - **Reason**: MariaDB 12.3 と SQL Server 2025 では、20 万行の変更の最初の行を読んで `Cancel` すると、例外なしに文全体が取り消された。最初の行が返るのに変更がない。#63 で所有者が決めた。
 - **Rejected**: SELECT と同じく `Cancel` を呼ぶ案（変更が黙って消える）。`Returning` の後に `First…` を置かない案（途中でやめた `AsAsyncEnumerable()` に同じ問題が残る）。
+
+## D1-54 `ON DUPLICATE KEY UPDATE` の左から順の代入
+
+- **Decision**: MySQL と MariaDB の `OnDuplicateKeyUpdate` にも、前の代入の列を読む値の検査（D1-43）を当てる（§10.2）。
+- **Reason**: `ON DUPLICATE KEY UPDATE` の代入も左から順に評価され（8.4 と 9.7、10.11 と 12.3 で確かめた）、SQLite と PostgreSQL の `DO UPDATE` と結果が違う。#70 の Grill で所有者が決めた。
+- **Rejected**: 検査しない案（黙って違う値が入る）。
+
+## D1-55 MySQL の行の別名と、含めていない列
+
+- **Decision**: MySQL は行の別名 `AS excluded` で挿入しようとした行を読み、INSERT に含めていない列を `excluded` で読むと組み立て時の例外にする（§10.2）。
+- **Reason**: MySQL は別名の列の並びにない列をエラー 1054 で拒む。`VALUES(列)` は 8.0.20 から非推奨で、削除されうる。#70 の Grill で所有者が決めた。
+- **Rejected**: 読まれる列を `DEFAULT` で列の並びに足す案（書いていない列が SQL に出る。試していない）。MySQL でも `VALUES(列)` を使う案（非推奨）。jOOQ のように既存の行の列に書き換える案（意味が変わる）。
+
+## D1-56 UPSERT の行の名前 `excluded`
+
+- **Decision**: 挿入しようとした行を、どの方言でも `excluded` と呼ぶ（MySQL の行の別名も `excluded`）。テーブルの名前が `excluded` のときは、SQLite、PostgreSQL、MySQL で組み立て時の例外にする（§10.1、§10.2）。
+- **Reason**: 名前を揃えると、方言をまたいで同じラムダを書ける。jOOQ も MySQL に `AS excluded` を出す。`excluded` という名前のテーブルでは、SQLite 3.40 が既存の行の値を黙って読み、PostgreSQL（15 と 18）は「あいまい」、MySQL（8.4 と 9.7）はエラー 1066 で拒んだ。#70 の Grill（Q12）で、試してから決めると所有者が決め、その結果で決めた。
+- **Rejected**: 設計の前の版の `AS new`（方言で名前が分かれる）。`excluded` という名前のテーブルをそのまま書く案（SQLite で誤った値が入る）。
+
+## D1-57 UPSERT の、同じ値で衝突する複数の行
+
+- **Decision**: 一つの文の複数の行が同じ一意の値で衝突しても検査せず、§14.2 と XML ドキュメントに書く（§10.3）。
+- **Reason**: どの値が重なるかはデータで決まる。PostgreSQL はエラーにするので黙った誤りにはならず、ほかの方言は行ごとに順に適用する。調べたライブラリ（Drizzle ORM、Kysely、jOOQ、linq2db）にも検査はない。#70 の Grill で所有者が決めた。
+- **Rejected**: パラメータの値を比べて組み立て時に例外にする案（MySQL ではどの一意キーで衝突するかが分からず、半分しか調べられない）。
+
+## D1-58 SQLite の `DEFAULT VALUES` と UPSERT
+
+- **Decision**: SQLite で、設定した列が一つもない行に UPSERT の句を付けると `ArgumentException` にする（§10.1）。
+- **Reason**: SQLite の資料に「`DEFAULT VALUES` の後には UPSERT の句を書けない」とある。PostgreSQL、MySQL、MariaDB は書ける。#70 の Grill で所有者が決めた。
+- **Rejected**: そのまま書いて SQLite の構文エラーに任せる案（実行するまで分からない）。
+
+## D1-59 対象のない `DO NOTHING`
+
+- **Decision**: 対象のない `OnConflictDoNothing()` と、対象のある `OnConflict(…).DoNothing()` / `DoUpdate(…)` を置く。対象のない `DoUpdate` は置かない（§10.1）。
+- **Reason**: PostgreSQL の資料によれば、対象を省けるのは `DO NOTHING` だけである。Drizzle ORM と jOOQ も対象のない `DO NOTHING` を持つ。#70 の Grill で所有者が決めた。
+- **Rejected**: 対象を必ず書かせる案（どの衝突でも飛ばす書き方ができない）。
+
+## D1-60 UPSERT の行の数
+
+- **Decision**: `ExecuteAsync` は UPSERT の行の数をプロバイダーの値のまま返し、方言ごとの意味（MySQL と MariaDB は更新した行を 2 と数える）を XML ドキュメントに書く（§10.3）。
+- **Reason**: D1-48 と同じ。数え直すには、もう一度問い合わせることになる。#70 の Grill で所有者が決めた。
+- **Rejected**: 方言の違いを吸収して数え直す案。
+
+## D1-61 UPSERT の代入先の検査
+
+- **Decision**: `DoUpdate` と `OnDuplicateKeyUpdate` の代入先が既存の行の列でないと（`excluded` の列）、組み立て時に `InvalidOperationException` にする（§10.1）。
+- **Reason**: `excluded` の列もテーブルの列の型（`Column<T>`）なので型では止められず、代入先は列名だけで書くので、黙ってテーブルの列を更新してしまう。代入できない列の型を生成すると `Table<…>` の型引数が一つ増える（C# は制約から型引数を推論しない。D1-37）。#70 の Grill で所有者が決めた。
+- **Rejected**: 代入できない列の型をジェネレーターに出させる案（既存のすべての型の記述が変わる）。
+
+## D1-62 MySQL の「何もしない」と、衝突の対象の照合
+
+- **Decision**: MySQL と MariaDB に「何もしない」形（`INSERT IGNORE`）は置かず、`Set(u.Id, u.Id)` で書けることを XML ドキュメントに書く。衝突の対象をスキーマの一意の制約と照らさない（§10.2、§10.3）。
+- **Reason**: `INSERT IGNORE` は一意キーの衝突のほかのエラーも警告にする。データベースには C# に宣言していないインデックスがありうる。#70 の Grill で所有者が決めた。
+- **Rejected**: `InsertIgnore()` を置く案。宣言した制約と照らして例外にする案（正しい文を拒みうる）。
+
+## D1-63 部分インデックスの対象と制約の名前
+
+- **Decision**: UPSERT の式の衝突の対象、部分インデックスの対象（`ON CONFLICT (…) WHERE …`）、制約の名前（`ON CONFLICT ON CONSTRAINT …`）は、v0.1 の後の行 U3 にする（§10.1、§18）。
+- **Reason**: 要件 R4 は `ON CONFLICT` と `ON DUPLICATE KEY UPDATE` までで、列の対象で足りる。#70 の Grill で所有者が決めた。
+- **Rejected**: 行 M2 に入れる案（範囲が広がる）。

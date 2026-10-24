@@ -38,6 +38,7 @@
 | W1 | ウィンドウ関数 | - | planned |
 | U1 | `UPDATE … FROM` / JOIN を伴う UPDATE と DELETE | - | planned |
 | U2 | SQL Server の `MERGE` | - | planned |
+| U3 | UPSERT の式の衝突の対象、部分インデックスの対象、制約の名前 | - | planned |
 | L1 | 行ロック | - | planned |
 | T2 | セーブポイント | - | planned |
 | C2 | 再帰 CTE | - | planned |
