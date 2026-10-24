@@ -59,8 +59,8 @@ public sealed class ParameterTests
     }
 
     /// <summary>
-    /// A value that is written more than once gets a parameter each time (design §4.2, the SQL Server expansion of
-    /// IsNotDistinctFrom).
+    /// A value that the rendering writes more than once is one parameter, used at each place (design §4.2, the SQL Server
+    /// expansion of IsNotDistinctFrom; §5.12).
     /// </summary>
     /// <remarks>
     /// Preconditions:
@@ -70,15 +70,46 @@ public sealed class ParameterTests
     /// - Render it on SQL Server.
     ///
     /// Expected:
-    /// - Three parameters, @p0 to @p2, all 5.
+    /// - The SQL uses @p0 three times.
+    /// - The statement has one parameter, @p0 = 5.
     /// </remarks>
     [Fact]
-    public void ParameterName_ValueWrittenThreeTimes_GetsThreeParameters()
+    public void ParameterName_ValueWrittenThreeTimes_GetsOneParameter()
     {
         SqlStatement statement = SqlRenderContext.Render(DialectRenderer.For<SqlServerDialect>(), IsNotDistinctFrom(Age, 5).Node);
 
-        Assert.Equal(["@p0", "@p1", "@p2"], statement.Parameters.Select(p => p.Name));
-        Assert.Equal([5, 5, 5], statement.Parameters.Select(p => p.Value));
+        Assert.Equal(3, statement.Text.Split("@p0").Length - 1);
+        Assert.Equal(["@p0"], statement.Parameters.Select(p => p.Name));
+        Assert.Equal([5], statement.Parameters.Select(p => p.Value));
+    }
+
+    /// <summary>
+    /// The same expression written twice in one statement reuses its parameter, and an equal value written separately gets
+    /// its own parameter (design §5.12).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <c>key = Add(Score, 1)</c>.
+    ///
+    /// Steps:
+    /// - Render <c>And(Gt(key, 0), Lt(key, 9), Eq(Add(Score, 1), 2))</c> on PostgreSQL and on SQLite.
+    ///
+    /// Expected:
+    /// - <c>key</c> is <c>$1</c> at both places; the separately written <c>Add(Score, 1)</c> gets its own parameter.
+    /// - The parameters are numbered in order of first use: 1, 0, 9, 1, 2.
+    /// </remarks>
+    [Fact]
+    public void ParameterName_SameExpressionTwice_ReusesItsParameter()
+    {
+        IExpr<int, PerRow> key = Add(Score, 1);
+        Condition<PerRow> condition = And(Gt(key, 0), Lt(key, 9), Eq(Add(Score, 1), 2));
+
+        SqlStatement postgres = SqlRenderContext.Render(DialectRenderer.For<PostgreSqlDialect>(), condition.Node);
+        SqlStatement sqlite = SqlRenderContext.Render(DialectRenderer.For<SqliteDialect>(), condition.Node);
+
+        Assert.Equal("((\"users\".\"Score\" + $1) > $2 AND (\"users\".\"Score\" + $1) < $3 AND (\"users\".\"Score\" + $4) = $5)", postgres.Text);
+        Assert.Equal([1, 0, 9, 1, 2], postgres.Parameters.Select(p => p.Value));
+        Assert.Equal(["@p0", "@p1", "@p2", "@p3", "@p4"], sqlite.Parameters.Select(p => p.Name));
     }
 
     /// <summary>

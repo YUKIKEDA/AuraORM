@@ -64,6 +64,21 @@ checks.SameItems("left join", [("Dune", (Loan?)null), ("Anonymous Tales", null),
 long later = await db.From(Book.Table).InnerJoin(Book.Table.As("later"), (b, x) => Gt(x.Id, b.Id)).Select((b, x) => Count()).SingleAsync();
 checks.Equal("self join", 3L, later);
 
+// GROUP BY with HAVING and ORDER BY on aggregates, and a key with a value, which is one parameter wherever it is written.
+List<(Genre, long, int?)> perGenre = await db.From(Book.Table)
+    .GroupBy(b => b.Genre)
+    .Having((k, b) => Ge(Count(), 1L))
+    .Select((k, b) => (k, Count(), Max(b.Pages)))
+    .OrderBy((k, b) => [Desc(Count()), Asc(k)])
+    .ToListAsync();
+checks.SameItems("group by", [(Genre.Fiction, 2L, (int?)412), (Genre.Science, 1L, (int?)365)], perGenre);
+List<(int?, long)> keyed = await db.From(Book.Table)
+    .GroupBy(b => Add(b.Pages, 1))
+    .Having((k, b) => Gt(k, 400))
+    .Select((k, b) => (k, Count()))
+    .ToListAsync();
+checks.SameItems("group by a key with a value", [((int?)413, 1L)], keyed);
+
 SqlStatement offline = new SqlBuilder<SqliteDialect>().From(Book.Table).Select(b => b.Title).Limit(1).ToSql();
 checks.Equal("sql builder", "SELECT \"books\".\"title\" FROM \"books\" LIMIT @p0", offline.Text);
 checks.Equal("select aggregates", (3L, (int?)412), (count, longest));

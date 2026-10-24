@@ -1,0 +1,237 @@
+using static AuraORM.Sql;
+
+namespace AuraORM.Tests;
+
+public sealed class SelectGroupTests
+{
+    /// <summary>
+    /// A single key is written after <c>WHERE</c> as <c>GROUP BY</c>, and the select list gets the key itself (design §5.5).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/>.
+    ///
+    /// Steps:
+    /// - Render <c>GroupBy(a =&gt; a.Status).Select((k, a) =&gt; (k, Count()))</c> on each dialect.
+    ///
+    /// Expected:
+    /// - <c>SELECT "accounts"."status", COUNT(*) FROM "accounts" GROUP BY "accounts"."status"</c>, with <c>COUNT_BIG</c> on
+    ///   SQL Server.
+    /// </remarks>
+    [Fact]
+    public void GroupBy_OneKey_WritesGroupBy()
+    {
+        SqlAssert.Statement(
+            new OneKey(),
+            new(
+                "SELECT \"accounts\".\"status\", COUNT(*) FROM \"accounts\" GROUP BY \"accounts\".\"status\"",
+                "SELECT \"accounts\".\"status\", COUNT(*) FROM \"accounts\" GROUP BY \"accounts\".\"status\"",
+                "SELECT `accounts`.`status`, COUNT(*) FROM `accounts` GROUP BY `accounts`.`status`",
+                "SELECT [accounts].[status], COUNT_BIG(*) FROM [accounts] GROUP BY [accounts].[status]"
+            )
+        );
+    }
+
+    /// <summary>
+    /// A tuple of keys, <c>WHERE</c>, <c>HAVING</c>, <c>ORDER BY</c>, and <c>LIMIT</c> are written in the standard order,
+    /// with the parameters in their order of appearance (design §5.1, §5.5, §5.8).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/>.
+    ///
+    /// Steps:
+    /// - Render a statement with a <c>WHERE</c> value, two keys, a <c>HAVING</c> on <c>COUNT(*)</c>, a projection of both keys
+    ///   and a sum, an <c>ORDER BY</c> on an aggregate and a key, and a limit, on each dialect.
+    ///
+    /// Expected:
+    /// - <c>… WHERE … GROUP BY "accounts"."status", "accounts"."display_name" HAVING COUNT(*) &gt; @p1 ORDER BY COUNT(*) DESC,
+    ///   "accounts"."status" ASC LIMIT @p2</c>, with the sum of each dialect.
+    /// - The parameters: 0, 2, 10.
+    /// </remarks>
+    [Fact]
+    public void GroupBy_TupleKeysWithHavingAndOrderBy_WritesClausesInOrder()
+    {
+        SqlAssert.Statement(
+            new TupleKeys(),
+            new(
+                "SELECT \"accounts\".\"status\", \"accounts\".\"display_name\", SUM(\"accounts\".\"login_count\") FROM \"accounts\" WHERE \"accounts\".\"login_count\" > @p0 GROUP BY \"accounts\".\"status\", \"accounts\".\"display_name\" HAVING COUNT(*) > @p1 ORDER BY COUNT(*) DESC, \"accounts\".\"status\" ASC LIMIT @p2",
+                "SELECT \"accounts\".\"status\", \"accounts\".\"display_name\", CAST(SUM(\"accounts\".\"login_count\") AS bigint) FROM \"accounts\" WHERE \"accounts\".\"login_count\" > $1 GROUP BY \"accounts\".\"status\", \"accounts\".\"display_name\" HAVING COUNT(*) > $2 ORDER BY COUNT(*) DESC, \"accounts\".\"status\" ASC LIMIT $3",
+                "SELECT `accounts`.`status`, `accounts`.`display_name`, CAST(SUM(`accounts`.`login_count`) AS SIGNED) FROM `accounts` WHERE `accounts`.`login_count` > @p0 GROUP BY `accounts`.`status`, `accounts`.`display_name` HAVING COUNT(*) > @p1 ORDER BY COUNT(*) DESC, `accounts`.`status` ASC LIMIT @p2",
+                "SELECT [accounts].[status], [accounts].[display_name], SUM(CAST([accounts].[login_count] AS bigint)) FROM [accounts] WHERE [accounts].[login_count] > @p0 GROUP BY [accounts].[status], [accounts].[display_name] HAVING COUNT_BIG(*) > @p1 ORDER BY COUNT_BIG(*) DESC, [accounts].[status] ASC OFFSET 0 ROWS FETCH NEXT @p2 ROWS ONLY"
+            ),
+            0,
+            2L,
+            10
+        );
+    }
+
+    /// <summary>
+    /// A key with a value is one parameter wherever the key is written: in the select list, in <c>GROUP BY</c>, in
+    /// <c>HAVING</c>, and in <c>ORDER BY</c> (design §5.5, §5.12).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/>; the key <c>Add(a.LoginCount, 1)</c>.
+    ///
+    /// Steps:
+    /// - Render a statement that selects the key and a count, has <c>HAVING</c> on the key, and orders by the key, on each
+    ///   dialect.
+    ///
+    /// Expected:
+    /// - <c>("accounts"."login_count" + @p0)</c> at all four places; the <c>HAVING</c> value is <c>@p1</c>.
+    /// - The parameters: 1, 3.
+    /// </remarks>
+    [Fact]
+    public void GroupBy_KeyWithValue_UsesOneParameter()
+    {
+        SqlAssert.Statement(
+            new KeyWithValue(),
+            new(
+                "SELECT (\"accounts\".\"login_count\" + @p0), COUNT(*) FROM \"accounts\" GROUP BY (\"accounts\".\"login_count\" + @p0) HAVING (\"accounts\".\"login_count\" + @p0) > @p1 ORDER BY (\"accounts\".\"login_count\" + @p0) ASC",
+                "SELECT (\"accounts\".\"login_count\" + $1), COUNT(*) FROM \"accounts\" GROUP BY (\"accounts\".\"login_count\" + $1) HAVING (\"accounts\".\"login_count\" + $1) > $2 ORDER BY (\"accounts\".\"login_count\" + $1) ASC",
+                "SELECT (`accounts`.`login_count` + @p0), COUNT(*) FROM `accounts` GROUP BY (`accounts`.`login_count` + @p0) HAVING (`accounts`.`login_count` + @p0) > @p1 ORDER BY (`accounts`.`login_count` + @p0) ASC",
+                "SELECT ([accounts].[login_count] + @p0), COUNT_BIG(*) FROM [accounts] GROUP BY ([accounts].[login_count] + @p0) HAVING ([accounts].[login_count] + @p0) > @p1 ORDER BY ([accounts].[login_count] + @p0) ASC"
+            ),
+            1,
+            3
+        );
+    }
+
+    /// <summary>
+    /// <c>Having</c> with the list form of <c>And</c> writes no <c>HAVING</c> when the list has no condition, and the
+    /// condition when it has one (design §4.2).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/>; a list of nullable <see cref="PerGroup"/> conditions.
+    ///
+    /// Steps:
+    /// - Render the statement with a list of nulls, and with a list holding <c>Gt(Count(), 1L)</c>, on each dialect.
+    ///
+    /// Expected:
+    /// - No <c>HAVING</c> and no parameter for the empty list; <c>HAVING COUNT(*) &gt; @p0</c> for the other.
+    /// </remarks>
+    [Fact]
+    public void Having_OptionalCondition_WritesHavingOnlyWhenThereIsACondition()
+    {
+        SqlAssert.Statement(
+            new OptionalHaving(false),
+            new(
+                "SELECT \"accounts\".\"status\" FROM \"accounts\" GROUP BY \"accounts\".\"status\"",
+                "SELECT \"accounts\".\"status\" FROM \"accounts\" GROUP BY \"accounts\".\"status\"",
+                "SELECT `accounts`.`status` FROM `accounts` GROUP BY `accounts`.`status`",
+                "SELECT [accounts].[status] FROM [accounts] GROUP BY [accounts].[status]"
+            )
+        );
+        SqlAssert.Statement(
+            new OptionalHaving(true),
+            new(
+                "SELECT \"accounts\".\"status\" FROM \"accounts\" GROUP BY \"accounts\".\"status\" HAVING COUNT(*) > @p0",
+                "SELECT \"accounts\".\"status\" FROM \"accounts\" GROUP BY \"accounts\".\"status\" HAVING COUNT(*) > $1",
+                "SELECT `accounts`.`status` FROM `accounts` GROUP BY `accounts`.`status` HAVING COUNT(*) > @p0",
+                "SELECT [accounts].[status] FROM [accounts] GROUP BY [accounts].[status] HAVING COUNT_BIG(*) > @p0"
+            ),
+            1L
+        );
+    }
+
+    /// <summary>
+    /// A grouped statement over a join gets the key and the column set of each table; <c>SELECT DISTINCT</c> after
+    /// <c>GROUP BY</c> orders by the position of its item (design §5.3, §5.5, §5.7).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/> left-joined with <see cref="Membership"/>.
+    ///
+    /// Steps:
+    /// - Render a statement grouped by the role of the joined table that counts distinct accounts, and a
+    ///   <c>SelectDistinct</c> of a count ordered by it, on each dialect.
+    ///
+    /// Expected:
+    /// - <c>… LEFT JOIN … GROUP BY "memberships"."Role"</c>, and <c>SELECT DISTINCT COUNT(*) … ORDER BY 1 DESC</c>.
+    /// </remarks>
+    [Fact]
+    public void GroupBy_JoinAndDistinct_WritesTheirClauses()
+    {
+        SqlAssert.Statement(
+            new JoinedKey(),
+            new(
+                "SELECT \"memberships\".\"Role\", COUNT(DISTINCT \"accounts\".\"id\") FROM \"accounts\" LEFT JOIN \"app\".\"memberships\" ON \"memberships\".\"AccountId\" = \"accounts\".\"id\" GROUP BY \"memberships\".\"Role\"",
+                "SELECT \"memberships\".\"Role\", COUNT(DISTINCT \"accounts\".\"id\") FROM \"accounts\" LEFT JOIN \"app\".\"memberships\" ON \"memberships\".\"AccountId\" = \"accounts\".\"id\" GROUP BY \"memberships\".\"Role\"",
+                "SELECT `memberships`.`Role`, COUNT(DISTINCT `accounts`.`id`) FROM `accounts` LEFT JOIN `app`.`memberships` ON `memberships`.`AccountId` = `accounts`.`id` GROUP BY `memberships`.`Role`",
+                "SELECT [memberships].[Role], COUNT_BIG(DISTINCT [accounts].[id]) FROM [accounts] LEFT JOIN [app].[memberships] ON [memberships].[AccountId] = [accounts].[id] GROUP BY [memberships].[Role]"
+            )
+        );
+        SqlAssert.Statement(
+            new DistinctCount(),
+            new(
+                "SELECT DISTINCT COUNT(*) FROM \"accounts\" GROUP BY \"accounts\".\"status\" ORDER BY 1 DESC",
+                "SELECT DISTINCT COUNT(*) FROM \"accounts\" GROUP BY \"accounts\".\"status\" ORDER BY 1 DESC",
+                "SELECT DISTINCT COUNT(*) FROM `accounts` GROUP BY `accounts`.`status` ORDER BY 1 DESC",
+                "SELECT DISTINCT COUNT_BIG(*) FROM [accounts] GROUP BY [accounts].[status] ORDER BY 1 DESC"
+            )
+        );
+    }
+
+    private sealed class OneKey : IQueryCase
+    {
+        public SqlStatement Build<TDialect>(Database<TDialect> db)
+            where TDialect : IDialect => db.From(Account.Table).GroupBy(a => a.Status).Select((k, a) => (k, Count())).ToSql();
+    }
+
+    private sealed class TupleKeys : IQueryCase
+    {
+        public SqlStatement Build<TDialect>(Database<TDialect> db)
+            where TDialect : IDialect =>
+            db.From(Account.Table)
+                .Where(a => Gt(a.LoginCount, 0))
+                .GroupBy(a => (a.Status, a.DisplayName))
+                .Having((k, a) => Gt(Count(), 2L))
+                .Select((k, a) => (k.Item1, k.Item2, Sum(a.LoginCount)))
+                .OrderBy((k, a) => [Desc(Count()), Asc(k.Item1)])
+                .Limit(10)
+                .ToSql();
+    }
+
+    private sealed class KeyWithValue : IQueryCase
+    {
+        public SqlStatement Build<TDialect>(Database<TDialect> db)
+            where TDialect : IDialect =>
+            db.From(Account.Table)
+                .GroupBy(a => Add(a.LoginCount, 1))
+                .Having((k, a) => Gt(k, 3))
+                .Select((k, a) => (k, Count()))
+                .OrderBy((k, a) => [Asc(k)])
+                .ToSql();
+    }
+
+    private sealed class OptionalHaving(bool withCondition) : IQueryCase
+    {
+        public SqlStatement Build<TDialect>(Database<TDialect> db)
+            where TDialect : IDialect =>
+            db.From(Account.Table)
+                .GroupBy(a => a.Status)
+                .Having((k, a) => And(new List<Condition<PerGroup>?> { null, withCondition ? Gt(Count(), 1L) : null }))
+                .Select((k, a) => k)
+                .ToSql();
+    }
+
+    private sealed class JoinedKey : IQueryCase
+    {
+        public SqlStatement Build<TDialect>(Database<TDialect> db)
+            where TDialect : IDialect =>
+            db.From(Account.Table)
+                .LeftJoin(Membership.Table, (a, m) => Eq(m.AccountId, a.Id))
+                .GroupBy((a, m) => m.Role)
+                .Select((k, a, m) => (k, CountDistinct(a.Id)))
+                .ToSql();
+    }
+
+    private sealed class DistinctCount : IQueryCase
+    {
+        public SqlStatement Build<TDialect>(Database<TDialect> db)
+            where TDialect : IDialect =>
+            db.From(Account.Table).GroupBy(a => a.Status).SelectDistinct((k, a) => Count()).OrderBy(c => [Desc(c)]).ToSql();
+    }
+}

@@ -6,6 +6,7 @@ namespace AuraORM;
 internal sealed class SqlRenderContext : IDisposable
 {
     private readonly List<SqlStatementParameter> _parameters = [];
+    private readonly Dictionary<ParameterNode, string> _names = new(ReferenceEqualityComparer.Instance);
     private readonly List<IReadOnlyList<TableAlias>> _scopes = [];
 
     public SqlRenderContext(DialectRenderer dialect)
@@ -89,14 +90,21 @@ internal sealed class SqlRenderContext : IDisposable
     public void WriteIdentifier(string name) => Dialect.WriteIdentifier(Writer, name);
 
     /// <summary>
-    /// Writes the placeholder of a new parameter. A value gets a new parameter each time it is written.
+    /// Writes the placeholder of a parameter. Each value given to the builder is its own node and gets its own parameter; a
+    /// node written again (the same expression written twice in one statement, such as a GROUP BY key that the select list
+    /// repeats) writes the parameter it already has, because PostgreSQL compares a GROUP BY key with the select list by its
+    /// parameter numbers (<c>docs/design.ja.md</c> §5.12).
     /// </summary>
     /// <param name="parameter">The parameter node.</param>
     public void WriteParameter(ParameterNode parameter)
     {
-        int index = _parameters.Count;
-        string name = Dialect.ParameterName(index);
-        _parameters.Add(new SqlStatementParameter(name, parameter.ProviderValue) { DbType = Dialect.ParameterDbType(parameter) });
+        if (!_names.TryGetValue(parameter, out string? name))
+        {
+            name = Dialect.ParameterName(_parameters.Count);
+            _parameters.Add(new SqlStatementParameter(name, parameter.ProviderValue) { DbType = Dialect.ParameterDbType(parameter) });
+            _names.Add(parameter, name);
+        }
+
         Writer.Append(name);
     }
 

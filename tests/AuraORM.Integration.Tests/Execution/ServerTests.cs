@@ -299,3 +299,63 @@ public sealed class SqlServerJoinTests : FullJoinTests<SqlServerDialect>, IAsync
 
     public ValueTask DisposeAsync() => _target.DisposeAsync();
 }
+
+/// <summary>
+/// <see cref="GroupByTests{TDialect}"/> on postgresql.
+/// </summary>
+[Collection("postgresql")]
+public sealed class PostgreSqlGroupByTests : GroupByTests<PostgreSqlDialect>, IAsyncLifetime
+{
+    private readonly PostgreSqlTarget _target = new();
+
+    private protected override ITestTarget<PostgreSqlDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="GroupByTests{TDialect}"/> on mysql.
+/// </summary>
+[Collection("mysql")]
+public sealed class MySqlGroupByTests : GroupByTests<MySqlDialect>, IAsyncLifetime
+{
+    private readonly MySqlTarget _target = new();
+
+    private protected override ITestTarget<MySqlDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="GroupByTests{TDialect}"/> on mariadb.
+/// </summary>
+[Collection("mariadb")]
+public sealed class MariaDbGroupByTests : GroupByTests<MariaDbDialect>, IAsyncLifetime
+{
+    private readonly MariaDbTarget _target = new();
+
+    private protected override ITestTarget<MariaDbDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="GroupByTests{TDialect}"/> on sqlserver.
+/// </summary>
+[Collection("sqlserver")]
+public sealed class SqlServerGroupByTests : GroupByTests<SqlServerDialect>, IAsyncLifetime
+{
+    private readonly SqlServerTarget _target = new();
+
+    private protected override ITestTarget<SqlServerDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}

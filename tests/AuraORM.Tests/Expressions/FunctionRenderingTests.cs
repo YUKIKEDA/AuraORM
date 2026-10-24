@@ -93,11 +93,8 @@ public sealed class FunctionRenderingTests
                     $"{U}.\"Age\" IS @p0",
                     $"{U}.\"Age\" IS NOT DISTINCT FROM $1",
                     $"{B}.`Age` <=> @p0",
-                    $"(({S}.[Age] IS NULL AND @p0 IS NULL) OR ({S}.[Age] IS NOT NULL AND @p1 IS NOT NULL AND {S}.[Age] = @p2))"
-                )
-                {
-                    SqlServerParameters = [5, 5, 5],
-                },
+                    $"(({S}.[Age] IS NULL AND @p0 IS NULL) OR ({S}.[Age] IS NOT NULL AND @p0 IS NOT NULL AND {S}.[Age] = @p0))"
+                ),
                 [5]
             },
             {

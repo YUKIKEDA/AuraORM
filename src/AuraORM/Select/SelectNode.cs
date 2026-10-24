@@ -51,6 +51,18 @@ internal sealed class SelectNode(SelectState state) : SqlNode
             state.Where.Render(context);
         }
 
+        if (!state.GroupBy.IsEmpty)
+        {
+            context.Write(" GROUP BY ");
+            context.WriteList(state.GroupBy);
+        }
+
+        if (state.Having is not null)
+        {
+            context.Write(" HAVING ");
+            state.Having.Render(context);
+        }
+
         if (!state.OrderBy.IsEmpty)
         {
             context.Write(" ORDER BY ");
