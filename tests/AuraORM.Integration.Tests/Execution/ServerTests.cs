@@ -698,7 +698,7 @@ public sealed class MySqlUpsertTests : DuplicateKeyUpsertTests<MySqlDialect>, IA
 
 /// <summary>
 /// <see cref="DuplicateKeyUpsertTests{TDialect}"/> on mariadb, and what only MariaDB has: <c>Returning</c> after the clause
-/// and <c>VALUES(a)</c> of a column the rows do not set (design §10.2, §10.3).
+/// and <c>VALUE(a)</c> of a column the rows do not set (design §10.2, §10.3).
 /// </summary>
 [Collection("mariadb")]
 public sealed class MariaDbUpsertTests : DuplicateKeyUpsertTests<MariaDbDialect>, IAsyncLifetime

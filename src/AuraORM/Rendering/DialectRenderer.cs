@@ -63,7 +63,7 @@ internal abstract class DialectRenderer
 
     /// <summary>
     /// Gets a value indicating whether the row proposed for insertion in an upsert is named <c>excluded</c>: PostgreSQL's and
-    /// SQLite's special table, and MySQL's row alias. MariaDB reads it with <c>VALUES(a)</c> (§10).
+    /// SQLite's special table, and MySQL's row alias. MariaDB reads it with <c>VALUE(a)</c> (§10).
     /// </summary>
     public virtual bool NamesProposedRowExcluded => true;
 
@@ -74,6 +74,7 @@ internal abstract class DialectRenderer
     /// <param name="column">The column name.</param>
     public virtual void RenderExcludedColumn(SqlRenderContext context, string column)
     {
+        _ = context.CheckExcludedQualifier();
         context.WriteIdentifier(TableAlias.ExcludedName);
         context.Write('.');
         context.WriteIdentifier(column);

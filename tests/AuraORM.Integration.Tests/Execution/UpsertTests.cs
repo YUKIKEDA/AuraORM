@@ -199,6 +199,37 @@ public abstract class DuplicateKeyUpsertTests<TDialect>
     }
 
     /// <summary>
+    /// A column of the proposed row can be read inside a subquery of the clause: MySQL's <c>`excluded`.`a`</c> and MariaDB's
+    /// <c>VALUE(`a`)</c> both run (design §10.2).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - Alice (1) and Bob (2); the pets Rex and Al.
+    ///
+    /// Steps:
+    /// - Upsert Alice as "Al", setting the nickname to the largest name of the pets named like the proposed name; select
+    ///   Alice's nickname.
+    ///
+    /// Expected:
+    /// - "Al".
+    /// </remarks>
+    [Fact]
+    public async Task ExcludedInSubquery_IsRead()
+    {
+        Database<TDialect> db = await UpsertSeed.SeedAsync(Target);
+        await db.ExecuteAsync($"INSERT INTO pets (id, owner_id, name) VALUES (10, 1, 'Rex'), (11, 1, 'Al')", Ct);
+
+        await db.Insert(Person.Table)
+            .Values(UpsertSeed.Person(1, "Al"))
+            .OnDuplicateKeyUpdate(
+                (p, excluded) => [Set(p.Nickname, Scalar(db.From(Pet.Table).Where(x => Eq(x.Name, excluded.Name)).Select(x => Max(x.Name))))]
+            )
+            .ExecuteAsync(Ct);
+
+        Assert.Equal("Al", await db.From(Person.Table).Where(p => Eq(p.Id, 1L)).Select(p => p.Nickname).SingleAsync(Ct));
+    }
+
+    /// <summary>
     /// A row that sets no column is written <c>() VALUES ()</c> before the clause, and is inserted (design §10.2).
     /// </summary>
     /// <remarks>

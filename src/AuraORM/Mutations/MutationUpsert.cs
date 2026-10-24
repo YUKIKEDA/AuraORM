@@ -88,7 +88,7 @@ public static class MutationUpsert
 
     /// <summary>
     /// Updates the existing row of a conflict on any unique key: <c>ON DUPLICATE KEY UPDATE "b" = …</c> (§10.2). The proposed
-    /// row (<c>excluded</c>) is MySQL's row alias <c>AS `excluded`</c>, or <c>VALUES(`b`)</c> on MariaDB. MySQL and MariaDB
+    /// row (<c>excluded</c>) is MySQL's row alias <c>AS `excluded`</c>, or <c>VALUE(`b`)</c> on MariaDB. MySQL and MariaDB
     /// evaluate the assignments from left to right, so a value that reads a column assigned before it throws when the
     /// statement is rendered, as in <c>UPDATE</c> (§7). To leave a conflicting row as it is, assign a column that can be
     /// assigned to itself: <c>(u, excluded) =&gt; [Set(u.Name, u.Name)]</c> (an <c>[AutoIncrement]</c> column cannot be).

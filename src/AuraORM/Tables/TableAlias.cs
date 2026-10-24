@@ -34,7 +34,7 @@ public sealed class TableAlias
 
     /// <summary>
     /// Gets a value indicating whether this occurrence is the row proposed for insertion in an upsert, whose columns are
-    /// written <c>"excluded"."a"</c>, or <c>VALUES(`a`)</c> on MariaDB (§10).
+    /// written <c>"excluded"."a"</c>, or <c>VALUE(`a`)</c> on MariaDB (§10).
     /// </summary>
     internal bool IsExcluded { get; private init; }
 

@@ -72,7 +72,7 @@ public sealed class UpsertTests
 
     /// <summary>
     /// <c>ON DUPLICATE KEY UPDATE</c> reads the proposed row through MySQL's row alias <c>AS `excluded`</c> and through
-    /// <c>VALUES(`a`)</c> on MariaDB (design §10.2).
+    /// <c>VALUE(`t`.`a`)</c> on MariaDB (design §10.2).
     /// </summary>
     /// <remarks>
     /// Preconditions:
@@ -85,7 +85,7 @@ public sealed class UpsertTests
     /// - MySQL: <c>… VALUES (@p0, @p1, @p2) AS `excluded` ON DUPLICATE KEY UPDATE `login_count` = (`accounts`.`login_count` +
     ///   `excluded`.`login_count`)</c>.
     /// - MariaDB: <c>… VALUES (@p0, @p1, @p2) ON DUPLICATE KEY UPDATE `login_count` = (`accounts`.`login_count` +
-    ///   VALUES(`login_count`))</c>.
+    ///   VALUE(`accounts`.`login_count`))</c>.
     /// </remarks>
     [Fact]
     public void OnDuplicateKeyUpdate_WritesTheProposedRowOfTheDialect()
@@ -100,12 +100,52 @@ public sealed class UpsertTests
         );
         SqlAssert.Compare(
             "MariaDB",
-            "INSERT INTO `accounts` (`email`, `status`, `login_count`) VALUES (@p0, @p1, @p2) ON DUPLICATE KEY UPDATE `login_count` = (`accounts`.`login_count` + VALUES(`login_count`))",
+            "INSERT INTO `accounts` (`email`, `status`, `login_count`) VALUES (@p0, @p1, @p2) ON DUPLICATE KEY UPDATE `login_count` = (`accounts`.`login_count` + VALUE(`accounts`.`login_count`))",
             AddLogins(MariaDb).ToSql(),
             "a@example.com",
             (short)1,
             3
         );
+    }
+
+    /// <summary>
+    /// A column of the proposed row read inside a subquery of the clause is written as at the top: <c>`excluded`.`a`</c> on
+    /// MySQL, <c>VALUE(`t`.`a`)</c> on MariaDB (the old name <c>VALUES(…)</c> is error 1064 there, and an unqualified
+    /// <c>VALUE(`a`)</c> reads the subquery's column), and <c>"excluded"."a"</c> on SQLite and PostgreSQL; a subquery table
+    /// with the qualifier's name throws (design §10.1, §10.2, §14.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/> and <see cref="Membership"/>.
+    ///
+    /// Steps:
+    /// - Render an upsert that sets the display name to the largest role of the memberships whose role is the proposed
+    ///   email, on MySQL and MariaDB with <c>OnDuplicateKeyUpdate</c>, and on SQLite with <c>DoUpdate</c>.
+    /// - Render, on MariaDB, one whose subquery reads <c>Account.Table</c> without an alias, whose name qualifies
+    ///   <c>VALUE(…)</c>.
+    ///
+    /// Expected:
+    /// - The last: <see cref="InvalidOperationException"/>, because SQL would read the subquery's table.
+    /// - The subquery ends with <c>= `excluded`.`email`)</c>, <c>= VALUE(`accounts`.`email`))</c>, and <c>= "excluded"."email")</c>.
+    /// </remarks>
+    [Fact]
+    public void Upsert_ExcludedInSubquery_IsWrittenAsAtTheTop()
+    {
+        var shadowed = MariaDb
+            .Insert(Account.Table)
+            .Values(Row)
+            .OnDuplicateKeyUpdate(
+                (a, x) => [Set(a.DisplayName, Scalar(MariaDb.From(Account.Table).Where(y => Eq(y.Email, x.Email)).Select(y => Max(y.Email))))]
+            );
+        Assert.Throws<InvalidOperationException>(() => shadowed.ToSql());
+        Assert.EndsWith("WHERE `memberships`.`Role` = `excluded`.`email`)", RoleOfEmail(MySql).ToSql().Text, StringComparison.Ordinal);
+        Assert.EndsWith("WHERE `memberships`.`Role` = VALUE(`accounts`.`email`))", RoleOfEmail(MariaDb).ToSql().Text, StringComparison.Ordinal);
+        var conflict = Sqlite
+            .Insert(Account.Table)
+            .Values(Row)
+            .OnConflict(a => [a.Email])
+            .DoUpdate((a, x) => [Set(a.DisplayName, Scalar(Sqlite.From(Membership.Table).Where(m => Eq(m.Role, x.Email)).Select(m => Max(m.Role))))]);
+        Assert.EndsWith("WHERE \"memberships\".\"Role\" = \"excluded\".\"email\")", conflict.ToSql().Text, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -168,7 +208,11 @@ public sealed class UpsertTests
             Update(PostgreSql).Returning(a => a.Id).ToSql().Text,
             StringComparison.Ordinal
         );
-        Assert.EndsWith("VALUES(`login_count`)) RETURNING `id`", AddLogins(MariaDb).Returning(a => a.Id).ToSql().Text, StringComparison.Ordinal);
+        Assert.EndsWith(
+            "VALUE(`accounts`.`login_count`)) RETURNING `id`",
+            AddLogins(MariaDb).Returning(a => a.Id).ToSql().Text,
+            StringComparison.Ordinal
+        );
     }
 
     /// <summary>
@@ -235,7 +279,7 @@ public sealed class UpsertTests
     ///
     /// Expected:
     /// - <c>Excluded</c>: <see cref="InvalidOperationException"/> on SQLite, PostgreSQL, and MySQL; MariaDB renders
-    ///   <c>VALUES(`N`)</c>.
+    ///   <c>VALUE(`Excluded`.`N`)</c>.
     /// - The proposed column not set: <see cref="InvalidOperationException"/> naming error 1054 on MySQL; MariaDB renders it.
     /// - The email read after it is assigned: <see cref="InvalidOperationException"/> on MySQL and MariaDB; SQLite and
     ///   PostgreSQL render it.
@@ -251,7 +295,7 @@ public sealed class UpsertTests
             MySql.Insert(ExcludedRow.Table).Values(row).OnDuplicateKeyUpdate((e, x) => [Set(e.N, x.N)]).ToSql()
         );
         Assert.EndsWith(
-            "ON DUPLICATE KEY UPDATE `N` = VALUES(`N`)",
+            "ON DUPLICATE KEY UPDATE `N` = VALUE(`Excluded`.`N`)",
             MariaDb.Insert(ExcludedRow.Table).Values(row).OnDuplicateKeyUpdate((e, x) => [Set(e.N, x.N)]).ToSql().Text,
             StringComparison.Ordinal
         );
@@ -296,6 +340,14 @@ public sealed class UpsertTests
     private static UpsertStatement<TDialect, Executable, Account.Columns> AddLogins<TDialect>(Database<TDialect> db)
         where TDialect : IOnDuplicateKeyDialect =>
         db.Insert(Account.Table).Values(Row).OnDuplicateKeyUpdate((a, x) => [Set(a.LoginCount, Add(a.LoginCount, x.LoginCount))]);
+
+    private static UpsertStatement<TDialect, Executable, Account.Columns> RoleOfEmail<TDialect>(Database<TDialect> db)
+        where TDialect : IOnDuplicateKeyDialect =>
+        db.Insert(Account.Table)
+            .Values(Row)
+            .OnDuplicateKeyUpdate(
+                (a, x) => [Set(a.DisplayName, Scalar(db.From(Membership.Table).Where(m => Eq(m.Role, x.Email)).Select(m => Max(m.Role))))]
+            );
 
     private static UpsertStatement<TDialect, Executable, Account.Columns> MaxLogins<TDialect>(Database<TDialect> db)
         where TDialect : IOnDuplicateKeyDialect =>

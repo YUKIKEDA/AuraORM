@@ -222,6 +222,35 @@ internal sealed class SqlRenderContext : IDisposable
     }
 
     /// <summary>
+    /// Returns the name that qualifies a column of the proposed row of the upsert being written: <c>excluded</c>, or on
+    /// MariaDB the table's name inside <c>VALUE(…)</c>. Throws when a table of a subquery has that name, which SQL would
+    /// read instead (§10.1, §10.2, as §5.11 does for an outer column).
+    /// </summary>
+    /// <returns>The name.</returns>
+    /// <exception cref="InvalidOperationException">A subquery has a table of that name.</exception>
+    public string CheckExcludedQualifier()
+    {
+        TableAlias target = _mutationTarget!;
+        string name = Dialect.NamesProposedRowExcluded ? TableAlias.ExcludedName : target.Reference;
+        foreach (IReadOnlyList<TableAlias> scope in _scopes)
+        {
+            foreach (TableAlias table in scope)
+            {
+                if (!ReferenceEquals(table, target) && !table.IsExcluded && table.Reference == name)
+                {
+                    throw new InvalidOperationException(
+                        "A column of excluded is read in a subquery whose FROM has a table named "
+                            + name
+                            + ", which SQL would read instead of the row proposed for insertion. Give that table an alias with As(\"...\")."
+                    );
+                }
+            }
+        }
+
+        return name;
+    }
+
+    /// <summary>
     /// Gets the columns that the rows of the upsert being written set, for MySQL's row alias (§10.2).
     /// </summary>
     public System.Collections.Immutable.ImmutableArray<string> InsertedColumns => _insertedColumns;
