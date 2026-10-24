@@ -252,7 +252,7 @@ public static partial class Sql
         where TSubLevel : EvaluationLevel => new SqlExpr<T?, PerRow>(ScalarSubquery(subquery));
 
     /// <summary>
-    /// <inheritdoc cref="Scalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types.
+    /// <inheritdoc cref="Scalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types; do not pass <paramref name="overload"/>.
     /// </summary>
     /// <typeparam name="T">The type of the selected expression.</typeparam>
     /// <typeparam name="TDialect">The dialect of the subquery, which must be the outer statement's.</typeparam>
@@ -283,7 +283,7 @@ public static partial class Sql
         where TMode : ExecutionMode => new SqlExpr<T?, PerRow>(ScalarSubquery(subquery));
 
     /// <summary>
-    /// <inheritdoc cref="Scalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types.
+    /// <inheritdoc cref="Scalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types; do not pass <paramref name="overload"/>.
     /// </summary>
     /// <typeparam name="T">The type of the selected expression.</typeparam>
     /// <typeparam name="TDialect">The dialect of the subquery, which must be the outer statement's.</typeparam>
@@ -309,7 +309,7 @@ public static partial class Sql
         where TMode : ExecutionMode => new SqlExpr<T?, PerRow>(ScalarSubquery(subquery));
 
     /// <summary>
-    /// <inheritdoc cref="Scalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types.
+    /// <inheritdoc cref="Scalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types; do not pass <paramref name="overload"/>.
     /// </summary>
     /// <typeparam name="T">The type of the selected expression.</typeparam>
     /// <typeparam name="TDialect">The dialect of the subquery, which must be the outer statement's.</typeparam>
@@ -349,7 +349,7 @@ public static partial class Sql
         where TSubLevel : EvaluationLevel => new SqlExpr<T?, PerGroup>(new GroupSubqueryNode(ScalarSubquery(subquery)));
 
     /// <summary>
-    /// <inheritdoc cref="GroupScalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types.
+    /// <inheritdoc cref="GroupScalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types; do not pass <paramref name="overload"/>.
     /// </summary>
     /// <typeparam name="T">The type of the selected expression.</typeparam>
     /// <typeparam name="TDialect">The dialect of the subquery, which must be the outer statement's.</typeparam>
@@ -380,7 +380,7 @@ public static partial class Sql
         where TMode : ExecutionMode => new SqlExpr<T?, PerGroup>(new GroupSubqueryNode(ScalarSubquery(subquery)));
 
     /// <summary>
-    /// <inheritdoc cref="GroupScalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types.
+    /// <inheritdoc cref="GroupScalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types; do not pass <paramref name="overload"/>.
     /// </summary>
     /// <typeparam name="T">The type of the selected expression.</typeparam>
     /// <typeparam name="TDialect">The dialect of the subquery, which must be the outer statement's.</typeparam>
@@ -406,7 +406,7 @@ public static partial class Sql
         where TMode : ExecutionMode => new SqlExpr<T?, PerGroup>(new GroupSubqueryNode(ScalarSubquery(subquery)));
 
     /// <summary>
-    /// <inheritdoc cref="GroupScalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types.
+    /// <inheritdoc cref="GroupScalar{T, TDialect, TMode, TSubLevel}(SelectProjection{TDialect, TMode, T, TSubLevel})" path="/summary"/> This overload is for reference types; do not pass <paramref name="overload"/>.
     /// </summary>
     /// <typeparam name="T">The type of the selected expression.</typeparam>
     /// <typeparam name="TDialect">The dialect of the subquery, which must be the outer statement's.</typeparam>

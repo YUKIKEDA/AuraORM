@@ -146,6 +146,41 @@ public abstract class SubqueryTests<TDialect>
     }
 
     /// <summary>
+    /// A self-correlated subquery with an alias on the inner table compares the inner rows with the outer row on every
+    /// database; without the alias it throws before it is sent, because SQL would read both sides as the inner table
+    /// (design §5.11).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="SeedAsync"/>: Alice (1) and Bob (2) are 30, Carol (3) is 40, Dave (4) has no age.
+    ///
+    /// Steps:
+    /// - Select the people for whom someone of the same age has a larger id, with <c>As("o")</c> on the inner table; build
+    ///   the same without the alias.
+    ///
+    /// Expected:
+    /// - Alice; <see cref="InvalidOperationException"/>.
+    /// </remarks>
+    [Fact]
+    public async Task SelfCorrelation_NeedsAnAlias()
+    {
+        Database<TDialect> db = await SeedAsync();
+
+        List<string> rows = await db.From(Person.Table)
+            .Where(p => Exists(db.From(Person.Table.As("o")).Where(o => And(Eq(o.Age, p.Age), Gt(o.Id, p.Id))).Select(o => o.Id)))
+            .Select(p => p.Name)
+            .ToListAsync(Ct);
+
+        Assert.Equal(["Alice"], rows);
+        Assert.Throws<InvalidOperationException>(() =>
+            db.From(Person.Table)
+                .Where(p => Exists(db.From(Person.Table).Where(o => And(Eq(o.Age, p.Age), Gt(o.Id, p.Id))).Select(o => o.Id)))
+                .Select(p => p.Name)
+                .ToSql()
+        );
+    }
+
+    /// <summary>
     /// <c>Exists</c> and <c>Scalar</c> accept a subquery with a row limit on every database, MySQL and MariaDB included
     /// (design §5.11).
     /// </summary>

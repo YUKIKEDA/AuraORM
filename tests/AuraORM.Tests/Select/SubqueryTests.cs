@@ -213,6 +213,76 @@ public sealed class SubqueryTests
         Assert.Throws<ArgumentException>(() => mssql.From(Account.Table).Select(a => Scalar(mssql.From(Membership.Table).Select(m => m))));
     }
 
+    /// <summary>
+    /// A correlation with an outer table whose name an inner table has too throws when the statement is built, because both
+    /// columns would be written <c>"accounts"."…"</c> and SQL would read them as the inner table's; an alias on either table,
+    /// or a subquery that does not use the outer columns, renders (design §5.11, §14.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/> as the outer table and as the subquery's table.
+    ///
+    /// Steps:
+    /// - Build a self-correlated <c>Exists</c> (same email, larger id) with no alias; one where the subquery's table is joined
+    ///   after another table; then the same with <c>As("x")</c> on the inner table, and on the outer table; then an
+    ///   uncorrelated <c>In</c> on the same table.
+    ///
+    /// Expected:
+    /// - The first two throw <see cref="InvalidOperationException"/> whose message names <c>As</c>.
+    /// - With an alias, the SQL qualifies the inner columns with <c>"x"</c> (or the outer with it); the uncorrelated one renders.
+    /// </remarks>
+    [Fact]
+    public void Correlation_OuterTableOfTheSameName_Throws()
+    {
+        Database<PostgreSqlDialect> pg = Db<PostgreSqlDialect>();
+        var selfCorrelated = Assert.Throws<InvalidOperationException>(() =>
+            pg.From(Account.Table)
+                .Where(a => Exists(pg.From(Account.Table).Where(x => And(Eq(x.Email, a.Email), Gt(x.Id, a.Id))).Select(x => x.Id)))
+                .Select(a => a.Id)
+                .ToSql()
+        );
+        var joined = Assert.Throws<InvalidOperationException>(() =>
+            pg.From(Account.Table)
+                .Where(a =>
+                    Exists(
+                        pg.From(Membership.Table)
+                            .InnerJoin(Account.Table, (m, x) => Eq(x.Id, m.AccountId))
+                            .Where((m, x) => Eq(x.Email, a.Email))
+                            .Select((m, x) => m.Role)
+                    )
+                )
+                .Select(a => a.Id)
+                .ToSql()
+        );
+
+        Assert.Contains("As(", selfCorrelated.Message, StringComparison.Ordinal);
+        Assert.Contains("As(", joined.Message, StringComparison.Ordinal);
+        SqlStatement innerAlias = pg.From(Account.Table)
+            .Where(a => Exists(pg.From(Account.Table.As("x")).Where(x => And(Eq(x.Email, a.Email), Gt(x.Id, a.Id))).Select(x => x.Id)))
+            .Select(a => a.Id)
+            .ToSql();
+        SqlStatement outerAlias = pg.From(Account.Table.As("a"))
+            .Where(a => Exists(pg.From(Account.Table).Where(x => Eq(x.Email, a.Email)).Select(x => x.Id)))
+            .Select(a => a.Id)
+            .ToSql();
+        SqlStatement uncorrelated = pg.From(Account.Table)
+            .Where(a => In(a.Id, pg.From(Account.Table).Where(x => Gt(x.LoginCount, 1)).Select(x => x.Id)))
+            .Select(a => a.Id)
+            .ToSql();
+        Assert.Equal(
+            "SELECT \"accounts\".\"id\" FROM \"accounts\" WHERE EXISTS (SELECT \"x\".\"id\" FROM \"accounts\" AS \"x\" WHERE (\"x\".\"email\" = \"accounts\".\"email\" AND \"x\".\"id\" > \"accounts\".\"id\"))",
+            innerAlias.Text
+        );
+        Assert.Equal(
+            "SELECT \"a\".\"id\" FROM \"accounts\" AS \"a\" WHERE EXISTS (SELECT \"accounts\".\"id\" FROM \"accounts\" WHERE \"accounts\".\"email\" = \"a\".\"email\")",
+            outerAlias.Text
+        );
+        Assert.Equal(
+            "SELECT \"accounts\".\"id\" FROM \"accounts\" WHERE \"accounts\".\"id\" IN (SELECT \"accounts\".\"id\" FROM \"accounts\" WHERE \"accounts\".\"login_count\" > $1)",
+            uncorrelated.Text
+        );
+    }
+
     private static SqlStatement LimitedIn<TDialect>(Database<TDialect> db)
         where TDialect : ILimitInSubqueryDialect =>
         db.From(Account.Table)

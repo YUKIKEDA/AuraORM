@@ -51,7 +51,8 @@ public sealed class SubqueryTypingTests
 
     /// <summary>
     /// Invalid subqueries do not compile: a row limit in <c>In</c> on MySQL and MariaDB, a subquery with <c>OrderBy</c> but no
-    /// limit, a subquery of another type or of a tuple, and a subquery of the wrong evaluation level (design §5.11, §14.1).
+    /// limit (CS0619 with the fix, in every function and for value, nullable, and reference types), a subquery of another
+    /// type or of a tuple, and a subquery of the wrong evaluation level (design §5.11, §14.1).
     /// </summary>
     /// <remarks>
     /// Preconditions:
@@ -69,9 +70,21 @@ public sealed class SubqueryTypingTests
         "var c = NotIn(id, mysql.From(Membership.Table).Select(m => m.AccountId).OrderBy(m => [Asc(m.AccountId)]).Limit(1).Offset(1));",
         "CS0311"
     )]
-    [InlineData("var c = In(id, sqlite.From(Membership.Table).Select(m => m.AccountId).OrderBy(m => [Asc(m.AccountId)]));", "CS1503")]
-    [InlineData("var c = Exists(sqlite.From(Membership.Table).Select(m => m.AccountId).OrderBy(m => [Asc(m.AccountId)]));", "CS0411")]
-    [InlineData("var c = Scalar(sqlite.From(Membership.Table).Select(m => m.AccountId).OrderBy(m => [Asc(m.AccountId)]));", "CS0411")]
+    [InlineData("var c = In(id, sqlite.From(Membership.Table).Select(m => m.AccountId).OrderBy(m => [Asc(m.AccountId)]));", "CS0619")]
+    [InlineData("var c = NotIn(age, sqlite.From(Account.Table).Select(a => a.LoginCount).OrderBy(a => [Asc(a.Id)]));", "CS0619")]
+    [InlineData("var c = In(id, sqlite.From(Account.Table).Select(a => Max(a.Id)).OrderBy(a => [Asc(Max(a.Id))]));", "CS0619")]
+    [InlineData("var c = Exists(sqlite.From(Membership.Table).Select(m => m.AccountId).OrderBy(m => [Asc(m.AccountId)]));", "CS0619")]
+    [InlineData(
+        "var q = sqlite.From(Account.Table).GroupBy(a => a.Id).Having((k, a) => GroupExists(sqlite.From(Membership.Table).Select(m => m.Role).OrderBy(m => [Asc(m.Role)])));",
+        "CS0619"
+    )]
+    [InlineData("var c = Scalar(sqlite.From(Membership.Table).Select(m => m.AccountId).OrderBy(m => [Asc(m.AccountId)]));", "CS0619")]
+    [InlineData("var c = Scalar(sqlite.From(Membership.Table).Select(m => m.Role).OrderBy(m => [Asc(m.Role)]));", "CS0619")]
+    [InlineData("var c = Scalar(sqlite.From(Account.Table).Select(a => Max(a.LoginCount)).OrderBy(a => [Asc(Max(a.LoginCount))]));", "CS0619")]
+    [InlineData(
+        "var q = sqlite.From(Account.Table).GroupBy(a => a.Id).Having((k, a) => Gt(Count(), GroupScalar(sqlite.From(Membership.Table).Select(m => Count()).OrderBy(m => [Asc(Count())]))));",
+        "CS0619"
+    )]
     [InlineData("var c = In(id, sqlite.From(Membership.Table).Select(m => m.Role));", "CS0453")]
     [InlineData("var c = In(id, sqlite.From(Membership.Table).Select(m => (m.AccountId, m.Role)));", "CS1503")]
     [InlineData(

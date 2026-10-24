@@ -51,9 +51,11 @@ version has been published to NuGet.
   silently ordered by the first column).
 - Subqueries: `In` / `NotIn` with a subquery of the value's type, `Exists`, and `Scalar` (null when there is no row), and
   their group forms `GroupScalar` / `GroupExists` for `HAVING` and grouped projections, correlated with the grouped
-  statement through `Outer(k)`. A subquery with `OrderBy` and no limit does not compile, nor does a limited subquery in
-  `In` on MySQL and MariaDB (`ILimitInSubqueryDialect`). A subquery of another dialect, a subquery in a `GROUP BY` key,
-  and a grouped statement's column used in a group subquery without `Outer` throw when the statement is built.
+  statement through `Outer(k)`. A subquery with `OrderBy` and no limit does not compile (CS0619, whose message names the
+  fix), nor does a limited subquery in `In` on MySQL and MariaDB (`ILimitInSubqueryDialect`). A subquery of another
+  dialect, a subquery in a `GROUP BY` key, a grouped statement's column used in a group subquery without `Outer`, and a
+  correlation with an outer table whose name the subquery's table has too (which SQL would read as the inner table)
+  throw when the statement is built.
 - Analyzers in the package: a comparison with a typed null constant (AURA0201) or with a value that may be null
   (AURA0202), which matches no row in SQL, a `NotIn` whose subquery may return null (AURA0203), and a raw SQL hole whose value is not a column type (AURA0301).
 - On SQLite, ordering, comparing by size, and `Min` / `Max` / `Sum` / `Avg` of decimals throw when the statement is

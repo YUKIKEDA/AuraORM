@@ -97,6 +97,28 @@ internal sealed class SqlRenderContext : IDisposable
     /// </summary>
     public bool InGroupSubquery => _groupBoundary >= 0;
 
+    // §5.11: a column of an outer statement is written with the same qualifier as a table of the same name in an inner
+    // statement, and SQL resolves it to the inner one, so the correlation would compare the inner table with itself.
+    private void CheckShadowed(int depth, TableAlias table, string column)
+    {
+        for (int inner = depth + 1; inner < _scopes.Count; inner++)
+        {
+            foreach (TableAlias candidate in _scopes[inner])
+            {
+                if (candidate.Reference == table.Reference)
+                {
+                    throw new InvalidOperationException(
+                        "The column "
+                            + table.Reference
+                            + "."
+                            + column
+                            + " of an outer statement is used in a subquery whose FROM has a table of the same name, so SQL would read it as the subquery's column. Give one of the two tables an alias with As(\"...\")."
+                    );
+                }
+            }
+        }
+    }
+
     private void CheckGroupSubquery(int depth, TableAlias table, string column)
     {
         if (depth < _groupBoundary && _keyDepth == 0)
@@ -145,6 +167,7 @@ internal sealed class SqlRenderContext : IDisposable
                 if (ReferenceEquals(candidate, table))
                 {
                     CheckGroupSubquery(depth, table, column);
+                    CheckShadowed(depth, table, column);
                     return;
                 }
             }
