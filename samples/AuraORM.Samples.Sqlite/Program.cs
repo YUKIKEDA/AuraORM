@@ -109,6 +109,18 @@ List<long> notLent = await db.From(Book.Table)
     .ToListAsync();
 checks.SameItems("except", [1L, 2L], notLent);
 
+// A named query as a derived table and as a CTE, with a result type whose column has its own name ([Column("heading")]).
+var longBooks = db.From(Book.Table).Select(b => new TitleAndPages.RowProjection { Title = b.Title, Pages = b.Pages }).As("t");
+List<string> derived = await db.From(longBooks).Where(t => Gt(t.Pages, 400)).Select(t => t.Title).ToListAsync();
+checks.SameItems("derived table", ["Dune"], derived);
+List<TitleAndPages> cte = await db.With(longBooks)
+    .From(longBooks)
+    .Where(t => Gt(t.Pages, 300))
+    .Select(t => t)
+    .OrderBy(t => [Asc(t.Title)])
+    .ToListAsync();
+checks.SameItems("cte", [new TitleAndPages("Cosmos", 365), new TitleAndPages("Dune", 412)], cte);
+
 SqlStatement offline = new SqlBuilder<SqliteDialect>().From(Book.Table).Select(b => b.Title).Limit(1).ToSql();
 checks.Equal("sql builder", "SELECT \"books\".\"title\" FROM \"books\" LIMIT @p0", offline.Text);
 checks.Equal("select aggregates", (3L, (int?)412), (count, longest));

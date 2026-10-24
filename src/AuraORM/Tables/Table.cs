@@ -8,7 +8,7 @@ namespace AuraORM;
 /// <typeparam name="TColumns">The column set.</typeparam>
 /// <typeparam name="TNullable">The column set on the nullable side of an outer join.</typeparam>
 /// <typeparam name="TInsert">The <c>INSERT</c> model.</typeparam>
-public sealed class Table<TRow, TColumns, TNullable, TInsert> : ITableReference
+public sealed class Table<TRow, TColumns, TNullable, TInsert> : ITableReference, ITableSource<TColumns, TNullable>
     where TRow : class
     where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
     where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
@@ -43,6 +43,8 @@ public sealed class Table<TRow, TColumns, TNullable, TInsert> : ITableReference
 
     /// <inheritdoc/>
     string? ITableReference.Alias => Alias;
+
+    TableAlias ITableSource<TColumns, TNullable>.CreateOccurrence() => new(Info.Schema, Info.Name, Alias);
 
     /// <summary>
     /// Gives the table an alias in a statement: <c>FROM "users" AS "u"</c>, and its columns are written <c>"u"."column"</c>

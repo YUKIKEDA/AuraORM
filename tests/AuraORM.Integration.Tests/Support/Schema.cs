@@ -59,3 +59,15 @@ public sealed partial record TypedRow(
 /// </summary>
 [Table("pets", Naming = ColumnNaming.SnakeCase)]
 public sealed partial record Pet([PrimaryKey] long Id, long? OwnerId, [MaxLength(50)] string Name);
+
+/// <summary>
+/// The number of pets of an owner, for the derived tables and CTEs of the tests (design §3.5, §5.11).
+/// </summary>
+[QueryResult]
+public sealed partial record OwnerPets(long? Owner, long Count);
+
+/// <summary>
+/// A name and a number, for the set operations as named queries of the tests (design §5.11).
+/// </summary>
+[QueryResult]
+public sealed partial record NamedValue(string Name, long Value);

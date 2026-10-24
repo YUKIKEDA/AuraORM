@@ -43,3 +43,9 @@ public sealed partial record Membership(
 /// </summary>
 [QueryResult]
 public sealed partial record NameTotal(string Name, decimal? Total);
+
+/// <summary>
+/// A result type of an email and a count, for the derived tables and CTEs of the tests (design §3.5, §5.11).
+/// </summary>
+[QueryResult]
+public sealed partial record EmailCount(string Email, long Count);

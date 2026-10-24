@@ -17,15 +17,16 @@ internal static class TableEmitter
 
         EmitTable(w, table, row);
         w.Line();
-        EmitColumns(w, table, row);
+        EmitColumns(w, table, row, "one occurrence of the table <c>" + Xml(table.TableName) + "</c> in a statement");
         w.Line();
-        EmitNullableColumns(w, table, row);
+        EmitNullableColumns(w, table, row, "the table <c>" + Xml(table.TableName) + "</c>");
         w.Line();
         EmitInsert(w, table);
         w.Line();
         NamedReading.Emit(w, row, table.Columns.Select(c => (c.Member, c.ColumnName)).ToList(), value => Construct(table, row, value));
 
         w.EndTarget(opened);
+        NamedQueryEmitter.Emit(w, table.Target, table.Columns.Select(c => c.ColumnName).ToList());
         return w.ToString();
     }
 
@@ -108,10 +109,10 @@ internal static class TableEmitter
         w.Line("}));");
     }
 
-    private static void EmitColumns(CodeWriter w, TableModel table, string row)
+    public static void EmitColumns(CodeWriter w, TableModel table, string row, string subject)
     {
         w.Line("/// <summary>");
-        w.Line("/// The columns of one occurrence of the table <c>" + Xml(table.TableName) + "</c> in a statement.");
+        w.Line("/// The columns of " + subject + ".");
         w.Line("/// </summary>");
         w.Open("public sealed class Columns : " + Lib + "TableColumns<" + row + ">, " + Lib + "ITableColumns<Columns>");
         w.Open("private Columns(" + Lib + "TableAlias " + TableParameter + ")");
@@ -165,10 +166,10 @@ internal static class TableEmitter
         w.Close();
     }
 
-    private static void EmitNullableColumns(CodeWriter w, TableModel table, string row)
+    public static void EmitNullableColumns(CodeWriter w, TableModel table, string row, string subject)
     {
         w.Line("/// <summary>");
-        w.Line("/// The columns of the table <c>" + Xml(table.TableName) + "</c> on the nullable side of an outer join.");
+        w.Line("/// The columns of " + subject + " on the nullable side of an outer join.");
         w.Line("/// </summary>");
         w.Open("public sealed class NullableColumns : " + Lib + "NullableTableColumns<" + row + ">, " + Lib + "ITableColumns<NullableColumns>");
         w.Open("private NullableColumns(" + Lib + "TableAlias " + TableParameter + ")");

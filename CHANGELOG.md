@@ -61,6 +61,11 @@ version has been published to NuGet.
   result, and as subqueries. Mixed operators, a set operation after `OrderBy` or `Limit`, an operand with `OrderBy` or
   `Limit`, and another set operation as an operand fail with CS0619 and the fix; `OrderBy` after a projection that holds a
   whole row throws, and so does a SQLite set operation of more than 500 statements.
+- Derived tables and CTEs: `As("name")` on a query whose rows are a `[QueryResult]` type or a `[Table]` row (generated for
+  each type) names it; `db.From(t)` and joins write it as a derived table, and `db.With(t, …).From(…)` writes it as a CTE.
+  The items inside are named after the members or columns, `t.As("t2")` references it again, and `[QueryResult]` types
+  get `Columns` and `NullableColumns`. `As` on expressions or tuples fails with CS0619; a nested `With`, a table with the
+  name of a CTE, and a named query of another dialect throw when the statement is built.
 - Analyzers in the package: a comparison with a typed null constant (AURA0201) or with a value that may be null
   (AURA0202), which matches no row in SQL, a `NotIn` whose subquery may return null (AURA0203), and a raw SQL hole whose value is not a column type (AURA0301).
 - On SQLite, ordering, comparing by size, and `Min` / `Max` / `Sum` / `Avg` of decimals throw when the statement is

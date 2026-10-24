@@ -39,8 +39,19 @@ internal static class SchemaReader
         "WriteValues",
     ];
 
-    private static readonly string[] ResultGeneratedNames = ["RowProjection", "GroupProjection"];
-    private static readonly string[] ResultReservedMemberNames = ["RowProjection", "GroupProjection", "AddItems", "ReadResult"];
+    private static readonly string[] ResultGeneratedNames = ["RowProjection", "GroupProjection", "Columns", "NullableColumns"];
+    private static readonly string[] ResultReservedMemberNames =
+    [
+        "RowProjection",
+        "GroupProjection",
+        "Columns",
+        "NullableColumns",
+        "AddItems",
+        "ReadResult",
+        "Create",
+        "GetColumns",
+        "ReadRow",
+    ];
 
     private static readonly SymbolDisplayFormat TypeFormat = SymbolDisplayFormat.FullyQualifiedFormat.AddMiscellaneousOptions(
         SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
@@ -476,7 +487,23 @@ internal static class SchemaReader
         }
 
         string? ns = type.ContainingNamespace.IsGlobalNamespace ? null : type.ContainingNamespace.ToDisplayString();
-        return new TypeTarget(ns, Equatable(containers), declaration!, type.Name);
+        string flatName = type.Name;
+        bool isPublic = type.DeclaredAccessibility == Accessibility.Public;
+        for (INamedTypeSymbol? outer = type.ContainingType; outer is not null; outer = outer.ContainingType)
+        {
+            flatName = outer.Name + flatName;
+            isPublic &= outer.DeclaredAccessibility == Accessibility.Public;
+        }
+
+        return new TypeTarget(
+            ns,
+            Equatable(containers),
+            declaration!,
+            type.Name,
+            type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            flatName,
+            isPublic
+        );
     }
 
     private static string? Declaration(INamedTypeSymbol type)

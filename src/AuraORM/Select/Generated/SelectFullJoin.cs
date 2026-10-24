@@ -15,12 +15,10 @@ public static class SelectFullJoin
     /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
     /// <typeparam name="T1">The column set of table 1, as the lambdas get it now.</typeparam>
     /// <typeparam name="TNullable1">The column set of table 1 on the nullable side of an outer join.</typeparam>
-    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
     /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
     /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
-    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
     /// <param name="from">The statement to join the table to.</param>
-    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>, or a named query.</param>
     /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
     /// <returns>The statement with the joined table.</returns>
     /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
@@ -30,22 +28,18 @@ public static class SelectFullJoin
         TMode,
         T1,
         TNullable1,
-        TJoinRow,
         TJoinColumns,
-        TJoinNullable,
-        TJoinInsert
+        TJoinNullable
     >(
         this SelectFrom<TDialect, TMode, T1, TNullable1> from,
-        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        ITableSource<TJoinColumns, TJoinNullable> table,
         Func<T1, TJoinColumns, Condition<PerRow>> on
     )
         where TDialect : IFullJoinDialect
         where TMode : ExecutionMode
         where TNullable1 : ITableColumns<TNullable1>
-        where TJoinRow : class
-        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
-        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
-        where TJoinInsert : InsertModel
+        where TJoinColumns : ITableColumns<TJoinColumns>
+        where TJoinNullable : ITableColumns<TJoinNullable>
     {
         ArgumentNullException.ThrowIfNull(from);
         return from.FullJoinCore(table, on);
@@ -60,12 +54,10 @@ public static class SelectFullJoin
     /// <typeparam name="TNullable1">The column set of table 1 on the nullable side of an outer join.</typeparam>
     /// <typeparam name="T2">The column set of table 2, as the lambdas get it now.</typeparam>
     /// <typeparam name="TNullable2">The column set of table 2 on the nullable side of an outer join.</typeparam>
-    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
     /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
     /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
-    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
     /// <param name="from">The statement to join the table to.</param>
-    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>, or a named query.</param>
     /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
     /// <returns>The statement with the joined table.</returns>
     /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
@@ -77,23 +69,19 @@ public static class SelectFullJoin
         TNullable1,
         T2,
         TNullable2,
-        TJoinRow,
         TJoinColumns,
-        TJoinNullable,
-        TJoinInsert
+        TJoinNullable
     >(
         this SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2> from,
-        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        ITableSource<TJoinColumns, TJoinNullable> table,
         Func<T1, T2, TJoinColumns, Condition<PerRow>> on
     )
         where TDialect : IFullJoinDialect
         where TMode : ExecutionMode
         where TNullable1 : ITableColumns<TNullable1>
         where TNullable2 : ITableColumns<TNullable2>
-        where TJoinRow : class
-        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
-        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
-        where TJoinInsert : InsertModel
+        where TJoinColumns : ITableColumns<TJoinColumns>
+        where TJoinNullable : ITableColumns<TJoinNullable>
     {
         ArgumentNullException.ThrowIfNull(from);
         return from.FullJoinCore(table, on);
@@ -110,12 +98,10 @@ public static class SelectFullJoin
     /// <typeparam name="TNullable2">The column set of table 2 on the nullable side of an outer join.</typeparam>
     /// <typeparam name="T3">The column set of table 3, as the lambdas get it now.</typeparam>
     /// <typeparam name="TNullable3">The column set of table 3 on the nullable side of an outer join.</typeparam>
-    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
     /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
     /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
-    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
     /// <param name="from">The statement to join the table to.</param>
-    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>, or a named query.</param>
     /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
     /// <returns>The statement with the joined table.</returns>
     /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
@@ -131,9 +117,9 @@ public static class SelectFullJoin
         TNullable3,
         TJoinNullable,
         TJoinNullable
-    > FullJoin<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+    > FullJoin<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, TJoinColumns, TJoinNullable>(
         this SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3> from,
-        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        ITableSource<TJoinColumns, TJoinNullable> table,
         Func<T1, T2, T3, TJoinColumns, Condition<PerRow>> on
     )
         where TDialect : IFullJoinDialect
@@ -141,10 +127,8 @@ public static class SelectFullJoin
         where TNullable1 : ITableColumns<TNullable1>
         where TNullable2 : ITableColumns<TNullable2>
         where TNullable3 : ITableColumns<TNullable3>
-        where TJoinRow : class
-        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
-        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
-        where TJoinInsert : InsertModel
+        where TJoinColumns : ITableColumns<TJoinColumns>
+        where TJoinNullable : ITableColumns<TJoinNullable>
     {
         ArgumentNullException.ThrowIfNull(from);
         return from.FullJoinCore(table, on);
@@ -163,12 +147,10 @@ public static class SelectFullJoin
     /// <typeparam name="TNullable3">The column set of table 3 on the nullable side of an outer join.</typeparam>
     /// <typeparam name="T4">The column set of table 4, as the lambdas get it now.</typeparam>
     /// <typeparam name="TNullable4">The column set of table 4 on the nullable side of an outer join.</typeparam>
-    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
     /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
     /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
-    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
     /// <param name="from">The statement to join the table to.</param>
-    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>, or a named query.</param>
     /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
     /// <returns>The statement with the joined table.</returns>
     /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
@@ -186,9 +168,9 @@ public static class SelectFullJoin
         TNullable4,
         TJoinNullable,
         TJoinNullable
-    > FullJoin<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4, TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert>(
+    > FullJoin<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4, TJoinColumns, TJoinNullable>(
         this SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4> from,
-        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        ITableSource<TJoinColumns, TJoinNullable> table,
         Func<T1, T2, T3, T4, TJoinColumns, Condition<PerRow>> on
     )
         where TDialect : IFullJoinDialect
@@ -197,10 +179,8 @@ public static class SelectFullJoin
         where TNullable2 : ITableColumns<TNullable2>
         where TNullable3 : ITableColumns<TNullable3>
         where TNullable4 : ITableColumns<TNullable4>
-        where TJoinRow : class
-        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
-        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
-        where TJoinInsert : InsertModel
+        where TJoinColumns : ITableColumns<TJoinColumns>
+        where TJoinNullable : ITableColumns<TJoinNullable>
     {
         ArgumentNullException.ThrowIfNull(from);
         return from.FullJoinCore(table, on);
@@ -221,12 +201,10 @@ public static class SelectFullJoin
     /// <typeparam name="TNullable4">The column set of table 4 on the nullable side of an outer join.</typeparam>
     /// <typeparam name="T5">The column set of table 5, as the lambdas get it now.</typeparam>
     /// <typeparam name="TNullable5">The column set of table 5 on the nullable side of an outer join.</typeparam>
-    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
     /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
     /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
-    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
     /// <param name="from">The statement to join the table to.</param>
-    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>, or a named query.</param>
     /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
     /// <returns>The statement with the joined table.</returns>
     /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
@@ -246,26 +224,9 @@ public static class SelectFullJoin
         TNullable5,
         TJoinNullable,
         TJoinNullable
-    > FullJoin<
-        TDialect,
-        TMode,
-        T1,
-        TNullable1,
-        T2,
-        TNullable2,
-        T3,
-        TNullable3,
-        T4,
-        TNullable4,
-        T5,
-        TNullable5,
-        TJoinRow,
-        TJoinColumns,
-        TJoinNullable,
-        TJoinInsert
-    >(
+    > FullJoin<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4, T5, TNullable5, TJoinColumns, TJoinNullable>(
         this SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4, T5, TNullable5> from,
-        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        ITableSource<TJoinColumns, TJoinNullable> table,
         Func<T1, T2, T3, T4, T5, TJoinColumns, Condition<PerRow>> on
     )
         where TDialect : IFullJoinDialect
@@ -275,10 +236,8 @@ public static class SelectFullJoin
         where TNullable3 : ITableColumns<TNullable3>
         where TNullable4 : ITableColumns<TNullable4>
         where TNullable5 : ITableColumns<TNullable5>
-        where TJoinRow : class
-        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
-        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
-        where TJoinInsert : InsertModel
+        where TJoinColumns : ITableColumns<TJoinColumns>
+        where TJoinNullable : ITableColumns<TJoinNullable>
     {
         ArgumentNullException.ThrowIfNull(from);
         return from.FullJoinCore(table, on);
@@ -301,12 +260,10 @@ public static class SelectFullJoin
     /// <typeparam name="TNullable5">The column set of table 5 on the nullable side of an outer join.</typeparam>
     /// <typeparam name="T6">The column set of table 6, as the lambdas get it now.</typeparam>
     /// <typeparam name="TNullable6">The column set of table 6 on the nullable side of an outer join.</typeparam>
-    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
     /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
     /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
-    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
     /// <param name="from">The statement to join the table to.</param>
-    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>, or a named query.</param>
     /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
     /// <returns>The statement with the joined table.</returns>
     /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
@@ -343,13 +300,11 @@ public static class SelectFullJoin
         TNullable5,
         T6,
         TNullable6,
-        TJoinRow,
         TJoinColumns,
-        TJoinNullable,
-        TJoinInsert
+        TJoinNullable
     >(
         this SelectFrom<TDialect, TMode, T1, TNullable1, T2, TNullable2, T3, TNullable3, T4, TNullable4, T5, TNullable5, T6, TNullable6> from,
-        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        ITableSource<TJoinColumns, TJoinNullable> table,
         Func<T1, T2, T3, T4, T5, T6, TJoinColumns, Condition<PerRow>> on
     )
         where TDialect : IFullJoinDialect
@@ -360,10 +315,8 @@ public static class SelectFullJoin
         where TNullable4 : ITableColumns<TNullable4>
         where TNullable5 : ITableColumns<TNullable5>
         where TNullable6 : ITableColumns<TNullable6>
-        where TJoinRow : class
-        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
-        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
-        where TJoinInsert : InsertModel
+        where TJoinColumns : ITableColumns<TJoinColumns>
+        where TJoinNullable : ITableColumns<TJoinNullable>
     {
         ArgumentNullException.ThrowIfNull(from);
         return from.FullJoinCore(table, on);
@@ -388,12 +341,10 @@ public static class SelectFullJoin
     /// <typeparam name="TNullable6">The column set of table 6 on the nullable side of an outer join.</typeparam>
     /// <typeparam name="T7">The column set of table 7, as the lambdas get it now.</typeparam>
     /// <typeparam name="TNullable7">The column set of table 7 on the nullable side of an outer join.</typeparam>
-    /// <typeparam name="TJoinRow">The row type of the joined table.</typeparam>
     /// <typeparam name="TJoinColumns">The column set of the joined table.</typeparam>
     /// <typeparam name="TJoinNullable">The nullable column set of the joined table.</typeparam>
-    /// <typeparam name="TJoinInsert">The <c>INSERT</c> model of the joined table.</typeparam>
     /// <param name="from">The statement to join the table to.</param>
-    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>.</param>
+    /// <param name="table">The table, such as <c>Order.Table</c> or <c>Order.Table.As("o")</c>, or a named query.</param>
     /// <param name="on">The condition, from the column sets of the tables before it and of the joined table.</param>
     /// <returns>The statement with the joined table.</returns>
     /// <exception cref="InvalidOperationException">The statement already has a table under the same name; give the table
@@ -434,10 +385,8 @@ public static class SelectFullJoin
         TNullable6,
         T7,
         TNullable7,
-        TJoinRow,
         TJoinColumns,
-        TJoinNullable,
-        TJoinInsert
+        TJoinNullable
     >(
         this SelectFrom<
             TDialect,
@@ -457,7 +406,7 @@ public static class SelectFullJoin
             T7,
             TNullable7
         > from,
-        Table<TJoinRow, TJoinColumns, TJoinNullable, TJoinInsert> table,
+        ITableSource<TJoinColumns, TJoinNullable> table,
         Func<T1, T2, T3, T4, T5, T6, T7, TJoinColumns, Condition<PerRow>> on
     )
         where TDialect : IFullJoinDialect
@@ -469,10 +418,8 @@ public static class SelectFullJoin
         where TNullable5 : ITableColumns<TNullable5>
         where TNullable6 : ITableColumns<TNullable6>
         where TNullable7 : ITableColumns<TNullable7>
-        where TJoinRow : class
-        where TJoinColumns : TableColumns<TJoinRow>, ITableColumns<TJoinColumns>
-        where TJoinNullable : NullableTableColumns<TJoinRow>, ITableColumns<TJoinNullable>
-        where TJoinInsert : InsertModel
+        where TJoinColumns : ITableColumns<TJoinColumns>
+        where TJoinNullable : ITableColumns<TJoinNullable>
     {
         ArgumentNullException.ThrowIfNull(from);
         return from.FullJoinCore(table, on);

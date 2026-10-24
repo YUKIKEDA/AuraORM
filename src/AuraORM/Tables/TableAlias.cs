@@ -19,6 +19,18 @@ public sealed class TableAlias
         Alias = alias;
     }
 
+    internal TableAlias(NamedQueryDefinition query, string? alias)
+    {
+        Table = query.Name;
+        Alias = alias;
+        Query = query;
+    }
+
+    /// <summary>
+    /// Gets the named query that this occurrence names, or <see langword="null"/> for a table (§5.11).
+    /// </summary>
+    internal NamedQueryDefinition? Query { get; }
+
     internal string? Schema { get; }
 
     internal string Table { get; }
@@ -36,6 +48,13 @@ public sealed class TableAlias
     /// <param name="context">The rendering context.</param>
     internal void RenderSource(SqlRenderContext context)
     {
+        if (Query is not null)
+        {
+            context.WriteNamedQuerySource(this, Query);
+            return;
+        }
+
+        context.CheckCteShadow(this);
         if (Schema is not null)
         {
             context.WriteIdentifier(Schema);

@@ -8,6 +8,8 @@ internal sealed class SqlRenderContext : IDisposable
     private readonly List<SqlStatementParameter> _parameters = [];
     private readonly Dictionary<ParameterNode, string> _names = new(ReferenceEqualityComparer.Instance);
     private readonly List<IReadOnlyList<TableAlias>> _scopes = [];
+    private readonly List<NamedQueryDefinition> _ctes = [];
+    private int _statementDepth;
     private int _groupBoundary = -1;
     private int _keyDepth;
 
@@ -144,6 +146,122 @@ internal sealed class SqlRenderContext : IDisposable
     /// Leaves the scope that <see cref="EnterScope"/> entered last.
     /// </summary>
     public void ExitScope() => _scopes.RemoveAt(_scopes.Count - 1);
+
+    /// <summary>
+    /// Starts a SELECT statement and returns how deep it is: 1 for the outermost statement.
+    /// </summary>
+    /// <returns>The depth.</returns>
+    public int EnterStatement() => ++_statementDepth;
+
+    /// <summary>
+    /// Ends the statement that <see cref="EnterStatement"/> started; the CTEs end with the outermost statement.
+    /// </summary>
+    public void ExitStatement()
+    {
+        if (--_statementDepth == 0)
+        {
+            _ctes.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Writes a CTE of the outermost statement's <c>WITH</c>: <c>"t" AS (SELECT …)</c>. From then on, a reference to the named
+    /// query writes its name (§5.11).
+    /// </summary>
+    /// <param name="query">The named query.</param>
+    public void WriteCte(NamedQueryDefinition query)
+    {
+        WriteIdentifier(query.Name);
+        Write(" AS (");
+        WriteNamedQueryBody(query);
+        Write(')');
+        _ctes.Add(query);
+    }
+
+    /// <summary>
+    /// Writes an occurrence of a named query in <c>FROM</c> or a join: its name (with the alias) when the statement lists it
+    /// in <c>With</c>, or the query itself as a derived table (§5.11).
+    /// </summary>
+    /// <param name="source">The occurrence.</param>
+    /// <param name="query">The named query.</param>
+    public void WriteNamedQuerySource(TableAlias source, NamedQueryDefinition query)
+    {
+        foreach (NamedQueryDefinition cte in _ctes)
+        {
+            if (ReferenceEquals(cte, query))
+            {
+                WriteIdentifier(query.Name);
+                if (source.Alias is not null)
+                {
+                    Write(" AS ");
+                    WriteIdentifier(source.Alias);
+                }
+
+                return;
+            }
+        }
+
+        Write('(');
+        WriteNamedQueryBody(query);
+        Write(") AS ");
+        WriteIdentifier(source.Reference);
+    }
+
+    /// <summary>
+    /// Throws when a table has the name of a CTE of the statement: SQL would read the name as the CTE (§5.11).
+    /// </summary>
+    /// <param name="table">The table's occurrence.</param>
+    public void CheckCteShadow(TableAlias table)
+    {
+        if (table.Schema is not null)
+        {
+            return;
+        }
+
+        foreach (NamedQueryDefinition cte in _ctes)
+        {
+            if (cte.Name == table.Table)
+            {
+                throw new InvalidOperationException(
+                    "The table "
+                        + table.Table
+                        + " has the name of a CTE of the statement's With, so SQL would read it as the CTE. Give the named query another name."
+                );
+            }
+        }
+    }
+
+    // A named query is a statement of its own: it cannot use the columns of the statement around it.
+    private void WriteNamedQueryBody(NamedQueryDefinition query)
+    {
+        if (!ReferenceEquals(query.Dialect, Dialect))
+        {
+            throw new InvalidOperationException(
+                "The named query "
+                    + query.Name
+                    + " was built for "
+                    + query.Dialect.Name
+                    + " and is used in a "
+                    + Dialect.Name
+                    + " statement. Build it with the same dialect."
+            );
+        }
+
+        IReadOnlyList<TableAlias>[] scopes = [.. _scopes];
+        int boundary = _groupBoundary;
+        int keys = _keyDepth;
+        bool inHaving = InHaving;
+        _scopes.Clear();
+        _groupBoundary = -1;
+        _keyDepth = 0;
+        InHaving = false;
+        new SelectNode(query.State, query.ColumnNames).Render(this);
+        _scopes.Clear();
+        _scopes.AddRange(scopes);
+        _groupBoundary = boundary;
+        _keyDepth = keys;
+        InHaving = inHaving;
+    }
 
     /// <summary>
     /// Throws when a column of a table that no enclosing statement has in its <c>FROM</c> is written: a column taken out of
