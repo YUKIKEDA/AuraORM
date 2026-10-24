@@ -18,6 +18,7 @@ Details: `docs/conventions.md`. C# style: `.cursor/rules/csharp.mdc`. Tests: `.c
 
 - The runtime library targets `net8.0`. The generator targets `netstandard2.0` (it runs inside the compiler). C# 14 in this repository; code that the generator emits into a consumer's project compiles with C# 12, the default of `net8.0` (`docs/design.ja.md`).
 - `TreatWarningsAsErrors` is on from the first commit. Do not add `NoWarn` or `#pragma warning disable` to get a build through; fix the cause, or change `.editorconfig` with the reason in a comment when a rule is wrong for this repository, in a PR that says so.
+- A name that the generator writes outside the user's type (a class at the namespace level, such as `{Type}NamedQueries`) can collide with another type, and the error would point at generated code (CS0101). The generator checks such a name and reports a diagnostic that names both types (AURA0114).
 - The runtime library is `IsAotCompatible` (`.cursor/rules/aot.mdc`) and needs XML docs on the public API.
 - Package versions live in `Directory.Packages.props` (Central Package Management). A new package goes through `.cursor/rules/dependencies.mdc` first.
 - The runtime library builds with `BannedSymbols.txt`. Do not remove an entry to get a build through.

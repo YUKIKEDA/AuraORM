@@ -21,6 +21,7 @@ alwaysApply: true
 - Contract, public API, generated SQL, type-safety guarantee, invariant, or phase: open a `design` Issue, update `docs/design.ja.md` (and `docs/design-decisions.md` for what was rejected) in its PR, and merge it before implementation Issues.
 - Wording, typos, and examples: may ship in the same PR as code.
 - Do not implement first and update the design later. If code and design conflict, stop and fix the design through the process above.
+- An exception or an edge behavior that the implementation adds (a check at build time, how an input that the design did not mention is handled) is written into the design before the PR is ready. Keep a list of them while implementing, and read it against the design before the PR. Row Q6 shipped the isolation of a named query's body, the rejection of an aliased reference in `With`, and the handling of the CTE order without a word in the design, and the review had to ask.
 
 ## Claims about databases and other libraries
 
