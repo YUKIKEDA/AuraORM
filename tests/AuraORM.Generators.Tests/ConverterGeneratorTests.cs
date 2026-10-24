@@ -136,6 +136,10 @@ public sealed class ConverterGeneratorTests
         "AURA0115",
         """[assembly: ValueConverter(typeof(A2Converter))] [ValueConverter(typeof(AConverter))] public readonly record struct A(long Value); public sealed class AConverter : IValueConverter<A, long> { public static long ToProvider(A v) => v.Value; public static A FromProvider(long v) => new(v); } public sealed class A2Converter : IValueConverter<A, string> { public static string ToProvider(A v) => ""; public static A FromProvider(string v) => new(0); }"""
     )]
+    [InlineData(
+        "AURA0105",
+        """[ValueConverter(typeof(AConverter))] public readonly record struct A(long Value); public sealed class AConverter : IValueConverter<A, long>, IValueConverter<A, string> { static long IValueConverter<A, long>.ToProvider(A v) => v.Value; static A IValueConverter<A, long>.FromProvider(long v) => new(v); static string IValueConverter<A, string>.ToProvider(A v) => ""; static A IValueConverter<A, string>.FromProvider(string v) => new(0); }"""
+    )]
     [InlineData("AURA0116", RegistrationCollision)]
     [InlineData(
         "AURA0105",

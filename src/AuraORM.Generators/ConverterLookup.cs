@@ -81,6 +81,12 @@ internal static class ConverterLookup
             return "it does not implement AuraORM.IValueConverter<TModel, TProvider>";
         }
 
+        // One converter is one conversion: with two, which one applies would depend on the order of the declaration.
+        if (converter.AllInterfaces.Count(IsContract) > 1)
+        {
+            return "it implements AuraORM.IValueConverter<TModel, TProvider> more than once";
+        }
+
         ITypeSymbol modelType = contract.TypeArguments[0];
         ITypeSymbol provider = contract.TypeArguments[1];
         if (annotated is not null && !SymbolEqualityComparer.Default.Equals(modelType.OriginalDefinition, annotated.OriginalDefinition))
@@ -167,10 +173,10 @@ internal static class ConverterLookup
         }
     }
 
-    private static INamedTypeSymbol? Interface(INamedTypeSymbol converter) =>
-        converter.AllInterfaces.FirstOrDefault(i =>
-            i.TypeArguments.Length == 2 && i.OriginalDefinition.ToDisplayString().StartsWith(InterfaceName + "<", StringComparison.Ordinal)
-        );
+    private static INamedTypeSymbol? Interface(INamedTypeSymbol converter) => converter.AllInterfaces.FirstOrDefault(IsContract);
+
+    private static bool IsContract(INamedTypeSymbol type) =>
+        type.TypeArguments.Length == 2 && type.OriginalDefinition.ToDisplayString().StartsWith(InterfaceName + "<", StringComparison.Ordinal);
 
     // The generated registration names the types, so they must be public, or internal and in this compilation.
     private static bool IsAccessible(ITypeSymbol type)

@@ -167,6 +167,56 @@ public sealed class ValueConverterTests
     }
 
     /// <summary>
+    /// An exception that a converter throws reaches the caller as it is, from a parameter and from a read (design §3.6,
+    /// D1-69).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Faulty"/>, whose converter throws <see cref="FaultyException"/> both ways.
+    ///
+    /// Steps:
+    /// - Render a select of <c>Value(new Faulty(1))</c>; read a <see cref="Faulty"/> with <c>QueryScalarAsync</c> from a fake
+    ///   connection that returns 1.
+    ///
+    /// Expected:
+    /// - <see cref="FaultyException"/> from both, not wrapped.
+    /// </remarks>
+    [Fact]
+    public async Task ConverterException_ReachesTheCaller()
+    {
+        var parameter = Sqlite.From(Order.Table).Select(o => Value(new Faulty(1)));
+        Assert.Throws<FaultyException>(() => parameter.ToSql());
+        var reader = new Database<SqliteDialect>(new FakeConnection { Rows = [1L] });
+        await Assert.ThrowsAsync<FaultyException>(() => reader.QueryScalarAsync<Faulty>($"SELECT value", Ct));
+    }
+
+    /// <summary>
+    /// A value whose converter throws.
+    /// </summary>
+    /// <param name="Value">The value.</param>
+    [ValueConverter(typeof(FaultyConverter))]
+    public readonly record struct Faulty(long Value);
+
+    /// <summary>
+    /// Throws from both conversions.
+    /// </summary>
+    public sealed class FaultyConverter : IValueConverter<Faulty, long>
+    {
+        public static long ToProvider(Faulty value) => throw new FaultyException();
+
+        public static Faulty FromProvider(long value) => throw new FaultyException();
+    }
+
+    /// <summary>
+    /// The exception of <see cref="FaultyConverter"/>.
+    /// </summary>
+    public sealed class FaultyException : Exception
+    {
+        public FaultyException()
+            : base("faulty") { }
+    }
+
+    /// <summary>
     /// A moment stored as a <see cref="DateTime"/>.
     /// </summary>
     /// <param name="Value">The stored value.</param>
