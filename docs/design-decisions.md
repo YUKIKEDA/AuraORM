@@ -318,3 +318,9 @@
 - **Decision**: `ReadOnlyColumn<T>` を受け取る `Set` と、`OptionalCondition` を受け取る UPDATE / DELETE の `Where` を `[Obsolete(…, error: true)]` で置き、CS0619 と直し方のメッセージにする（§7、§14.1）。
 - **Reason**: D1-51 の型引数のため、`[AutoIncrement]` の列への代入は値の側の型引数の誤り（CS0311）として報告され、列の誤りだと分からない。`OptionalCondition` はラムダの戻り値の変換の誤り（CS0029）になり、`AllRows()` を書けばよいと分からない。D1-25 と同じ考えで、直し方を示す。行 M1 の実装（#60）で決めた。
 - **Rejected**: コンパイラーのエラーのままにする案（直し方が分からない）。
+
+## D1-53 `Returning` の文を途中で閉じるときの `Cancel`
+
+- **Decision**: `Returning` の文を最後まで読まずに閉じるとき、`DbCommand.Cancel()` を呼ばず、残りの行をプロバイダーに読み捨てさせる（§9、§12.2）。
+- **Reason**: MariaDB 12.3 と SQL Server 2025 では、20 万行の変更の最初の行を読んで `Cancel` すると、例外なしに文全体が取り消された。最初の行が返るのに変更がない。#63 で所有者が決めた。
+- **Rejected**: SELECT と同じく `Cancel` を呼ぶ案（変更が黙って消える）。`Returning` の後に `First…` を置かない案（途中でやめた `AsAsyncEnumerable()` に同じ問題が残る）。
