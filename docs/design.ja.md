@@ -648,7 +648,7 @@ var q = db.From(User.Table).Select(u => u.Name)
 
 - キーワードは大文字。要素の区切りは `, `。句の間は半角空白一つ。改行と末尾の `;` は出さない。
 - 識別子は常にクォートする。SQLite と PostgreSQL は `"x"`（中の `"` は `""`）、MySQL と MariaDB は `` `x` ``（中の `` ` `` は ``` `` ```）、SQL Server は `[x]`（中の `]` は `]]`）。
-- パラメータの名前は、PostgreSQL が `$1`、`$2`、…（名前のないパラメータ）、ほかの方言は `@p0`、`@p1`、… である。番号は、SQL の文字列に現れる順に振る（`SqlStatement.Parameters` の順でもある）。別々に書いた値は、同じ値でも別のパラメータになる。同じ式（同じ値の引数から作った式）を一つの文の中でもう一度書くときは、同じパラメータをもう一度使う（`GROUP BY ("orders"."Price" + $1)` と `SELECT ("orders"."Price" + $1)`）。PostgreSQL は、GROUP BY のキーと SELECT の式を、パラメータの番号まで含めて比べるためである（PostgreSQL 18 で、`$1` と `$2` に分かれると `must appear in the GROUP BY clause` で失敗し、同じ `$1` なら通ることを確かめた）。`SqlStatement.Parameters` には、そのパラメータが一度だけ入る。
+- パラメータの名前は、PostgreSQL が `$1`、`$2`、…（名前のないパラメータ）、ほかの方言は `@p0`、`@p1`、… である。番号は、SQL の文字列に現れる順に振る（`SqlStatement.Parameters` の順でもある）。一つの式のオブジェクトを、一つの文の中の複数の場所で使うときは、同じパラメータをもう一度使う（`GroupBy` のキー `k` を SELECT で使うと `GROUP BY ("orders"."Price" + $1)` と `SELECT ("orders"."Price" + $1)`、§4.2 の SQL Server の `IsNotDistinctFrom` の展開）。同じ形の式でも、別々に書けば別のパラメータになる（`Add(o.Price, 1)` を `GroupBy` と `Select` に一度ずつ書くと `$1` と `$2`）。キーは後のラムダに `k` として渡るので、別々に書く必要はない（§5.5）。PostgreSQL は、GROUP BY のキーと SELECT の式を、パラメータの番号まで含めて比べるためである（PostgreSQL 18 で、`$1` と `$2` に分かれると `must appear in the GROUP BY clause` で失敗し、同じ `$1` なら通ることを確かめた）。`SqlStatement.Parameters` には、そのパラメータが一度だけ入る。
 - 複合の式（`And`、`Or`、算術、`Concat`）は常にかっこで囲む。比較とそれ以外の関数呼び出しは囲まない。
 - 本書の例では、読みやすさのために SQL を改行して示すことがある。実際の出力は一行である。
 
