@@ -9,9 +9,12 @@ namespace AuraORM;
 /// <typeparam name="TItem2">The type of item 2.</typeparam>
 /// <typeparam name="TLevel">The evaluation level of every item.</typeparam>
 internal sealed class TupleProjection<TItem1, TItem2, TLevel>(IProjection<TItem1, TLevel> p1, IProjection<TItem2, TLevel> p2)
-    : IProjection<(TItem1, TItem2), TLevel>
+    : IProjection<(TItem1, TItem2), TLevel>,
+        IExpressionTuple
     where TLevel : EvaluationLevel
 {
+    bool IExpressionTuple.AllExpressions => p1 is IExpr<TItem1, TLevel> && p2 is IExpr<TItem2, TLevel>;
+
     void IProjection<(TItem1, TItem2), TLevel>.CollectSelectItems(List<SqlNode> items)
     {
         p1.CollectSelectItems(items);
@@ -32,9 +35,11 @@ internal sealed class TupleProjection<TItem1, TItem2, TItem3, TLevel>(
     IProjection<TItem1, TLevel> p1,
     IProjection<TItem2, TLevel> p2,
     IProjection<TItem3, TLevel> p3
-) : IProjection<(TItem1, TItem2, TItem3), TLevel>
+) : IProjection<(TItem1, TItem2, TItem3), TLevel>, IExpressionTuple
     where TLevel : EvaluationLevel
 {
+    bool IExpressionTuple.AllExpressions => p1 is IExpr<TItem1, TLevel> && p2 is IExpr<TItem2, TLevel> && p3 is IExpr<TItem3, TLevel>;
+
     void IProjection<(TItem1, TItem2, TItem3), TLevel>.CollectSelectItems(List<SqlNode> items)
     {
         p1.CollectSelectItems(items);
@@ -59,9 +64,12 @@ internal sealed class TupleProjection<TItem1, TItem2, TItem3, TItem4, TLevel>(
     IProjection<TItem2, TLevel> p2,
     IProjection<TItem3, TLevel> p3,
     IProjection<TItem4, TLevel> p4
-) : IProjection<(TItem1, TItem2, TItem3, TItem4), TLevel>
+) : IProjection<(TItem1, TItem2, TItem3, TItem4), TLevel>, IExpressionTuple
     where TLevel : EvaluationLevel
 {
+    bool IExpressionTuple.AllExpressions =>
+        p1 is IExpr<TItem1, TLevel> && p2 is IExpr<TItem2, TLevel> && p3 is IExpr<TItem3, TLevel> && p4 is IExpr<TItem4, TLevel>;
+
     void IProjection<(TItem1, TItem2, TItem3, TItem4), TLevel>.CollectSelectItems(List<SqlNode> items)
     {
         p1.CollectSelectItems(items);
@@ -89,9 +97,16 @@ internal sealed class TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TL
     IProjection<TItem3, TLevel> p3,
     IProjection<TItem4, TLevel> p4,
     IProjection<TItem5, TLevel> p5
-) : IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5), TLevel>
+) : IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5), TLevel>, IExpressionTuple
     where TLevel : EvaluationLevel
 {
+    bool IExpressionTuple.AllExpressions =>
+        p1 is IExpr<TItem1, TLevel>
+        && p2 is IExpr<TItem2, TLevel>
+        && p3 is IExpr<TItem3, TLevel>
+        && p4 is IExpr<TItem4, TLevel>
+        && p5 is IExpr<TItem5, TLevel>;
+
     void IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5), TLevel>.CollectSelectItems(List<SqlNode> items)
     {
         p1.CollectSelectItems(items);
@@ -122,9 +137,17 @@ internal sealed class TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TI
     IProjection<TItem4, TLevel> p4,
     IProjection<TItem5, TLevel> p5,
     IProjection<TItem6, TLevel> p6
-) : IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel>
+) : IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel>, IExpressionTuple
     where TLevel : EvaluationLevel
 {
+    bool IExpressionTuple.AllExpressions =>
+        p1 is IExpr<TItem1, TLevel>
+        && p2 is IExpr<TItem2, TLevel>
+        && p3 is IExpr<TItem3, TLevel>
+        && p4 is IExpr<TItem4, TLevel>
+        && p5 is IExpr<TItem5, TLevel>
+        && p6 is IExpr<TItem6, TLevel>;
+
     void IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5, TItem6), TLevel>.CollectSelectItems(List<SqlNode> items)
     {
         p1.CollectSelectItems(items);
@@ -159,9 +182,18 @@ internal sealed class TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TI
     IProjection<TItem5, TLevel> p5,
     IProjection<TItem6, TLevel> p6,
     IProjection<TItem7, TLevel> p7
-) : IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel>
+) : IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel>, IExpressionTuple
     where TLevel : EvaluationLevel
 {
+    bool IExpressionTuple.AllExpressions =>
+        p1 is IExpr<TItem1, TLevel>
+        && p2 is IExpr<TItem2, TLevel>
+        && p3 is IExpr<TItem3, TLevel>
+        && p4 is IExpr<TItem4, TLevel>
+        && p5 is IExpr<TItem5, TLevel>
+        && p6 is IExpr<TItem6, TLevel>
+        && p7 is IExpr<TItem7, TLevel>;
+
     void IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7), TLevel>.CollectSelectItems(List<SqlNode> items)
     {
         p1.CollectSelectItems(items);
@@ -199,9 +231,19 @@ internal sealed class TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TI
     IProjection<TItem6, TLevel> p6,
     IProjection<TItem7, TLevel> p7,
     IProjection<TItem8, TLevel> p8
-) : IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel>
+) : IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel>, IExpressionTuple
     where TLevel : EvaluationLevel
 {
+    bool IExpressionTuple.AllExpressions =>
+        p1 is IExpr<TItem1, TLevel>
+        && p2 is IExpr<TItem2, TLevel>
+        && p3 is IExpr<TItem3, TLevel>
+        && p4 is IExpr<TItem4, TLevel>
+        && p5 is IExpr<TItem5, TLevel>
+        && p6 is IExpr<TItem6, TLevel>
+        && p7 is IExpr<TItem7, TLevel>
+        && p8 is IExpr<TItem8, TLevel>;
+
     void IProjection<(TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8), TLevel>.CollectSelectItems(List<SqlNode> items)
     {
         p1.CollectSelectItems(items);

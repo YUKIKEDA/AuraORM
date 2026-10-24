@@ -54,4 +54,34 @@ public static partial class Sql
         ArgumentNullException.ThrowIfNull(key);
         return new(DecimalOrderingNode.For<T>(new PositionNode(key.Position), "ORDER BY"), descending: true);
     }
+
+    /// <summary>
+    /// Orders the result of a set operation by one of its items, smallest first: <c>n ASC</c>, where <c>n</c> is the item's
+    /// position in the select list (<c>docs/design.ja.md</c> §5.10).
+    /// </summary>
+    /// <typeparam name="T">The type of the item.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the item.</typeparam>
+    /// <param name="key">The item.</param>
+    /// <returns>The key.</returns>
+    public static Ordering<TLevel> Asc<T, TLevel>(SetItem<T, TLevel> key)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        return new(DecimalOrderingNode.For<T>(new PositionNode(key.Position), "ORDER BY"), descending: false);
+    }
+
+    /// <summary>
+    /// Orders the result of a set operation by one of its items, largest first: <c>n DESC</c>, where <c>n</c> is the item's
+    /// position in the select list (<c>docs/design.ja.md</c> §5.10).
+    /// </summary>
+    /// <typeparam name="T">The type of the item.</typeparam>
+    /// <typeparam name="TLevel">The evaluation level of the item.</typeparam>
+    /// <param name="key">The item.</param>
+    /// <returns>The key.</returns>
+    public static Ordering<TLevel> Desc<T, TLevel>(SetItem<T, TLevel> key)
+        where TLevel : EvaluationLevel
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        return new(DecimalOrderingNode.For<T>(new PositionNode(key.Position), "ORDER BY"), descending: true);
+    }
 }

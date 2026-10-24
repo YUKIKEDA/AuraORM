@@ -2,7 +2,7 @@
 
 作業の順序と状態だけを置く。受け入れ条件は各 Issue に書く。行の追加と削除は Grill を経る（`.cursor/rules/workflow.mdc`）。設計は [design.ja.md](./design.ja.md) にある。
 
-**今**: Q5
+**今**: Q6
 
 ## v0.1
 
@@ -20,7 +20,7 @@
 | Q2 | SELECT: JOIN と NULL 化、別名（§5.2、§5.3） | #23 | done |
 | Q3 | SELECT: GROUP BY / HAVING、集計、評価の段階（§4.5、§5.5） | #30 | done |
 | Q4 | SELECT: サブクエリ（`In` / `NotIn` / `Exists` / `Scalar`、`GroupScalar` / `GroupExists`、相関）（§5.11、§14） | #37 | done |
-| Q5 | SELECT: 集合演算と、その後の `OrderBy` / `Limit` / `Offset`（§5.10） | - | planned |
+| Q5 | SELECT: 集合演算と、その後の `OrderBy` / `Limit` / `Offset`（§5.10） | #44 | done |
 | Q6 | SELECT: 派生テーブル、CTE、`[QueryResult]` の型の `Columns`（§3.5、§5.11） | - | planned |
 | M1 | INSERT / UPDATE / DELETE と RETURNING、SQLite の最小版（3.39）の結合テスト（§6〜§9、§17） | - | planned |
 | M2 | UPSERT（§10） | - | planned |

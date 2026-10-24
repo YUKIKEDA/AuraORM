@@ -17,12 +17,37 @@ internal sealed class SelectNode(SelectState state) : SqlNode
         context.EnterScope(tables);
         bool inHaving = context.InHaving;
         context.InHaving = false;
-        RenderClauses(context);
-        context.InHaving = inHaving;
+        RenderCore(context);
+        if (state.SetOperands.IsEmpty)
+        {
+            RenderTail(context);
+            context.InHaving = inHaving;
+            context.ExitScope();
+            return;
+        }
+
+        // §5.10: the operands follow without parentheses, each in its own scope, and ORDER BY and LIMIT apply to the whole
+        // compound SELECT; its ORDER BY keys are positions, so they need no table.
         context.ExitScope();
+        foreach (SetOperand operand in state.SetOperands)
+        {
+            context.Write(
+                operand.Operator switch
+                {
+                    SetOperator.Union => " UNION ",
+                    SetOperator.UnionAll => " UNION ALL ",
+                    SetOperator.Intersect => " INTERSECT ",
+                    _ => " EXCEPT ",
+                }
+            );
+            new SelectNode(operand.State).Render(context);
+        }
+
+        RenderTail(context);
+        context.InHaving = inHaving;
     }
 
-    private void RenderClauses(SqlRenderContext context)
+    private void RenderCore(SqlRenderContext context)
     {
         context.Write(state.Distinct ? "SELECT DISTINCT " : "SELECT ");
         context.WriteList(state.Items);
@@ -91,7 +116,10 @@ internal sealed class SelectNode(SelectState state) : SqlNode
             state.Having.Render(context);
             context.InHaving = false;
         }
+    }
 
+    private void RenderTail(SqlRenderContext context)
+    {
         if (!state.OrderBy.IsEmpty)
         {
             context.Write(" ORDER BY ");
