@@ -420,3 +420,64 @@
 - **Decision**: コンバーターが投げた例外は包まずに届ける（§3.6）。
 - **Reason**: `DbException` を包まない方針（`.cursor/rules/csharp.mdc`）と同じで、利用者のコードの例外を、その型のまま捕まえられる。#78 の Grill で所有者が決めた。
 - **Rejected**: AuraORM の例外に包む案。
+
+## D1-70 DDL の文の形
+
+- **Decision**: DDL は `CreateTable`、`CreateIndexes`、`DropIndexes`、`DropTable` の四つの文にする。一つの呼び出しは一つのテーブルで、`CreateIndexes` と `DropIndexes` は `[Index]` ごとに一つの文の一覧（`ToSql()` は `IReadOnlyList<SqlStatement>`）を順に実行する。`ExecuteAsync` は `Task` を返す。テーブルを作る順序と消す順序は利用者が決める（§13.1）。
+- **Reason**: 要件 R8 は CREATE / DROP の TABLE と INDEX である。DDL の影響行数には意味がない。文を一つずつにすれば、一つの命令に複数の文を書けるかをプロバイダーに頼らずにすむ。`DropIndexes` は #86 の Grill（Q1）で、`CreateIndexes` と対になる形として所有者が決めた。
+- **Rejected**: 名前を文字列で受け取る `DropIndex(T, "名前")`（名前の誤りが型で分からない）。索引の文を `;` でつないだ一つの文（一つの命令の複数の文の扱いがプロバイダーで違う）。EF Core の `EnsureCreated` のように、テーブルを外部キーの依存の順に並べる一括の作成（一つの呼び出しが一つの文という形から外れ、差分のマイグレーション MG1 の領分に入る）。
+
+## D1-71 トランザクションの中の DDL
+
+- **Decision**: `Transaction` の DDL は、`ITransactionalDdlDialect`（SQLite、PostgreSQL、SQL Server）だけで書ける。MySQL と MariaDB は CS0311 にする（§12.5、§13.1）。
+- **Reason**: MySQL と MariaDB の DDL は暗黙のコミットを起こし、ロールバックで戻らないうえ、それより前の文までコミットする。トランザクションの中に書けると、利用者が書いたとおりに動かない。#86 の Grill（Q13）で所有者が決めた。
+- **Rejected**: すべての方言で書けるようにし、資料で知らせる案（ロールバックした INSERT がコミットされる）。
+
+## D1-72 一意制約と一意の索引
+
+- **Decision**: `[Unique]` は CREATE TABLE の表の制約、`Unique = true` の `[Index]` は `CREATE UNIQUE INDEX` にする。SQL Server では、NULL を許す列を含む一意の `[Index]` に `WHERE … IS NOT NULL` を付け、NULL を許す列の `[Unique]` は組み立て時に `InvalidOperationException` にする（§13.4）。
+- **Reason**: 表の制約はテーブルと一緒にでき、外部キーの参照先になれる。SQL Server の一意制約だけが NULL を一つしか許さないので、フィルターで他の方言と同じ意味にする。表の制約にはフィルターを付けられず、フィルター付きの索引は外部キーの参照先にならない（エラー 1776）。EF Core も同じフィルターを付ける。#86 の Grill（Q2、Q3）で所有者が決めた。
+- **Rejected**: 方言で NULL の扱いが違うことを資料に書くだけの案（同じ定義で、SQL Server だけ 2 行目の NULL が失敗する）。`[Unique]` も `CreateIndexes` の索引にする案（外部キーの参照先がテーブルとは別の呼び出しでできることになる）。
+
+## D1-73 外部キーの参照先と、MySQL の外部キーの索引
+
+- **Decision**: `[References]` の参照先は、単独の主キーか `[Unique]` の列に限る（AURA0108）。MySQL と MariaDB では、主キーの先頭でも `[Unique]` でもない外部キーの列に、CREATE TABLE で `KEY (列)` を書く（§13.5）。`ON DELETE` と `CASCADE` は持たない。
+- **Reason**: どの方言も、主キーでも一意でもない列への外部キーを失敗させる（SQLite は INSERT の時に）。MySQL と MariaDB は、外部キーのために暗黙に作った索引を、同じ列で始まる索引を作ると消し、その索引を `DropIndexes` で消せなくする（エラー 1553）。明示した `KEY` は消されない。参照先は #86 の Grill（Q4）で所有者が決めた。`KEY` は設計の PR の確かめで見つかった。
+- **Rejected**: 参照先を検査せず、データベースのエラーに任せる案（SQLite では CREATE TABLE が通り、INSERT まで分からない）。MySQL で `DropIndexes` を組み立て時に拒む案（外部キーの列で始まる索引を持つテーブルで、索引を消す方法がなくなる）。
+
+## D1-74 現在時刻の既定値
+
+- **Decision**: `SqlDefault.CurrentTimestamp` は、すべての方言で UTC の現在時刻にする。付けられるのは `DateTime` と `DateTimeOffset` の列だけで、ほかは AURA0117 にする（§13.3）。
+- **Reason**: SQL の `CURRENT_TIMESTAMP` は、SQLite では UTC、PostgreSQL と MySQL ではセッションのタイムゾーン、SQL Server ではサーバーの時刻で、同じ定義で入る値が変わる。`DateOnly` と `TimeOnly` は、MySQL の `DATE` の既定値がエラーになり、SQLite の文字列の形が読み取りと合わない。#86 の Grill（Q5、Q6）で所有者が決めた。
+- **Rejected**: `CURRENT_TIMESTAMP` をそのまま出す案（値がサーバーとセッションの設定で変わる）。
+
+## D1-75 既定値のリテラル
+
+- **Decision**: `[Default]` の定数は方言ごとのリテラルで書く。MySQL と MariaDB の長さのない文字列とバイト列の列ではかっこで囲む。MySQL と MariaDB でバックスラッシュを含む文字列は組み立て時に `InvalidOperationException`、配列、有限でない数、NULL を許さない列の `null` は AURA0113 にする（§13.3）。
+- **Reason**: DDL の既定値はパラメータにできない。MySQL は TEXT と BLOB の既定値を式の形でしか受け付けない（Pomelo も同じ形にする）。MySQL と MariaDB の文字列のバックスラッシュの意味は `sql_mode` で変わり、同じ SQL で既定値が変わる。SQLite の `decimal` のリテラルは、パラメータで書いた値と文字列として等しくなる形にする。MySQL のかっこは #86 の Grill（Q7）で所有者が決めた。
+- **Rejected**: バックスラッシュを二重にする案（`NO_BACKSLASH_ESCAPES` のサーバーでは二つのバックスラッシュが残る）。
+
+## D1-76 方言の上限
+
+- **Decision**: 型の長さ、精度、位取り、キーの大きさの方言の上限を、DDL を組み立てるときに検査し、`InvalidOperationException` にする。方言に依存しない下限（1 以上、位取りは 0 以上で精度以下）はジェネレーターの AURA0119 にする。MariaDB にも MySQL と同じキーの上限を当てる（§13.7）。
+- **Reason**: SQL Server は上限を超えるキーを警告だけで通し、長い値の INSERT まで失敗しない。ほかの上限も、データベースに送る前に、どの列の誤りかを示せる。MariaDB は長すぎる一意制約を HASH の索引にするが、外部キーの参照先にならず、複数の列の索引と主キーはエラーにするので、一つの規則にそろえる。#86 の Grill（Q8）で所有者が決めた。
+- **Rejected**: 上限を資料に書くだけの案（SQL Server ではデータを入れるまで誤りが分からない）。上限をジェネレーターで検査する案（ジェネレーターは方言を知らない）。
+
+## D1-77 制約の名前と索引の名前
+
+- **Decision**: 主キー、一意制約、外部キーには名前を付けない。同じスキーマのテーブルの間で、または一つのテーブルの中で、`[Index]` の名前が重複すれば AURA0118 にする（§13.4）。
+- **Reason**: 制約の名前を付けないので、名前の衝突が起きない。索引の名前は PostgreSQL と SQLite ではスキーマの中で一意でなければならず、テーブルごとに一意でよい MySQL、MariaDB、SQL Server でだけ通る定義を作らないためである。#86 の Grill（Q9）で所有者が決めた。
+- **Rejected**: 制約に `PK_表` などの名前を付ける案（名前を使う API がなく、名前の長さの上限と衝突の検査が要る）。
+
+## D1-78 スキーマ
+
+- **Decision**: テーブルの名前をスキーマで修飾し、スキーマは作らない。MySQL と MariaDB で、スキーマのあるテーブルからスキーマのないテーブルを参照する外部キーは、組み立て時に `InvalidOperationException` にする（§13.6）。
+- **Reason**: 要件 R8 にスキーマの作成はない。MySQL と MariaDB は修飾のない参照先を作るテーブルのデータベースで探すが、AuraORM の修飾のない名前は接続の既定のデータベースを指し、組み立ての時にはその名前が分からない。スキーマは #86 の Grill（Q11）で所有者が決めた。
+- **Rejected**: MySQL で修飾のない参照先をそのまま出す案（別のデータベースのテーブルを探してエラー 1824 になる）。
+
+## D1-79 名前の長さの上限
+
+- **Decision**: DDL の文に書く名前（スキーマ、テーブル、列、索引）の長さを、方言の上限（PostgreSQL 63 バイト、MySQL と MariaDB 64 文字、SQL Server 128 文字の UTF-16 の単位）で検査し、組み立て時に `InvalidOperationException` にする。MySQL と MariaDB では、U+0000 と基本多言語面の外の文字、データベースが付ける外部キーの名前（`テーブル名_ibfk_N`。MySQL 64 文字、MariaDB 63 文字）も検査する（§13.7）。
+- **Reason**: PostgreSQL は長すぎる名前を黙って切り詰めるので、別の名前が同じ名前になり、AURA0118 も `IF EXISTS` もそれを見つけられない。ほかの方言はエラーにするが、どの名前の誤りかを送る前に示せる。上限は方言ごとなので、ほかの上限（D1-76）と同じく組み立て時に検査する。#87 のレビューで見つかった。
+- **Rejected**: PostgreSQL の切り詰めに任せる案（黙った衝突になる）。ジェネレーターで最も短い上限（63 バイト）に限る案（SQL Server と MySQL で通る名前を拒む）。MySQL と MariaDB の ASCII でない名前のテーブルの、ファイルの名前の上限まで検査する案（上限がサーバーのファイルシステムで決まる。§14.2）。
+
