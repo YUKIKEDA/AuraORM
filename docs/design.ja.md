@@ -802,7 +802,7 @@ List<long> ids = await db.Insert(User.Table)
 - SQLite の `RETURNING` が返す行の順序は決まっていない。SQL Server も `OUTPUT` の行の順序を保証しない。PostgreSQL の `RETURNING` の順序も、AuraORM は保証しない。
 - `RETURNING` の射影に集計は書けない（型で `PerRow` に限る）。射影の形（一つの式、タプル、結果の型）と読み取りは SELECT と同じである（§5.6、§12.2）。
 - SQL Server で `Returning` の射影にサブクエリがあると、文を組み立てるときに `InvalidOperationException` になる（§14.3）。SQL Server は `OUTPUT` のサブクエリを拒む（資料は「データを読むサブクエリを含められない」と書く。2019 と 2025 でメッセージ 10705 を確かめた）。サブクエリは型の上では `IExpr<T, PerRow>` で、ほかの式と区別できないので、組み立て時に調べる。
-- どの方言でも、`Returning` のサブクエリが対象のテーブルを読むと（読むの意味は §7）、文を組み立てるときに `InvalidOperationException` になる（§14.3）。サブクエリが変更の前と後のどちらを見るかが方言で違う。2 行を削除した `DELETE … RETURNING (SELECT COUNT(*) FROM t)` は、PostgreSQL（15 と 18）と MariaDB（10.11 と 12.3）が削除の前の 3 を、SQLite 3.40 が削除の後の 2 を返した。SQLite の資料はこの結果を決まっていないもの（"Self-Referential Subqueries Are Indeterminate"）とし、PostgreSQL の資料も RETURNING のサブクエリについては書いていない。対象を読まないサブクエリは、SQL Server を除いて書ける。
+- どの方言でも、`Returning` のサブクエリが対象のテーブルを読むと（読むの意味は §7）、文を組み立てるときに `InvalidOperationException` になる（§14.3）。サブクエリがどの時点の表を見るかが方言で違う。3 行の表から 2 行を削除する `DELETE … RETURNING (SELECT COUNT(*) FROM t)` は、PostgreSQL（15 と 18）と MariaDB（10.11 と 12.3）が削除の前の 3 を返した。SQLite 3.40 は削除の前の 3 でも後の 1 でもない 2 を返し、6 行から 4 行を削除すると 5 を返した（後は 2 行）。最初の 1 行を消した途中の表を見ている。SQLite の UPDATE は更新の前の表を見た（`a` が 5、1、2 の 3 行に `UPDATE t SET a = a + 1 RETURNING (SELECT COUNT(*) FROM t WHERE a > 1)` を実行すると、前の表の 2 が返った。後の表なら 3）。SQLite の資料はこの結果を決まっていないもの（"Self-Referential Subqueries Are Indeterminate"）とし、PostgreSQL の資料も RETURNING のサブクエリについては書いていない。対象を読まないサブクエリは、SQL Server を除いて書ける。
 - MySQL で挿入した行の ID が必要なときは、同じ接続で `LAST_INSERT_ID()` を生 SQL で問い合わせる。ライブラリが自動でこの問い合わせを足すことはしない。
 
 ## 10. UPSERT

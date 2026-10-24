@@ -274,7 +274,7 @@
 ## D1-45 RETURNING のサブクエリが対象のテーブルを読む
 
 - **Decision**: どの方言でも、`Returning` のサブクエリが対象のテーブルを読むと、組み立て時の例外にする（§9、§14.3）。
-- **Reason**: 変更の前と後のどちらを見るかが方言で違い（PostgreSQL と MariaDB は前、SQLite 3.40 は後）、SQLite の資料は結果を決まっていないものとする。#56 の Grill で所有者が決めた。
+- **Reason**: どの時点の表を見るかが方言で違い（PostgreSQL と MariaDB の DELETE は削除の前、SQLite 3.40 の DELETE は最初の 1 行を消した途中、SQLite の UPDATE は更新の前）、SQLite の資料は結果を決まっていないものとする。#56 の Grill で所有者が決めた。
 - **Rejected**: 方言の違いを §14.2 に書く案（同じ文が方言で違う値を黙って返す）。
 
 ## D1-46 全列が既定値の複数行の INSERT
