@@ -130,6 +130,40 @@ public sealed class AnalyzerTests
     }
 
     /// <summary>
+    /// A raw SQL hole may hold a value of a type with one value converter, which becomes a parameter of the converted value;
+    /// a type with no converter is AURA0301 (design §3.6, §11.1).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <c>UserId</c> with a converter, and <c>Plain</c> without one.
+    ///
+    /// Steps:
+    /// - Compile <c>Where</c> with a raw condition whose hole is a <c>UserId</c>, then one whose hole is a <c>Plain</c>.
+    ///
+    /// Expected:
+    /// - No diagnostic for <c>UserId</c>; AURA0301 for <c>Plain</c>.
+    /// </remarks>
+    [Fact]
+    public void RawHole_ConvertedType_IsAllowed()
+    {
+        const string types = """
+
+            [ValueConverter(typeof(UserIdConverter))]
+            public readonly record struct UserId(long Value);
+
+            public readonly record struct Plain(long Value);
+
+            public sealed class UserIdConverter : IValueConverter<UserId, long>
+            {
+                public static long ToProvider(UserId value) => value.Value;
+                public static UserId FromProvider(long value) => new(value);
+            }
+            """;
+        GeneratorHarness.Compiles(Snippet("Where(u => Raw($\"{u.Id} = {new UserId(1)}\"))") + types);
+        GeneratorHarness.Fails(Snippet("Where(u => Raw($\"{u.Id} = {new Plain(1)}\"))") + types, "AURA0301");
+    }
+
+    /// <summary>
     /// A raw SQL hole whose value has a generic type is AURA0301: the type is not known to be a column type (design §11.1).
     /// </summary>
     /// <remarks>

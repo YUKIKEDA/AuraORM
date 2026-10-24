@@ -24,13 +24,31 @@ internal static class Diagnostics
     public static readonly DiagnosticDescriptor UnsupportedType = Error(
         "AURA0103",
         "The type of a column is not supported",
-        "The type '{1}' of '{0}' is not a column type; use one of the types in docs/design.ja.md section 3.3, or add [NotColumn]"
+        "The type '{1}' of '{0}' is not a column type; use one of the types in docs/design.ja.md section 3.3, declare a value converter with [ValueConverter] (section 3.6), or add [NotColumn]"
     );
 
     public static readonly DiagnosticDescriptor ReservedName = Error(
         "AURA0104",
         "A member has the name of a generated member",
         "'{0}' has the name of a member that AuraORM generates ({1}); rename the member ([Column] changes only the column name)"
+    );
+
+    public static readonly DiagnosticDescriptor InvalidConverter = Error(
+        "AURA0105",
+        "A value converter is not valid",
+        "The value converter '{0}' is not valid: {1}; see docs/design.ja.md section 3.6"
+    );
+
+    public static readonly DiagnosticDescriptor DuplicateConverter = Error(
+        "AURA0115",
+        "A type has two value converters",
+        "The type '{0}' has more than one value converter ({1}); a type has one converter, so remove all but one [ValueConverter]"
+    );
+
+    public static readonly DiagnosticDescriptor RegistrationCollision = Error(
+        "AURA0116",
+        "A type has the name of the generated converter registration",
+        "The type 'AuraORM.Generated.__AuraValueConverters' has the name of the class that AuraORM generates to register value converters; rename it"
     );
 
     public static readonly DiagnosticDescriptor DuplicateColumn = Error(
@@ -108,7 +126,7 @@ internal static class Diagnostics
     public static readonly DiagnosticDescriptor UnsupportedHole = Error(
         "AURA0301",
         "A raw SQL hole holds a value of a type that is not a column type",
-        "A hole of type '{0}' would become a parameter of a type that is not a column type; pass a column type of docs/design.ja.md section 3.3, an expression, a condition, or a fragment such as Identifier(...)"
+        "A hole of type '{0}' would become a parameter of a type that is not a column type; pass a column type of docs/design.ja.md section 3.3, a type with a value converter (section 3.6), an expression, a condition, or a fragment such as Identifier(...)"
     );
 
     private static readonly DiagnosticDescriptor[] All =
@@ -117,6 +135,7 @@ internal static class Diagnostics
         NullableDisabled,
         UnsupportedType,
         ReservedName,
+        InvalidConverter,
         DuplicateColumn,
         InvalidAutoIncrement,
         InvalidReference,
@@ -126,6 +145,8 @@ internal static class Diagnostics
         MissingPrecision,
         DefaultTypeMismatch,
         NamedQueriesCollision,
+        DuplicateConverter,
+        RegistrationCollision,
     ];
 
     public static DiagnosticDescriptor ById(string id) => All.First(d => d.Id == id);

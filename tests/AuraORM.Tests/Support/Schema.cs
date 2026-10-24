@@ -1,3 +1,5 @@
+[assembly: AuraORM.ValueConverter(typeof(AuraORM.Tests.UriConverter))]
+
 namespace AuraORM.Tests;
 
 /// <summary>
@@ -69,3 +71,60 @@ public sealed partial record ArchivedAccount([PrimaryKey] long Id, [MaxLength(20
 /// </summary>
 [Table("Excluded")]
 public sealed partial record ExcludedRow([PrimaryKey] long Id, int N);
+
+/// <summary>
+/// An order id, stored as its <see cref="long"/> through <see cref="OrderIdConverter"/> (design §3.6).
+/// </summary>
+/// <param name="Value">The stored value.</param>
+[ValueConverter(typeof(OrderIdConverter))]
+public readonly record struct OrderId(long Value);
+
+/// <summary>
+/// Converts <see cref="OrderId"/> to <see cref="long"/>.
+/// </summary>
+public sealed class OrderIdConverter : IValueConverter<OrderId, long>
+{
+    public static long ToProvider(OrderId value) => value.Value;
+
+    public static OrderId FromProvider(long value) => new(value);
+}
+
+/// <summary>
+/// A price, stored as its <see cref="decimal"/>, whose ordering SQLite rejects as for a decimal column (design §3.3, §3.6).
+/// </summary>
+/// <param name="Amount">The stored value.</param>
+[ValueConverter(typeof(PriceConverter))]
+public readonly record struct Price(decimal Amount);
+
+/// <summary>
+/// Converts <see cref="Price"/> to <see cref="decimal"/>.
+/// </summary>
+public sealed class PriceConverter : IValueConverter<Price, decimal>
+{
+    public static decimal ToProvider(Price value) => value.Amount;
+
+    public static Price FromProvider(decimal value) => new(value);
+}
+
+/// <summary>
+/// Converts <see cref="Uri"/>, a type of another library, to <see cref="string"/>; declared on the assembly (design §3.6).
+/// </summary>
+public sealed class UriConverter : IValueConverter<Uri, string>
+{
+    public static string ToProvider(Uri value) => value.ToString();
+
+    public static Uri FromProvider(string value) => new(value);
+}
+
+/// <summary>
+/// A table whose columns are converted: a key, a nullable value type, a reference type declared on the assembly, and a
+/// decimal (design §3.6).
+/// </summary>
+[Table("orders")]
+public sealed partial record Order([PrimaryKey] OrderId Id, OrderId? Parent, Uri? Link, [Precision(18, 2)] Price? Total);
+
+/// <summary>
+/// A result type with a converted member (design §3.6).
+/// </summary>
+[QueryResult]
+public sealed partial record OrderLink(OrderId Id, Uri? Link);

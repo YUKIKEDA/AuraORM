@@ -1,3 +1,5 @@
+[assembly: AuraORM.ValueConverter(typeof(AuraORM.Integration.Tests.UriConverter))]
+
 namespace AuraORM.Integration.Tests;
 
 /// <summary>
@@ -78,3 +80,59 @@ public sealed partial record OwnerPets(long? Owner, long Count);
 /// </summary>
 [QueryResult]
 public sealed partial record NamedValue(string Name, long Value);
+
+/// <summary>
+/// An order id, stored as its <see cref="long"/> (design §3.6).
+/// </summary>
+/// <param name="Value">The stored value.</param>
+[ValueConverter(typeof(OrderIdConverter))]
+public readonly record struct OrderId(long Value);
+
+/// <summary>
+/// Converts <see cref="OrderId"/> to <see cref="long"/>.
+/// </summary>
+public sealed class OrderIdConverter : IValueConverter<OrderId, long>
+{
+    public static long ToProvider(OrderId value) => value.Value;
+
+    public static OrderId FromProvider(long value) => new(value);
+}
+
+/// <summary>
+/// A price, stored as its <see cref="decimal"/> (design §3.6).
+/// </summary>
+/// <param name="Amount">The stored value.</param>
+[ValueConverter(typeof(PriceConverter))]
+public readonly record struct Price(decimal Amount);
+
+/// <summary>
+/// Converts <see cref="Price"/> to <see cref="decimal"/>.
+/// </summary>
+public sealed class PriceConverter : IValueConverter<Price, decimal>
+{
+    public static decimal ToProvider(Price value) => value.Amount;
+
+    public static Price FromProvider(decimal value) => new(value);
+}
+
+/// <summary>
+/// Converts <see cref="Uri"/>, a type of another library, to <see cref="string"/>; declared on the assembly (design §3.6).
+/// </summary>
+public sealed class UriConverter : IValueConverter<Uri, string>
+{
+    public static string ToProvider(Uri value) => value.ToString();
+
+    public static Uri FromProvider(string value) => new(value);
+}
+
+/// <summary>
+/// An order, whose columns are converted: the table of the value converter tests (design §3.6).
+/// </summary>
+[Table("orders", Naming = ColumnNaming.SnakeCase)]
+public sealed partial record Order([PrimaryKey] OrderId Id, OrderId? ParentId, Uri? Link, [Precision(18, 2)] Price? Total);
+
+/// <summary>
+/// The id and the link of an order, read by a raw query (design §3.6, §11.3).
+/// </summary>
+[QueryResult]
+public sealed partial record OrderLink(OrderId Id, Uri? Link);

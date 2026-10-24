@@ -105,14 +105,14 @@ internal static class SchemaReader
         var models = new List<ResultMemberModel>();
         foreach (Member member in members)
         {
-            if (ColumnTypeOf(member.Type) is null)
+            ConverterModel? converter = null;
+            if (ColumnTypeOf(member.Type) is null && !TryConverter(member, context.SemanticModel.Compilation, diagnostics, out converter))
             {
-                diagnostics.Add(DiagnosticInfo.Create(Diagnostics.UnsupportedType, member.Location, member.Name, member.Type.ToDisplayString()));
                 continue;
             }
 
             string column = member.Attribute(ColumnAttribute)?.ConstructorArguments[0].Value as string ?? member.Name;
-            models.Add(new ResultMemberModel(member.Model, column));
+            models.Add(new ResultMemberModel(member.Model, column, converter));
         }
 
         ResultModel? model = target is null || diagnostics.Count > 0 ? null : new ResultModel(target, Equatable(models), usesConstructor);
@@ -182,17 +182,23 @@ internal static class SchemaReader
     private static ColumnModel? ReadColumn(Member member, bool snakeCase, Compilation compilation, List<DiagnosticInfo> diagnostics)
     {
         string? columnType = ColumnTypeOf(member.Type);
+        ConverterModel? converter = null;
         if (columnType is null)
         {
-            diagnostics.Add(DiagnosticInfo.Create(Diagnostics.UnsupportedType, member.Location, member.Name, member.Type.ToDisplayString()));
-            return null;
+            if (!TryConverter(member, compilation, diagnostics, out converter))
+            {
+                return null;
+            }
+
+            // §3.6: the column stores the converter's provider type.
+            columnType = converter!.ProviderColumnType;
         }
 
         string name =
             member.Attribute(ColumnAttribute)?.ConstructorArguments[0].Value as string ?? (snakeCase ? Naming.ToSnakeCase(member.Name) : member.Name);
         int maxLength = member.Attribute(MaxLengthAttribute)?.ConstructorArguments[0].Value as int? ?? -1;
         AttributeData? precision = member.Attribute(PrecisionAttribute);
-        if (precision is null && Underlying(member.Type).SpecialType == SpecialType.System_Decimal)
+        if (precision is null && columnType == "Decimal")
         {
             diagnostics.Add(DiagnosticInfo.Create(Diagnostics.MissingPrecision, member.Location, member.Name));
         }
@@ -208,8 +214,25 @@ internal static class SchemaReader
             Precision: precision?.ConstructorArguments[0].Value as int? ?? -1,
             Scale: precision?.ConstructorArguments[1].Value as int? ?? -1,
             DefaultCode: ReadDefault(member, compilation, diagnostics),
-            ReferenceCode: ReadReference(member, diagnostics)
+            ReferenceCode: ReadReference(member, diagnostics),
+            Converter: converter
         );
+    }
+
+    // §3.6: a type outside §3.3 is a column through its value converter; without one it is AURA0103.
+    private static bool TryConverter(Member member, Compilation compilation, List<DiagnosticInfo> diagnostics, out ConverterModel? converter)
+    {
+        if (ConverterLookup.TryResolve(member.Type, compilation, out converter, out (DiagnosticDescriptor Descriptor, string[] Arguments)? error))
+        {
+            return true;
+        }
+
+        diagnostics.Add(
+            error is { } e
+                ? DiagnosticInfo.Create(e.Descriptor, member.Location, e.Arguments)
+                : DiagnosticInfo.Create(Diagnostics.UnsupportedType, member.Location, member.Name, member.Type.ToDisplayString())
+        );
+        return false;
     }
 
     private static string? ReadDefault(Member member, Compilation compilation, List<DiagnosticInfo> diagnostics)

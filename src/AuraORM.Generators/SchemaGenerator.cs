@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -23,6 +24,55 @@ public sealed class SchemaGenerator : IIncrementalGenerator
             SchemaReader.QueryResultAttribute,
             static (_, _) => true,
             static (ctx, ct) => SchemaReader.ReadResult(ctx, ct)
+        );
+
+        // §3.6: the converters declared on types and on the assembly, checked, and those that the tables and results use.
+        IncrementalValuesProvider<ParseResult<ConverterSet>> typeConverters = context.SyntaxProvider.ForAttributeWithMetadataName(
+            ConverterLookup.AttributeName,
+            static (node, _) => node is Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax,
+            static (ctx, _) => ConverterEmitter.ReadType(ctx)
+        );
+        IncrementalValueProvider<ParseResult<ConverterSet>> assemblyConverters = context.CompilationProvider.Select(
+            static (compilation, _) => ConverterEmitter.ReadAssembly(compilation)
+        );
+        IncrementalValueProvider<DiagnosticInfo?> registrationName = context.CompilationProvider.Select(
+            static (compilation, _) => ConverterEmitter.CheckName(compilation)
+        );
+        IncrementalValueProvider<ImmutableArray<ConverterModel>> usedConverters = tables
+            .SelectMany(static (result, _) => result.Model?.Columns.Select(c => c.Converter).OfType<ConverterModel>() ?? [])
+            .Collect()
+            .Combine(
+                results.SelectMany(static (result, _) => result.Model?.Members.Select(m => m.Converter).OfType<ConverterModel>() ?? []).Collect()
+            )
+            .Select(static (pair, _) => pair.Left.AddRange(pair.Right));
+        context.RegisterSourceOutput(
+            typeConverters.Collect().Combine(assemblyConverters).Combine(usedConverters).Combine(registrationName),
+            static (spc, input) =>
+            {
+                (
+                    ((ImmutableArray<ParseResult<ConverterSet>> declared, ParseResult<ConverterSet> assembly), ImmutableArray<ConverterModel> used),
+                    DiagnosticInfo? name
+                ) = input;
+                var all = new List<ConverterModel>(used);
+                foreach (ParseResult<ConverterSet> result in declared.Add(assembly))
+                {
+                    Report(spc, result.Diagnostics);
+                    all.AddRange(result.Model?.Converters ?? default);
+                }
+
+                if (ConverterEmitter.Emit(all) is not { } source)
+                {
+                    return;
+                }
+
+                if (name is not null)
+                {
+                    spc.ReportDiagnostic(name.ToDiagnostic());
+                    return;
+                }
+
+                spc.AddSource("AuraORM.Generated.__AuraValueConverters.g.cs", SourceText.From(source, Encoding.UTF8));
+            }
         );
 
         context.RegisterSourceOutput(

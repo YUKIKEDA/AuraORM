@@ -159,6 +159,18 @@ catch (InvalidOperationException) { }
 
 checks.Equal("rollback", 3L, await db.QueryScalarAsync<long>($"SELECT {Count()} FROM {Book.Table}"));
 
+// Value converters (design §3.6): registered by the generated module initializer, converted without reflection.
+await db.ExecuteAsync($"CREATE TABLE {Shelf.Table} (id INTEGER PRIMARY KEY, parent_id INTEGER)");
+await db.Insert(Shelf.Table)
+    .Values([new Shelf.Insert { Id = new ShelfId(1), ParentId = null }, new Shelf.Insert { Id = new ShelfId(2), ParentId = new ShelfId(1) }])
+    .ExecuteAsync();
+List<(ShelfId, ShelfId?)> shelves = await db.From(Shelf.Table)
+    .Where(s => In(s.Id, [new ShelfId(1), new ShelfId(2)]))
+    .Select(s => (s.Id, s.ParentId))
+    .OrderBy(s => [Asc(s.Id)])
+    .ToListAsync();
+checks.SameItems("value converters", [(new ShelfId(1), (ShelfId?)null), (new ShelfId(2), new ShelfId(1))], shelves);
+
 return checks.Report();
 
 namespace AuraORM.Samples.Sqlite
@@ -237,6 +249,29 @@ namespace AuraORM.Samples.Sqlite
     /// </summary>
     [Table("loans", Naming = ColumnNaming.SnakeCase)]
     public sealed partial record Loan([PrimaryKey] long Id, long BookId, string Borrower);
+
+    /// <summary>
+    /// The id of a shelf, stored as its <see cref="long"/> (design §3.6).
+    /// </summary>
+    /// <param name="Value">The stored value.</param>
+    [ValueConverter(typeof(ShelfIdConverter))]
+    public readonly record struct ShelfId(long Value);
+
+    /// <summary>
+    /// Converts <see cref="ShelfId"/> to <see cref="long"/>.
+    /// </summary>
+    public sealed class ShelfIdConverter : IValueConverter<ShelfId, long>
+    {
+        public static long ToProvider(ShelfId value) => value.Value;
+
+        public static ShelfId FromProvider(long value) => new(value);
+    }
+
+    /// <summary>
+    /// A shelf, whose columns are converted.
+    /// </summary>
+    [Table("shelves", Naming = ColumnNaming.SnakeCase)]
+    public sealed partial record Shelf([PrimaryKey] ShelfId Id, ShelfId? ParentId);
 
     /// <summary>
     /// A result type read by column name from a raw query.

@@ -38,6 +38,13 @@ internal static class CompileAssert
     }
 
     /// <summary>
+    /// Asserts that the snippet does not compile, whatever the error (for a call that overload resolution rejects with an id
+    /// that depends on the candidates).
+    /// </summary>
+    /// <param name="body">Statements of a method body.</param>
+    public static void Rejects(string body) => Assert.Contains(Compile(body), d => d.Severity == DiagnosticSeverity.Error);
+
+    /// <summary>
     /// Asserts that the snippet fails with exactly one error id, and that an error of that id has a message containing the
     /// given text (the fix that an <c>[Obsolete(error: true)]</c> member names).
     /// </summary>

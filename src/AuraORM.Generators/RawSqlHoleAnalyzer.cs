@@ -8,7 +8,7 @@ namespace AuraORM.Generators;
 /// <summary>
 /// Reports a hole of a raw SQL fragment (<c>AuraORM.SqlInterpolatedStringHandler</c>) whose value would become a parameter
 /// of a type that is not a column type (AURA0301, <c>docs/design.ja.md</c> §11.1). A hole may hold a column type of §3.3 or
-/// its nullable form, an enum, an expression, a condition, a column, a <c>SqlFragment</c>, or a table reference.
+/// its nullable form, a type with one value converter (§3.6), an enum, an expression, a condition, a column, a <c>SqlFragment</c>, or a table reference.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class RawSqlHoleAnalyzer : DiagnosticAnalyzer
@@ -55,7 +55,7 @@ public sealed class RawSqlHoleAnalyzer : DiagnosticAnalyzer
         }
 
         ITypeSymbol type = method.TypeArguments[0];
-        if (!IsAllowed(type))
+        if (!IsAllowed(type) && !ConverterLookup.HasConverter(type, context.Compilation))
         {
             context.ReportDiagnostic(Diagnostic.Create(Diagnostics.UnsupportedHole, append.Syntax.GetLocation(), type.ToDisplayString()));
         }
