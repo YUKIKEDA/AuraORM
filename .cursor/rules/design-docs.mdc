@@ -24,7 +24,7 @@ alwaysApply: true
 
 ## Claims about databases and other libraries
 
-- A claim about what a database does (a syntax, a type, a version that added a feature, how NULL compares, what an identifier quote is) names the documentation page or the version where it was read, and is read there before it goes in. A claim checked only on one database is written as that database's.
+- A claim about what a database does (a syntax, a type, a version that added a feature, how NULL compares, what an identifier quote is) names the documentation page or the version where it was read, and is read there before it goes in. A claim checked only on one database is written as that database's. A probe confirms a claim only when its statement ran to a result: a statement that stopped with an error for another reason (a missing column alias, a typo in the probe) confirms nothing, and the claim stays unchecked until a correct statement runs.
 - A claim about another ORM or query builder (Drizzle ORM, EF Core, Dapper, linq2db, jOOQ, Kysely) names the file or the documentation page where it was read.
 - A sentence that says AuraORM behaves "like X" is checked item by item in X; an item X lacks is written as AuraORM's own.
 - Before the design PR of a clause, run each SQL shape the design allows on every database in the WSL containers (`./tools/db.ps1 up`), including the degenerate inputs the types accept: an expression without a column, a key repeated in a later clause, an aggregate of each column type. In row Q3, a MySQL `HAVING` that repeats an expression key, SQL Server's `SUM(real)`, and `GROUP BY` / `ORDER BY` keys of only values were all found after the design PR, and each needed a second design change.
