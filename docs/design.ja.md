@@ -666,13 +666,13 @@ db.From(Order.Table).GroupBy(o => o.UserId)
 // HAVING SUM("orders"."Amount") > (SELECT "quotas"."Amount" FROM "quotas" WHERE "quotas"."UserId" = "orders"."UserId")
 ```
 
-- `In(a, sub)` / `NotIn(a, sub)` は、サブクエリの結果の型 `T` が `a` の型と合うものだけを受け取る（`a` が `IExpr<T?, …>` なら、値の一覧の `In` と同じく `T` のサブクエリも受け取る）。タプルの射影の結果の型はタプル、行全体と結果の型の射影は行の型なので、型が合えばサブクエリの項目は一つに決まる。新しい段階の型は作らない。jOOQ の `in(Select<? extends Record1<T>>)` と EF Core の `Contains<T>` も、結果の型で一つの列を求める（§19）。条件の段階は `a` の段階である。
+- `In(a, sub)` / `NotIn(a, sub)` は、サブクエリの結果の型 `T` が `a` の型と合うものだけを受け取る（`a` が `IExpr<T?, …>` なら、値の一覧の `In` と同じく `T` のサブクエリも受け取る。値型では逆に、`a` が `T` でサブクエリが `T?`（NULL を許す外部キーなど）の形も受け取る）。タプルの射影の結果の型はタプル、行全体と結果の型の射影は行の型なので、型が合えばサブクエリの項目は一つに決まる。新しい段階の型は作らない。jOOQ の `in(Select<? extends Record1<T>>)` と EF Core の `Contains<T>` も、結果の型で一つの列を求める（§19）。条件の段階は `a` の段階である。
 - `Exists(sub)` は、射影のあるどのサブクエリも受け取る。`PerRow` の条件である。
 - `Scalar(sub)` は、一つの式の射影のサブクエリから、その `T` を NULL を許す型にした `PerRow` の式を作る（行がなければ NULL）。Kysely も、選択の中のサブクエリを NULL を許す型にする（§19）。結果の型だけでは行全体の射影（`Select(a => a)`）も受け取ってしまうので、一つの式でない射影は `ArgumentException` にする（§14.3）。
 - `GroupScalar(sub)` / `GroupExists(sub)` は、`PerGroup` の式と条件を作る。`Having`、`GroupBy` の後の `Select` と `OrderBy` で使う。その中では、外側の文の列を GROUP BY のキーを通してだけ使える。ほかの外側の列を使うと、文を組み立てるときに `InvalidOperationException` になる（§14.3）。HAVING には GROUP BY のキーと集計しか書けず、SQLite はこの誤りを報告しないためである（§4.5。外側のキーでない列を参照するサブクエリを、SQLite は黙って通し、ほかの方言はエラーにした）。C# の型は戻り値で多重定義できず、二つの段階を実装する型は推論に失敗する（CS0411）ので、名前を分けた。
 - サブクエリのラムダは行の値（`PerRow`）を受け取るので、外側のキー `k`（`PerGroup`）はそのままでは書けない。`Outer(k)` で、キーをサブクエリの中の行の値にする（`Where(q => Eq(q.UserId, Outer(k)))`。SQL はキーの列のままである）。`Outer` が受け取るのは列のキー（`k`、`k.Item1` …）だけで、集計や列でないキー（`Add(o.Price, 1)`）は `ArgumentException` になる。列のキーの参照は全方言で通るが、列でないキーは PostgreSQL、MySQL、MariaDB がそのままでは拒み、`MIN` で包むと SQLite が拒む。外側の集計の参照も SQLite が拒む。`GroupScalar` / `GroupExists` の外で `Outer` を使うと、文を組み立てるときに `InvalidOperationException` になる（§14.3）。
 - 外側のクエリのラムダの引数を内側のラムダで使えば、相関サブクエリになる。内側の列を外側の文で使うと、文の外の列として例外になる（§14.3）。
-- サブクエリにできるのは射影のある段階である: `Select` / `SelectDistinct` の後、`GroupBy` の後の射影、`Limit` / `Offset` の後、集合演算（行 Q5）。`OrderBy` の後で `Limit` も `Offset` もない段階は置けない（CS1503）。その並び順は外側では保証されず、SQL Server はメッセージ 1033 で失敗する。EF Core はこの `ORDER BY` を黙って消し、jOOQ は `TOP` を足すが、どちらも書いたものと違う SQL になる（§19）。
+- サブクエリにできるのは射影のある段階である: `Select` / `SelectDistinct` の後、`GroupBy` の後の射影、`Limit` / `Offset` の後、集合演算（行 Q5）。`OrderBy` の後で `Limit` も `Offset` もない段階は置けない（`In` / `NotIn` は CS1503、受け取る多重定義のない `Exists` / `Scalar` は型の推論が失敗して CS0411）。その並び順は外側では保証されず、SQL Server はメッセージ 1033 で失敗する。EF Core はこの `ORDER BY` を黙って消し、jOOQ は `TOP` を足すが、どちらも書いたものと違う SQL になる（§19）。
 - MySQL と MariaDB では、`Limit` の後のサブクエリを `In` / `NotIn` に渡すとコンパイルエラーになる（CS0311、`ILimitInSubqueryDialect`）。この二つはメッセージ 1235（`LIMIT & IN/ALL/ANY/SOME subquery`）で失敗する。jOOQ と linq2db はサブクエリを派生テーブルで包むが、見えないサブクエリが増えるのでそうしない（§19）。`Exists` と `Scalar` は `Limit` 付きでも全方言で通る。
 - `NotIn(a, sub)` のサブクエリが NULL を返しうるときは AURA0203 になる（§4.4）。EF Core は `NOT EXISTS` などに書き換えるが、AuraORM は書いた SQL を変えない（§19）。
 - 外側の文と方言の違うサブクエリ（`SqlBuilder<SqliteDialect>` で作ったものを SQL Server の文に入れる）は、文を組み立てるときに `InvalidOperationException` になる（§14.3）。式の型は方言を持たないので型では止められず、サブクエリの方言ごとの規則（§5.9）を素通りさせないためである。
@@ -1016,7 +1016,7 @@ CREATE TABLE "users" (
 | `SelectDistinct` の後の `OrderBy` に選んでいない式を書く | `OrderBy` が選んだ項目だけを受け取る（§5.7） | CS1503 / CS1061 |
 | UPDATE / DELETE の `Where` に「条件なし」になりうる条件を渡す | `Where` が `Condition<PerRow>` だけを受け取る（§4.2） | CS1503 |
 | MySQL、MariaDB で `Limit` の後のサブクエリを `In` / `NotIn` に渡す（§5.11） | 方言のインターフェースの制約（`ILimitInSubqueryDialect`） | CS0311 |
-| `OrderBy` の後で `Limit` も `Offset` もない段階をサブクエリ、派生テーブル、CTE にする（§5.11） | 受け取る段階の型 | CS1503 |
+| `OrderBy` の後で `Limit` も `Offset` もない段階をサブクエリ、派生テーブル、CTE にする（§5.11） | 受け取る段階の型 | CS1503 / CS0411 |
 | `NotIn` のサブクエリが NULL を返しうる（§5.11） | アナライザー | AURA0203 |
 | `SqlBuilder` から作った文を実行する | 実行のメソッドは `Executable` の文にだけある（§12.3） | CS1929 |
 | 文字列の SQL を断片に入れる | 補間文字列ハンドラーだけを受け取る | CS1503 |

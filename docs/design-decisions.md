@@ -150,7 +150,7 @@
 
 ## D1-25 LIMIT のない ORDER BY のサブクエリ
 
-- **Decision**: `OrderBy` の後で `Limit` も `Offset` もない段階は、サブクエリ、派生テーブル、CTE の位置に、全方言で置けない（CS1503、§5.11）。
+- **Decision**: `OrderBy` の後で `Limit` も `Offset` もない段階は、サブクエリ、派生テーブル、CTE の位置に、全方言で置けない（CS1503 / CS0411、§5.11）。
 - **Reason**: その並び順は外側で保証されず、SQL Server はメッセージ 1033 で失敗する。Issue #35 の Grill で所有者が決めた。
 - **Rejected**: EF Core のように `ORDER BY` を黙って消す案、jOOQ のように `TOP` を足す案（どちらも書いたものと違う SQL になる）。SQL Server だけで拒む案（ほかの方言でも意味のない並べ替えになる）。
 
