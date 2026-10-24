@@ -38,6 +38,22 @@ internal static class CompileAssert
     }
 
     /// <summary>
+    /// Asserts that the snippet fails with exactly one error id, and that an error of that id has a message containing the
+    /// given text (the fix that an <c>[Obsolete(error: true)]</c> member names).
+    /// </summary>
+    /// <param name="body">Statements of a method body.</param>
+    /// <param name="id">The expected error id.</param>
+    /// <param name="message">Text that the error's message contains.</param>
+    public static void FailsWith(string body, string id, string message)
+    {
+        Fails(body, id);
+        Assert.Contains(
+            Compile(body),
+            d => d.Id == id && d.GetMessage(System.Globalization.CultureInfo.InvariantCulture).Contains(message, StringComparison.Ordinal)
+        );
+    }
+
+    /// <summary>
     /// Asserts that the snippet compiles with no error and reports the given warning.
     /// </summary>
     /// <param name="body">Statements of a method body.</param>

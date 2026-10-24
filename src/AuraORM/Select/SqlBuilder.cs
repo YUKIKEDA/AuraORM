@@ -40,4 +40,56 @@ public sealed class SqlBuilder<TDialect>
     /// <returns>The start of the statement.</returns>
     /// <exception cref="ArgumentException">A query is an aliased reference, or two have the same name.</exception>
     public SelectWith<TDialect, SqlOnly> With(params NamedQuery[] queries) => new(session: null, SelectStart.Ctes(queries));
+
+    /// <summary>
+    /// Starts an <c>INSERT</c> into a table: <c>Insert(User.Table).Values(new User.Insert { … })</c>
+    /// (<c>docs/design.ja.md</c> §6).
+    /// </summary>
+    /// <typeparam name="TRow">The row type.</typeparam>
+    /// <typeparam name="TColumns">The column set.</typeparam>
+    /// <typeparam name="TNullable">The column set on the nullable side of an outer join.</typeparam>
+    /// <typeparam name="TInsert">The <c>INSERT</c> model.</typeparam>
+    /// <param name="table">The table, without an alias.</param>
+    /// <returns>The start of the statement.</returns>
+    /// <exception cref="ArgumentException">The table has an alias (<c>docs/design.ja.md</c> §6.2).</exception>
+    public InsertInto<TDialect, SqlOnly, TColumns, TInsert> Insert<TRow, TColumns, TNullable, TInsert>(
+        Table<TRow, TColumns, TNullable, TInsert> table
+    )
+        where TRow : class
+        where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
+        where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
+        where TInsert : InsertModel => MutationStart.Insert<TDialect, SqlOnly, TRow, TColumns, TNullable, TInsert>(session: null, table);
+
+    /// <summary>
+    /// Starts an <c>UPDATE</c> of a table: <c>Update(User.Table).Set(u =&gt; [Set(u.Name, "Bob")]).Where(…)</c>
+    /// (<c>docs/design.ja.md</c> §7).
+    /// </summary>
+    /// <typeparam name="TRow">The row type.</typeparam>
+    /// <typeparam name="TColumns">The column set.</typeparam>
+    /// <typeparam name="TNullable">The column set on the nullable side of an outer join.</typeparam>
+    /// <typeparam name="TInsert">The <c>INSERT</c> model.</typeparam>
+    /// <param name="table">The table, without an alias.</param>
+    /// <returns>The start of the statement.</returns>
+    /// <exception cref="ArgumentException">The table has an alias (<c>docs/design.ja.md</c> §6.2).</exception>
+    public UpdateTable<TDialect, SqlOnly, TColumns> Update<TRow, TColumns, TNullable, TInsert>(Table<TRow, TColumns, TNullable, TInsert> table)
+        where TRow : class
+        where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
+        where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
+        where TInsert : InsertModel => MutationStart.Update<TDialect, SqlOnly, TRow, TColumns, TNullable, TInsert>(session: null, table);
+
+    /// <summary>
+    /// Starts a <c>DELETE</c> from a table: <c>Delete(User.Table).Where(…)</c> (<c>docs/design.ja.md</c> §8).
+    /// </summary>
+    /// <typeparam name="TRow">The row type.</typeparam>
+    /// <typeparam name="TColumns">The column set.</typeparam>
+    /// <typeparam name="TNullable">The column set on the nullable side of an outer join.</typeparam>
+    /// <typeparam name="TInsert">The <c>INSERT</c> model.</typeparam>
+    /// <param name="table">The table, without an alias.</param>
+    /// <returns>The start of the statement.</returns>
+    /// <exception cref="ArgumentException">The table has an alias (<c>docs/design.ja.md</c> §6.2).</exception>
+    public DeleteFrom<TDialect, SqlOnly, TColumns> Delete<TRow, TColumns, TNullable, TInsert>(Table<TRow, TColumns, TNullable, TInsert> table)
+        where TRow : class
+        where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
+        where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
+        where TInsert : InsertModel => MutationStart.Delete<TDialect, SqlOnly, TRow, TColumns, TNullable, TInsert>(session: null, table);
 }
