@@ -13,9 +13,6 @@ public sealed class SelectExcept<TDialect, TMode, TResult, TLevel> : SelectCombi
     where TMode : ExecutionMode
     where TLevel : EvaluationLevel
 {
-    private const string RejectedOperand =
-        "A set operation's operand is a statement right after its projection: an operand with OrderBy, Limit, or Offset is not accepted (SQLite rejects them inside a compound SELECT), nor is another set operation (mixed operators read differently on SQLite); order or limit the result of the set operation, or make the operand a derived table.";
-
     internal SelectExcept(IStatementRunner? session, SelectState state, RowFactory<TResult> factory)
         : base(session, state, factory) { }
 
@@ -36,7 +33,31 @@ public sealed class SelectExcept<TDialect, TMode, TResult, TLevel> : SelectCombi
     /// <typeparam name="TOtherMode">Whether the other statement was built to run.</typeparam>
     /// <param name="other">The other statement.</param>
     /// <returns>Nothing; the call does not compile.</returns>
-    [Obsolete(RejectedOperand, error: true)]
+    [Obsolete(SetOperationMessages.RejectedOperand, error: true)]
     public SelectExcept<TDialect, TMode, TResult, TLevel> Except<TOtherMode>(SelectQuery<TDialect, TOtherMode, TResult> other)
-        where TOtherMode : ExecutionMode => throw new InvalidOperationException(RejectedOperand);
+        where TOtherMode : ExecutionMode => throw new InvalidOperationException(SetOperationMessages.RejectedOperand);
+
+    /// <summary>Not accepted: a chain of set operations holds one operator.</summary>
+    /// <typeparam name="TOtherMode">Whether the other statement was built to run.</typeparam>
+    /// <param name="other">The other statement.</param>
+    /// <returns>Nothing; the call does not compile.</returns>
+    [Obsolete(SetOperationMessages.MixedOperators, error: true)]
+    public SelectUnion<TDialect, TMode, TResult, TLevel> Union<TOtherMode>(SelectQuery<TDialect, TOtherMode, TResult> other)
+        where TOtherMode : ExecutionMode => throw new InvalidOperationException(SetOperationMessages.MixedOperators);
+
+    /// <summary>Not accepted: a chain of set operations holds one operator.</summary>
+    /// <typeparam name="TOtherMode">Whether the other statement was built to run.</typeparam>
+    /// <param name="other">The other statement.</param>
+    /// <returns>Nothing; the call does not compile.</returns>
+    [Obsolete(SetOperationMessages.MixedOperators, error: true)]
+    public SelectUnionAll<TDialect, TMode, TResult, TLevel> UnionAll<TOtherMode>(SelectQuery<TDialect, TOtherMode, TResult> other)
+        where TOtherMode : ExecutionMode => throw new InvalidOperationException(SetOperationMessages.MixedOperators);
+
+    /// <summary>Not accepted: a chain of set operations holds one operator.</summary>
+    /// <typeparam name="TOtherMode">Whether the other statement was built to run.</typeparam>
+    /// <param name="other">The other statement.</param>
+    /// <returns>Nothing; the call does not compile.</returns>
+    [Obsolete(SetOperationMessages.MixedOperators, error: true)]
+    public SelectIntersect<TDialect, TMode, TResult, TLevel> Intersect<TOtherMode>(SelectQuery<TDialect, TOtherMode, TResult> other)
+        where TOtherMode : ExecutionMode => throw new InvalidOperationException(SetOperationMessages.MixedOperators);
 }

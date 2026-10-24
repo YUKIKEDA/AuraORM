@@ -58,8 +58,9 @@ version has been published to NuGet.
   throw when the statement is built.
 - Set operations: `Union`, `UnionAll`, `Intersect`, and `Except` of statements with the same dialect and result type,
   one operator to a chain, with `OrderBy` by the position of an item (`SetItem`), `Limit`, and `Offset` on the whole
-  result, and as subqueries. An operand with `OrderBy` or `Limit`, or another set operation as an operand, fails with
-  CS0619 and the fix; `OrderBy` after a projection that holds a whole row throws.
+  result, and as subqueries. Mixed operators, a set operation after `OrderBy` or `Limit`, an operand with `OrderBy` or
+  `Limit`, and another set operation as an operand fail with CS0619 and the fix; `OrderBy` after a projection that holds a
+  whole row throws, and so does a SQLite set operation of more than 500 statements.
 - Analyzers in the package: a comparison with a typed null constant (AURA0201) or with a value that may be null
   (AURA0202), which matches no row in SQL, a `NotIn` whose subquery may return null (AURA0203), and a raw SQL hole whose value is not a column type (AURA0301).
 - On SQLite, ordering, comparing by size, and `Min` / `Max` / `Sum` / `Avg` of decimals throw when the statement is

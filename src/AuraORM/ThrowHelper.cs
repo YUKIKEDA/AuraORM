@@ -11,6 +11,17 @@ namespace AuraORM;
 internal static class ThrowHelper
 {
     [DoesNotReturn]
+    public static void ThrowTooManySetOperands(int count, int max, string dialect) =>
+        throw new ArgumentException(
+            string.Format(
+                CultureInfo.InvariantCulture,
+                "The set operation combines {0} statements, which is more than the {1} that {2} accepts in one compound SELECT; split it into several statements.",
+                count,
+                max,
+                dialect
+            )
+        );
+
     public static void ThrowTooManyParameters(int count, int max, string dialect) =>
         throw new ArgumentException(
             string.Format(

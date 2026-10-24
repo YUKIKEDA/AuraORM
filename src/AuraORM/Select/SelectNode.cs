@@ -26,6 +26,11 @@ internal sealed class SelectNode(SelectState state) : SqlNode
             return;
         }
 
+        if (state.SetOperands.Length + 1 > context.Dialect.MaxSetOperands)
+        {
+            ThrowHelper.ThrowTooManySetOperands(state.SetOperands.Length + 1, context.Dialect.MaxSetOperands, context.Dialect.Name);
+        }
+
         // §5.10: the operands follow without parentheses, each in its own scope, and ORDER BY and LIMIT apply to the whole
         // compound SELECT; its ORDER BY keys are positions, so they need no table.
         context.ExitScope();

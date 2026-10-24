@@ -47,9 +47,10 @@ public sealed class SetOperationTypingTests
     }
 
     /// <summary>
-    /// Invalid set operations do not compile: mixed operators, operands of another result type or dialect, an operand with
-    /// <c>OrderBy</c> or <c>Limit</c> or a set operation as an operand (CS0619 with the fix), an unordered <c>Limit</c> on SQL
-    /// Server, and a limited set operation in <c>In</c> on MySQL (design §5.10, §5.11, §14.1).
+    /// Invalid set operations do not compile: mixed operators, a set operation after <c>OrderBy</c> or <c>Limit</c>, an operand
+    /// with <c>OrderBy</c> or <c>Limit</c> or a set operation as an operand (all CS0619 with the fix), operands of another
+    /// result type or dialect, an unordered <c>Limit</c> on SQL Server, and a limited set operation in <c>In</c> on MySQL
+    /// (design §5.10, §5.11, §14.1).
     /// </summary>
     /// <remarks>
     /// Preconditions:
@@ -64,7 +65,7 @@ public sealed class SetOperationTypingTests
     [Theory]
     [InlineData(
         "var q = sqlite.From(Account.Table).Select(a => a.Id).Union(sqlite.From(Account.Table).Select(a => a.Id)).Intersect(sqlite.From(Account.Table).Select(a => a.Id));",
-        "CS1061"
+        "CS0619"
     )]
     [InlineData("var q = sqlite.From(Account.Table).Select(a => a.Id).Union(sqlite.From(Account.Table).Select(a => a.Email));", "CS1503")]
     [InlineData(
@@ -91,9 +92,104 @@ public sealed class SetOperationTypingTests
         "var c = Exists(sqlite.From(Account.Table).Select(a => a.Id).Union(sqlite.From(Account.Table).Select(a => a.Id)).OrderBy(s => [Asc(s)]));",
         "CS0619"
     )]
+    [InlineData(
+        "var q = sqlite.From(Account.Table).Select(a => a.Id).UnionAll(sqlite.From(Account.Table).Select(a => a.Id)).Except(sqlite.From(Account.Table).Select(a => a.Id));",
+        "CS0619"
+    )]
+    [InlineData(
+        "var q = sqlite.From(Account.Table).Select(a => a.Id).OrderBy(a => [Asc(a.Id)]).Union(sqlite.From(Account.Table).Select(a => a.Id));",
+        "CS0619"
+    )]
+    [InlineData("var q = sqlite.From(Account.Table).Select(a => a.Id).Limit(1).Intersect(sqlite.From(Account.Table).Select(a => a.Id));", "CS0619")]
+    [InlineData(
+        "var q = sqlite.From(Account.Table).Select(a => a.Id).Union(sqlite.From(Account.Table).Select(a => a.Id)).Limit(1).Union(sqlite.From(Account.Table).Select(a => a.Id));",
+        "CS0619"
+    )]
     public void SetOperation_InvalidForms_DoNotCompile(string body, params string[] ids)
     {
         CompileAssert.Fails(body, ids);
+    }
+
+    /// <summary>
+    /// Every operator after a chain of another operator fails with CS0619 and the fix, and so does every operator after
+    /// <c>OrderBy</c>, <c>Limit</c>, and <c>Offset</c>: each is its own <c>[Obsolete(error: true)]</c> method (design §5.10).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The consumer snippet of <see cref="SetOperation_ValidForms_Compile"/>.
+    ///
+    /// Steps:
+    /// - Compile <paramref name="second"/> after a chain of <paramref name="first"/>, for every pair of different operators;
+    ///   and <paramref name="second"/> after <c>OrderBy</c>, <c>Limit</c>, and <c>Offset</c> on PostgreSQL.
+    ///
+    /// Expected:
+    /// - CS0619, and no other error.
+    /// </remarks>
+    /// <param name="first">The operator of the chain, or the clause before the operator.</param>
+    /// <param name="second">The operator written after it.</param>
+    [Theory]
+    [MemberData(nameof(RejectedPairs))]
+    public void SetOperation_EveryRejectedPair_IsCs0619(string first, string second)
+    {
+        string before = first switch
+        {
+            "OrderBy" => ".OrderBy(a => [Asc(a.Id)])",
+            "Limit" => ".OrderBy(a => [Asc(a.Id)]).Limit(1)",
+            "Offset" => ".OrderBy(a => [Asc(a.Id)]).Offset(1)",
+            _ => $".{first}(pg.From(Account.Table).Select(a => a.Id))",
+        };
+        CompileAssert.Fails(
+            $"var q = pg.From(Account.Table).Select(a => a.Id){before}.{second}(pg.From(Account.Table).Select(a => a.Id));",
+            "CS0619"
+        );
+    }
+
+    public static TheoryData<string, string> RejectedPairs()
+    {
+        string[] operators = ["Union", "UnionAll", "Intersect", "Except"];
+        var data = new TheoryData<string, string>();
+        foreach (string first in operators)
+        {
+            foreach (string second in operators.Where(o => o != first))
+            {
+                data.Add(first, second);
+            }
+        }
+
+        foreach (string clause in (string[])["OrderBy", "Limit", "Offset"])
+        {
+            foreach (string second in operators)
+            {
+                data.Add(clause, second);
+            }
+        }
+
+        return data;
+    }
+
+    /// <summary>
+    /// Operands whose reference types differ only in nullability compile with the nullable warning CS8620 only, because
+    /// <c>string</c> and <c>string?</c> are one type at run time; the result type is the first operand's (design §5.10).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The consumer snippet of <see cref="SetOperation_ValidForms_Compile"/>.
+    ///
+    /// Steps:
+    /// - Compile the union of <c>Email</c> (<c>string</c>) and <c>DisplayName</c> (<c>string?</c>), and of tuples with them.
+    ///
+    /// Expected:
+    /// - No error, and the warning CS8620.
+    /// </remarks>
+    /// <param name="body">The statement.</param>
+    [Theory]
+    [InlineData("var q = sqlite.From(Account.Table).Select(a => a.Email).Union(sqlite.From(Account.Table).Select(a => a.DisplayName));")]
+    [InlineData(
+        "var q = sqlite.From(Account.Table).Select(a => (a.Id, a.Email)).Union(sqlite.From(Account.Table).Select(a => (a.Id, a.DisplayName)));"
+    )]
+    public void SetOperation_ReferenceNullability_OnlyWarns(string body)
+    {
+        CompileAssert.Warns(body, "CS8620");
     }
 
     /// <summary>

@@ -162,6 +162,44 @@ public sealed class SetOperationTests
         );
     }
 
+    /// <summary>
+    /// SQLite combines at most 500 statements in one compound SELECT, so a set operation of more throws when it is built; the
+    /// other dialects have no such check (design §5.10, §12.4, §14.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <see cref="Account"/>.
+    ///
+    /// Steps:
+    /// - Union 500 and 501 statements on SQLite, and 501 on PostgreSQL.
+    ///
+    /// Expected:
+    /// - 500 renders; 501 throws <see cref="ArgumentException"/> on SQLite and renders on PostgreSQL.
+    /// </remarks>
+    [Fact]
+    public void ManyOperands_SqliteLimit_Throws()
+    {
+        Assert.Equal(499, CountUnions(Union(new Database<SqliteDialect>(new FakeConnection()), 500).ToSql().Text));
+        Assert.Throws<ArgumentException>(() => Union(new Database<SqliteDialect>(new FakeConnection()), 501).ToSql());
+        Assert.Equal(500, CountUnions(Union(new Database<PostgreSqlDialect>(new FakeConnection()), 501).ToSql().Text));
+    }
+
+    private static SelectUnion<TDialect, Executable, long, PerRow> Union<TDialect>(Database<TDialect> db, int operands)
+        where TDialect : IDialect
+    {
+        SelectUnion<TDialect, Executable, long, PerRow> union = db.From(Account.Table)
+            .Select(a => a.Id)
+            .Union(db.From(Account.Table).Select(a => a.Id));
+        for (int i = 2; i < operands; i++)
+        {
+            union = union.Union(db.From(Account.Table).Select(a => a.Id));
+        }
+
+        return union;
+    }
+
+    private static int CountUnions(string sql) => sql.Split(" UNION ").Length - 1;
+
     private sealed class ThreeUnions : IQueryCase
     {
         public SqlStatement Build<TDialect>(Database<TDialect> db)
