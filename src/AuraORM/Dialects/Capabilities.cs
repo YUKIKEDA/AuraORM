@@ -36,6 +36,12 @@ public interface IOffsetWithoutLimitDialect : IDialect;
 public interface IUnorderedOffsetDialect : IDialect;
 
 /// <summary>
+/// A dialect that accepts a row limit in a subquery of <c>IN</c> or <c>NOT IN</c>. MySQL and MariaDB reject it with error
+/// 1235 (<c>docs/design.ja.md</c> §5.11).
+/// </summary>
+public interface ILimitInSubqueryDialect : IDialect;
+
+/// <summary>
 /// A dialect with <c>INSERT … ON CONFLICT</c>.
 /// </summary>
 public interface IOnConflictDialect : IDialect;

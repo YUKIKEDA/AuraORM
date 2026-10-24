@@ -66,7 +66,15 @@ internal sealed class SelectNode(SelectState state) : SqlNode
 
                 // §5.5: SQL Server needs a column in each key, and MySQL reads a key of one value as a column position.
                 int columns = context.ColumnsWritten;
+                int subqueries = context.SubqueriesWritten;
                 state.GroupBy[i].Render(context);
+                if (context.SubqueriesWritten != subqueries)
+                {
+                    throw new InvalidOperationException(
+                        "A GROUP BY key holds a subquery. SQL Server rejects it, and MySQL rejects a correlated one; group by a column expression."
+                    );
+                }
+
                 if (context.ColumnsWritten == columns)
                 {
                     throw new InvalidOperationException(

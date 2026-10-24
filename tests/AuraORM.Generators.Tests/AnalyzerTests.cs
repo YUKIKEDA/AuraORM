@@ -184,6 +184,60 @@ public sealed class AnalyzerTests
         );
     }
 
+    /// <summary>
+    /// A <c>NotIn</c> whose subquery returns a type that allows null is AURA0203, for a nullable value type and a nullable
+    /// reference type, with or without a row limit: one null makes <c>NOT IN</c> match no row (design §4.4, §5.11).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <c>User</c> with the nullable columns <c>Age</c> (<c>int?</c>) and <c>Nickname</c> (<c>string?</c>).
+    ///
+    /// Steps:
+    /// - Compile <c>NotIn</c> with a subquery of each nullable column, and one of <c>Age</c> with <c>Limit</c>.
+    ///
+    /// Expected:
+    /// - AURA0203, and no other diagnostic.
+    /// </remarks>
+    /// <param name="condition">The condition.</param>
+    [Theory]
+    [InlineData("NotIn(u.Age, new SqlBuilder<SqliteDialect>().From(User.Table).Select(v => v.Age))")]
+    [InlineData("NotIn(u.Nickname, new SqlBuilder<SqliteDialect>().From(User.Table).Select(v => v.Nickname))")]
+    [InlineData("NotIn(u.Age, new SqlBuilder<SqliteDialect>().From(User.Table).Select(v => v.Age).Limit(3))")]
+    public void NotIn_NullableSubquery_ReportsAura0203(string condition)
+    {
+        GeneratorHarness.Fails(Snippet($"Where(u => {condition})"), "AURA0203");
+    }
+
+    /// <summary>
+    /// <c>NotIn</c> with a subquery that returns no null, and <c>In</c> with a subquery that may, have no diagnostic: a null in
+    /// <c>IN</c> only fails to match itself (design §5.11).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - The <c>User</c> table of <see cref="NotIn_NullableSubquery_ReportsAura0203"/>.
+    ///
+    /// Steps:
+    /// - Compile <c>NotIn</c> of the id and of <c>Coalesce(v.Age, 0)</c> for the nullable <c>Age</c>, and <c>In</c> of the nullable
+    ///   <c>Age</c>.
+    ///
+    /// Expected:
+    /// - No diagnostic.
+    /// </remarks>
+    [Fact]
+    public void NotIn_NonNullSubquery_Compiles()
+    {
+        GeneratorHarness.Compiles(
+            Snippet(
+                """
+                Where(u => And(
+                    NotIn(u.Id, new SqlBuilder<SqliteDialect>().From(User.Table).Select(v => v.Id)),
+                    NotIn(u.Age, new SqlBuilder<SqliteDialect>().From(User.Table).Select(v => Coalesce(v.Age, 0))),
+                    In(u.Age, new SqlBuilder<SqliteDialect>().From(User.Table).Select(v => v.Age))))
+                """
+            )
+        );
+    }
+
     private static string Snippet(string clause) =>
         $$"""
             using System;

@@ -10,16 +10,21 @@ internal sealed class GroupKeyNode(SqlNode key) : SqlNode
 {
     public override SqlNode Unwrapped => key.Unwrapped;
 
+    /// <summary>
+    /// Gets the key's own node.
+    /// </summary>
+    public SqlNode Key => key;
+
     public override void Render(SqlRenderContext context)
     {
         if (context.InHaving && context.Dialect.AggregatesGroupKeysInHaving && key is not ColumnNode)
         {
             context.Write("MIN(");
-            key.Render(context);
+            context.WriteGroupKey(key);
             context.Write(')');
             return;
         }
 
-        key.Render(context);
+        context.WriteGroupKey(key);
     }
 }

@@ -5,6 +5,7 @@ namespace AuraORM;
 /// </summary>
 public sealed class SqlServerDialect
     : IFullJoinDialect,
+        ILimitInSubqueryDialect,
         IInsertReturningDialect,
         IUpdateReturningDialect,
         IDeleteReturningDialect,
