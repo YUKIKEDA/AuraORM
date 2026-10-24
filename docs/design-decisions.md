@@ -252,3 +252,57 @@
 - **Reason**: CTE は前に定義したものしか読めない。派生テーブルとして書き直すと SQL としては正しいが、本体が二度出て、書き手が意図した CTE の参照と違う。#50 と #52 のレビューの後に所有者が決めた。
 - **Rejected**: その時点で定義済みの CTE だけを名前で読み、まだのものは派生テーブルにする案（並べる順序で SQL の形が変わり、本体が二度出る）。
 
+
+## D1-42 MySQL で UPDATE / DELETE のサブクエリが対象のテーブルを読む
+
+- **Decision**: MySQL では、UPDATE / DELETE の文の中のサブクエリが対象のテーブルを読むと（派生テーブルや CTE を通しても）、組み立て時の例外にする（§7、§14.3）。
+- **Reason**: MySQL はこの文をエラー 1093 で拒む。派生テーブルを通して通るのは実体化されたときだけで、既定は併合であり、どちらになるかを資料は保証しない（8.4 の `update.html`）。#56 の Grill で所有者が決めた。
+- **Rejected**: jOOQ のように `SELECT * FROM (…) AS t` で自動で包む案（書いたものと SQL が変わり、包んでも通る保証がない）。そのまま送る案（EF Core / Pomelo。MySQL でだけ実行時に失敗する）。
+
+## D1-43 MySQL と MariaDB の左から順の代入
+
+- **Decision**: MySQL と MariaDB では、UPDATE の代入の値がそれより前の代入の列を読むと、組み立て時の例外にする（§7、§14.3）。
+- **Reason**: この二つは代入を左から順に評価し、ほかの方言と結果が違う（`SET n = n + 1, m = n`）。黙って違う結果になる。#56 の Grill で所有者が決めた。
+- **Rejected**: §14.2 に書くだけの案（黙って誤る）。代入を並べ替える案（値の入れ替えは並べ替えても書けず、書いた順と SQL が変わる）。
+
+## D1-44 SQL Server の OUTPUT のサブクエリ
+
+- **Decision**: SQL Server で `Returning` の射影にサブクエリがあると、組み立て時の例外にする（§9、§14.3）。
+- **Reason**: SQL Server は `OUTPUT` のサブクエリを拒む（メッセージ 10705）。サブクエリは型でほかの式と区別できない。#56 の Grill で所有者が決めた。
+- **Rejected**: サーバーのエラーに任せる案（実行するまで分からない）。
+
+## D1-45 RETURNING のサブクエリが対象のテーブルを読む
+
+- **Decision**: どの方言でも、`Returning` のサブクエリが対象のテーブルを読むと、組み立て時の例外にする（§9、§14.3）。
+- **Reason**: 変更の前と後のどちらを見るかが方言で違い（PostgreSQL と MariaDB は前、SQLite 3.40 は後）、SQLite の資料は結果を決まっていないものとする。#56 の Grill で所有者が決めた。
+- **Rejected**: 方言の違いを §14.2 に書く案（同じ文が方言で違う値を黙って返す）。
+
+## D1-46 全列が既定値の複数行の INSERT
+
+- **Decision**: 設定された列が一つもない行が二つ以上あるとき、MySQL と MariaDB は `() VALUES (), ()` を出し、SQLite、PostgreSQL、SQL Server は `ArgumentException` にする（§6.2、§14.3）。
+- **Reason**: 三つの方言では `DEFAULT VALUES` が一行しか書けず、SQLite は `VALUES` の中に `DEFAULT` も書けない。#56 の Grill で所有者が決めた。
+- **Rejected**: PostgreSQL と SQL Server で列を一つ選んで `DEFAULT` を出す案（EF Core の SQL Server の形。`[AutoIncrement]` の列しかない表では選べる列がなく、規則が複雑になる）。すべての方言で例外にする案（MySQL と MariaDB で書ける文を拒む）。
+
+## D1-47 空の行の一覧の INSERT
+
+- **Decision**: `Values` に空の一覧を渡すと `ArgumentException` にする（§6.2、§14.3）。
+- **Reason**: 行のない INSERT は SQL にならない。何もしないで 0 を返すと、呼び出し側の誤りが隠れる。Drizzle ORM も例外にする。#56 の Grill で所有者が決めた。
+- **Rejected**: 何も実行せず 0 を返す案（jOOQ、linq2db）。
+
+## D1-48 `ExecuteAsync` の行の数
+
+- **Decision**: `ExecuteAsync` はプロバイダーが返す行の数をそのまま返し、接続の設定（MySqlConnector の `UseAffectedRows`、SQL Server の `NOCOUNT`）で意味が変わることを XML ドキュメントに書く（§6.2）。
+- **Reason**: 接続の設定は利用者のもので、AuraORM からは確かめられない。MySqlConnector も既定では、ほかのプロバイダーと同じく条件に合った行の数を返す（各方言の数は結合テストで確かめる）。#56 の Grill で所有者が決めた。
+- **Rejected**: 行の数を別の問い合わせで数え直す案（もう一度データベースに問い合わせることになり、同時の変更で数が合わない）。
+
+## D1-49 SQLite の最小版の結合テスト
+
+- **Decision**: CI の SQLite だけのジョブで、ネイティブのライブラリを `SQLitePCLRaw.lib.e_sqlite3` 2.1.3（SQLite 3.39.2）に替えて結合テストを回す。provider は core と同じ 2.1.13 を参照して、テストの始めに設定する（§17）。
+- **Reason**: 既存のパッケージで最小版を得られ、CI でビルドしなくてよい。bundle の 2.1.3 は provider の版が core と合わず失敗することを試して確かめた。#56 の Grill で所有者が決めた。
+- **Rejected**: sqlite.org の 3.39 のソースを CI でビルドする案（コンパイラーと手順が要り、OS ごとに違う）。
+
+## D1-50 INSERT / UPDATE / DELETE の対象の別名
+
+- **Decision**: INSERT、UPDATE、DELETE の対象に別名付きのテーブルを渡すと `ArgumentException` にする（§6.2、§14.3）。
+- **Reason**: `Table.As` は同じ型を返すので型では止められない。SQL Server では対象の別名を `FROM` 句でしか付けられず（§18 の U1）、方言で規則を分けないために三つの文で揃える。対象のテーブルを読むサブクエリは、内側に別名を付ければ書ける。#56 の Grill で所有者が決めた。
+- **Rejected**: SQL Server 以外で別名を出す案（方言で規則が分かれる）。別名を捨ててテーブル名で書く案（書いたものと SQL が変わる）。
