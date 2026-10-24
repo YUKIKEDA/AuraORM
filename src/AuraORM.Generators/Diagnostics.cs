@@ -93,6 +93,12 @@ internal static class Diagnostics
         "The value of '{0}' is of type '{1}' and may be null, and a comparison with null is never true in SQL; use IsNotDistinctFrom, or check the value for null and pass it with .Value or !"
     );
 
+    public static readonly DiagnosticDescriptor NullableNotInSubquery = Error(
+        "AURA0203",
+        "NOT IN with a subquery that may return null matches no row",
+        "The subquery of NotIn returns '{0}', which may be null, and a NOT IN whose subquery returns a null matches no row in SQL; write Not(Exists(...)), or select a value that is not null with Coalesce"
+    );
+
     public static readonly DiagnosticDescriptor UnsupportedHole = Error(
         "AURA0301",
         "A raw SQL hole holds a value of a type that is not a column type",

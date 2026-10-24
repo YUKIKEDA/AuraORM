@@ -79,6 +79,24 @@ List<(int?, long)> keyed = await db.From(Book.Table)
     .ToListAsync();
 checks.SameItems("group by a key with a value", [((int?)413, 1L)], keyed);
 
+// Subqueries: IN, a correlated EXISTS and scalar, and a group subquery correlated through Outer(k).
+List<string> lent = await db.From(Book.Table)
+    .Where(b => In(b.Id, db.From(Loan.Table).Select(l => l.BookId)))
+    .Select(b => b.Title)
+    .ToListAsync();
+checks.SameItems("in subquery", ["Cosmos"], lent);
+List<(string, string?)> borrowers = await db.From(Book.Table)
+    .Where(b => Exists(db.From(Loan.Table).Where(l => Eq(l.BookId, b.Id)).Select(l => l.Id)))
+    .Select(b => (b.Title, Scalar(db.From(Loan.Table).Where(l => Eq(l.BookId, b.Id)).Select(l => l.Borrower))))
+    .ToListAsync();
+checks.SameItems("correlated subqueries", [("Cosmos", (string?)"Ada")], borrowers);
+List<long> loanedIds = await db.From(Book.Table)
+    .GroupBy(b => b.Id)
+    .Having((k, b) => GroupExists(db.From(Loan.Table).Where(l => Eq(l.BookId, Outer(k))).Select(l => l.Id)))
+    .Select((k, b) => k)
+    .ToListAsync();
+checks.SameItems("group subquery", [3L], loanedIds);
+
 SqlStatement offline = new SqlBuilder<SqliteDialect>().From(Book.Table).Select(b => b.Title).Limit(1).ToSql();
 checks.Equal("sql builder", "SELECT \"books\".\"title\" FROM \"books\" LIMIT @p0", offline.Text);
 checks.Equal("select aggregates", (3L, (int?)412), (count, longest));

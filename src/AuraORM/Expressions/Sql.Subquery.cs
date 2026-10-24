@@ -42,6 +42,17 @@ public static partial class Sql
         where TSubLevel : EvaluationLevel => new(new InSubqueryNode(value.Node, Subquery(subquery), negated: false));
 
     /// <inheritdoc cref="In{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
+    public static Condition<TLevel> In<T, TLevel, TDialect, TMode, TSubLevel>(
+        IExpr<T, TLevel> value,
+        SelectProjection<TDialect, TMode, T?, TSubLevel> subquery
+    )
+        where T : struct
+        where TLevel : EvaluationLevel
+        where TDialect : IDialect
+        where TMode : ExecutionMode
+        where TSubLevel : EvaluationLevel => new(new InSubqueryNode(value.Node, Subquery(subquery), negated: false));
+
+    /// <inheritdoc cref="In{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
     public static Condition<TLevel> In<T, TLevel, TDialect, TMode>(IExpr<T, TLevel> value, SelectLimited<TDialect, TMode, T> subquery)
         where TLevel : EvaluationLevel
         where TDialect : ILimitInSubqueryDialect
@@ -55,6 +66,13 @@ public static partial class Sql
         where TMode : ExecutionMode => new(new InSubqueryNode(value.Node, Subquery(subquery), negated: false));
 
     /// <inheritdoc cref="In{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
+    public static Condition<TLevel> In<T, TLevel, TDialect, TMode>(IExpr<T, TLevel> value, SelectLimited<TDialect, TMode, T?> subquery)
+        where T : struct
+        where TLevel : EvaluationLevel
+        where TDialect : ILimitInSubqueryDialect
+        where TMode : ExecutionMode => new(new InSubqueryNode(value.Node, Subquery(subquery), negated: false));
+
+    /// <inheritdoc cref="In{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
     public static Condition<TLevel> In<T, TLevel, TDialect, TMode>(IExpr<T, TLevel> value, SelectOffset<TDialect, TMode, T> subquery)
         where TLevel : EvaluationLevel
         where TDialect : ILimitInSubqueryDialect
@@ -62,6 +80,13 @@ public static partial class Sql
 
     /// <inheritdoc cref="In{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
     public static Condition<TLevel> In<T, TLevel, TDialect, TMode>(IExpr<T?, TLevel> value, SelectOffset<TDialect, TMode, T> subquery)
+        where T : struct
+        where TLevel : EvaluationLevel
+        where TDialect : ILimitInSubqueryDialect
+        where TMode : ExecutionMode => new(new InSubqueryNode(value.Node, Subquery(subquery), negated: false));
+
+    /// <inheritdoc cref="In{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
+    public static Condition<TLevel> In<T, TLevel, TDialect, TMode>(IExpr<T, TLevel> value, SelectOffset<TDialect, TMode, T?> subquery)
         where T : struct
         where TLevel : EvaluationLevel
         where TDialect : ILimitInSubqueryDialect
@@ -101,6 +126,17 @@ public static partial class Sql
         where TSubLevel : EvaluationLevel => new(new InSubqueryNode(value.Node, Subquery(subquery), negated: true));
 
     /// <inheritdoc cref="NotIn{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
+    public static Condition<TLevel> NotIn<T, TLevel, TDialect, TMode, TSubLevel>(
+        IExpr<T, TLevel> value,
+        SelectProjection<TDialect, TMode, T?, TSubLevel> subquery
+    )
+        where T : struct
+        where TLevel : EvaluationLevel
+        where TDialect : IDialect
+        where TMode : ExecutionMode
+        where TSubLevel : EvaluationLevel => new(new InSubqueryNode(value.Node, Subquery(subquery), negated: true));
+
+    /// <inheritdoc cref="NotIn{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
     public static Condition<TLevel> NotIn<T, TLevel, TDialect, TMode>(IExpr<T, TLevel> value, SelectLimited<TDialect, TMode, T> subquery)
         where TLevel : EvaluationLevel
         where TDialect : ILimitInSubqueryDialect
@@ -114,6 +150,13 @@ public static partial class Sql
         where TMode : ExecutionMode => new(new InSubqueryNode(value.Node, Subquery(subquery), negated: true));
 
     /// <inheritdoc cref="NotIn{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
+    public static Condition<TLevel> NotIn<T, TLevel, TDialect, TMode>(IExpr<T, TLevel> value, SelectLimited<TDialect, TMode, T?> subquery)
+        where T : struct
+        where TLevel : EvaluationLevel
+        where TDialect : ILimitInSubqueryDialect
+        where TMode : ExecutionMode => new(new InSubqueryNode(value.Node, Subquery(subquery), negated: true));
+
+    /// <inheritdoc cref="NotIn{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
     public static Condition<TLevel> NotIn<T, TLevel, TDialect, TMode>(IExpr<T, TLevel> value, SelectOffset<TDialect, TMode, T> subquery)
         where TLevel : EvaluationLevel
         where TDialect : ILimitInSubqueryDialect
@@ -121,6 +164,13 @@ public static partial class Sql
 
     /// <inheritdoc cref="NotIn{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
     public static Condition<TLevel> NotIn<T, TLevel, TDialect, TMode>(IExpr<T?, TLevel> value, SelectOffset<TDialect, TMode, T> subquery)
+        where T : struct
+        where TLevel : EvaluationLevel
+        where TDialect : ILimitInSubqueryDialect
+        where TMode : ExecutionMode => new(new InSubqueryNode(value.Node, Subquery(subquery), negated: true));
+
+    /// <inheritdoc cref="NotIn{T, TLevel, TDialect, TMode, TSubLevel}(IExpr{T, TLevel}, SelectProjection{TDialect, TMode, T, TSubLevel})"/>
+    public static Condition<TLevel> NotIn<T, TLevel, TDialect, TMode>(IExpr<T, TLevel> value, SelectOffset<TDialect, TMode, T?> subquery)
         where T : struct
         where TLevel : EvaluationLevel
         where TDialect : ILimitInSubqueryDialect

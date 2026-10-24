@@ -8,7 +8,9 @@ namespace AuraORM.Generators;
 /// <summary>
 /// Reports a comparison function of <c>AuraORM.Sql</c> whose value argument is a null constant (AURA0201) or may be null at
 /// run time (AURA0202): in SQL, <c>a = NULL</c> is never true, so the query would match no row (<c>docs/design.ja.md</c>
-/// §4.4). A reference type may be null when the compiler's flow analysis says so; a nullable value type always may.
+/// §4.4). A reference type may be null when the compiler's flow analysis says so; a nullable value type always may. It also
+/// reports a <c>NotIn</c> whose subquery returns a type that allows null (AURA0203): one null makes <c>NOT IN</c> match no row
+/// (§5.11).
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class NullComparisonAnalyzer : DiagnosticAnalyzer
@@ -33,7 +35,7 @@ public sealed class NullComparisonAnalyzer : DiagnosticAnalyzer
 
     /// <inheritdoc/>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-        ImmutableArray.Create(Diagnostics.NullLiteralComparison, Diagnostics.NullableComparison);
+        ImmutableArray.Create(Diagnostics.NullLiteralComparison, Diagnostics.NullableComparison, Diagnostics.NullableNotInSubquery);
 
     /// <inheritdoc/>
     public override void Initialize(AnalysisContext context)
@@ -60,6 +62,19 @@ public sealed class NullComparisonAnalyzer : DiagnosticAnalyzer
             }
 
             ITypeSymbol declared = parameter.OriginalDefinition.Type;
+            if (method.Name == "NotIn" && parameter.Name == "subquery")
+            {
+                // The stages that a subquery can be all have the result type as their third type argument.
+                if (parameter.Type is INamedTypeSymbol { TypeArguments.Length: >= 3 } stage && MayBeNull(stage.TypeArguments[2]))
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(Diagnostics.NullableNotInSubquery, argument.Syntax.GetLocation(), stage.TypeArguments[2].ToDisplayString())
+                    );
+                }
+
+                continue;
+            }
+
             if (declared is ITypeParameterSymbol || declared.SpecialType == SpecialType.System_String)
             {
                 CheckValue(context, method.Name, argument);
