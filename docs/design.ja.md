@@ -263,7 +263,7 @@ public sealed partial record UserOrderTotal(string Name, decimal? Total);
 
 - `UserOrderTotal.RowProjection` と `UserOrderTotal.GroupProjection`: `required` な `init` プロパティを持つクラス。各プロパティの型は、前者が `IProjection<T, PerRow>`、後者が `IProjection<T, PerGroup>` で、`T` は対応するメンバーの型である（§4.5）。`GroupBy` のキーが一つの式なら、`Select` で `new UserOrderTotal.GroupProjection { Name = k, Total = Sum(o.Amount) }` のように使う。メンバーを書き忘れると CS9035、型や評価の段階が違うと CS0029 になる。
 - `UserOrderTotal.Columns` と `UserOrderTotal.NullableColumns`: この型を派生テーブルと CTE（§5.11）の行として使うときの列の集合（外部結合の NULL 化した側では後者、§5.3）。各列は結果の型のメンバーに対応し、名前はメンバー名（`[Column]` があればその名前）である。行全体の射影（`Select(t => t)`）は `UserOrderTotal` として読む。
-- 結果の型の行を返すクエリの `As("名前")`（拡張メソッド、§5.11）。`[Table]` の型にも、行全体を返すクエリの `As` を生成する。C# は制約から型引数を推論しないので、列の集合の型を結果の型から決めるには、型ごとに生成する必要がある。
+- 結果の型の行を返すクエリの `As("名前")`（拡張メソッド、§5.11）。`[Table]` の型にも、行全体を返すクエリの `As` を生成する。C# は制約から型引数を推論しないので、列の集合の型を結果の型から決めるには、型ごとに生成する必要がある。生成するのは名前空間の直下の静的クラス `UserOrderTotalNamedQueries`（入れ子の型では、外側の型の名前を前につなげる。`Outer.Item` なら `OuterItemNamedQueries`）で、型かそれを囲む型が公開でなければ `internal` にする。拡張メソッドは入れ子のクラスに置けないためである。射影の後、`Limit` の後、`Offset` の後の段階に `As` を置く。
 - `IQueryResult<UserOrderTotal>` の実装: 生のクエリ（§11.3）で、列名から値を読むコード。列名はメンバー名（`[Column]` があればその名前）である。
 
 ### 3.6 値コンバーター
