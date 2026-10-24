@@ -306,3 +306,9 @@
 - **Decision**: INSERT、UPDATE、DELETE の対象に別名付きのテーブルを渡すと `ArgumentException` にする（§6.2、§14.3）。
 - **Reason**: `Table.As` は同じ型を返すので型では止められない。SQL Server では対象の別名を `FROM` 句でしか付けられず（§18 の U1）、方言で規則を分けないために三つの文で揃える。対象のテーブルを読むサブクエリは、内側に別名を付ければ書ける。#56 の Grill で所有者が決めた。
 - **Rejected**: SQL Server 以外で別名を出す案（方言で規則が分かれる）。別名を捨ててテーブル名で書く案（書いたものと SQL が変わる）。
+
+## D1-53 `Returning` の文を途中で閉じるときの `Cancel`
+
+- **Decision**: `Returning` の文を最後まで読まずに閉じるとき、`DbCommand.Cancel()` を呼ばず、残りの行をプロバイダーに読み捨てさせる（§9、§12.2）。
+- **Reason**: MariaDB 12.3 と SQL Server 2025 では、20 万行の変更の最初の行を読んで `Cancel` すると、例外なしに文全体が取り消された。最初の行が返るのに変更がない。#63 で所有者が決めた。
+- **Rejected**: SELECT と同じく `Cancel` を呼ぶ案（変更が黙って消える）。`Returning` の後に `First…` を置かない案（途中でやめた `AsAsyncEnumerable()` に同じ問題が残る）。

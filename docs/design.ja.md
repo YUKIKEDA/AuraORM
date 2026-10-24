@@ -804,6 +804,7 @@ List<long> ids = await db.Insert(User.Table)
 - SQL Server で `Returning` の射影にサブクエリがあると、文を組み立てるときに `InvalidOperationException` になる（§14.3）。SQL Server は `OUTPUT` のサブクエリを拒む（資料は「データを読むサブクエリを含められない」と書く。2019 と 2025 でメッセージ 10705 を確かめた）。サブクエリは型の上では `IExpr<T, PerRow>` で、ほかの式と区別できないので、組み立て時に調べる。
 - どの方言でも、`Returning` のサブクエリが対象のテーブルを読むと（読むの意味は §7）、文を組み立てるときに `InvalidOperationException` になる（§14.3）。サブクエリがどの時点の表を見るかが方言で違う。3 行の表から 2 行を削除する `DELETE … RETURNING (SELECT COUNT(*) FROM t)` は、PostgreSQL（15 と 18）と MariaDB（10.11 と 12.3）が削除の前の 3 を返した。SQLite 3.40 は削除の前の 3 でも後の 1 でもない 2 を返し、6 行から 4 行を削除すると 5 を返した（後は 2 行）。最初の 1 行を消した途中の表を見ている。SQLite の UPDATE は更新の前の表を見た（`a` が 5、1、2 の 3 行に `UPDATE t SET a = a + 1 RETURNING (SELECT COUNT(*) FROM t WHERE a > 1)` を実行すると、前の表の 2 が返った。後の表なら 3）。SQLite の資料はこの結果を決まっていないもの（"Self-Referential Subqueries Are Indeterminate"）とし、PostgreSQL の資料も RETURNING のサブクエリについては書いていない。対象を読まないサブクエリは、SQL Server を除いて書ける。
 - MySQL で挿入した行の ID が必要なときは、同じ接続で `LAST_INSERT_ID()` を生 SQL で問い合わせる。ライブラリが自動でこの問い合わせを足すことはしない。
+- `Returning` の文を最後まで読まずに閉じるとき（`First…`、途中でやめた `AsAsyncEnumerable()`）、SELECT と違って `DbCommand.Cancel()` を呼ばない（§12.2）。`Cancel` は文そのものを止め、変更が黙って取り消されるためである。20 万行の表で、`RETURNING`（SQL Server は `OUTPUT`）付きの INSERT、UPDATE、DELETE の最初の行を読んで `Cancel` で閉じると、MariaDB 12.3 と SQL Server 2025 では、例外なしに最初の行が返り、変更は一行も残らなかった（MariaDB の UPDATE は `RETURNING` を書けないので除く）。SQLite（Microsoft.Data.Sqlite 10.0.13 が組み込む版）と PostgreSQL 18 では変更がすべて残った。1000 行ではどの方言でも残った（文が終わってから `Cancel` が届いたと考えられる）。`Cancel` を呼ばずに閉じると、20 万行でもどの方言でも変更がすべて残った。そのため `First…` でも、残りの行を受け取り終えるまで戻らない。行を減らしたいときは、文の条件で絞る。
 
 ## 10. UPSERT
 
@@ -920,7 +921,7 @@ var db2 = new Database<SqliteDialect>(connection);
 | `SingleOrDefaultAsync()` | ただ一つの行か `default` | 2 行以上なら `InvalidOperationException` |
 
 - `First…` と `Single…` は SQL に `LIMIT` を足さない。`First…` は最初の行を読んだらリーダーを閉じ、`Single…` は二行目があるかを確かめる。行を減らしたいときは `Limit` を書く。
-- 読み残しのある結果でリーダーを閉じるときは（`First…`、途中でやめた `AsAsyncEnumerable()`）、閉じる前に `DbCommand.Cancel()` を呼ぶ。SqlClient の `Close` は、残りの結果を読み切ってから戻るためである（`Cancel` を先に呼ぶと短くなると SqlClient の文書にある）。Dapper も、読み終えていないリーダーを閉じるときに `Cancel` を呼ぶ（`SqlMapper.QueryImpl` の `finally`）。この振る舞いは `FirstAsync` などの XML ドキュメントに書く。
+- SELECT の読み残しのある結果でリーダーを閉じるときは（`First…`、途中でやめた `AsAsyncEnumerable()`）、閉じる前に `DbCommand.Cancel()` を呼ぶ。`Returning` の後の文では呼ばず、残りの行はプロバイダーが読み捨てる（§9）。SqlClient の `Close` は、残りの結果を読み切ってから戻るためである（`Cancel` を先に呼ぶと短くなると SqlClient の文書にある）。Dapper も、読み終えていないリーダーを閉じるときに `Cancel` を呼ぶ（`SqlMapper.QueryImpl` の `finally`）。この振る舞いは `FirstAsync` などの XML ドキュメントに書く。
 - `FirstOrDefaultAsync` と `SingleOrDefaultAsync` は、行がなければ `default` を返す。値型の結果（`long`、タプル）では、行がないことと値が `default` の行とを区別できない。区別するときは `FirstAsync` を使うか、NULL を許す型で読む。
 - `AsAsyncEnumerable()` は、列挙している間だけ接続とリーダーを持つ。列挙を途中でやめれば閉じる。
 - すべての実行メソッドは、最後の引数に `CancellationToken` を取る。
