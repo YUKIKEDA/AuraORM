@@ -57,6 +57,29 @@ internal abstract class DialectRenderer
     public virtual bool ReturnsWithOutput => false;
 
     /// <summary>
+    /// Gets a value indicating whether an upsert clause may follow <c>DEFAULT VALUES</c> (§10.1). SQLite does not accept it.
+    /// </summary>
+    public virtual bool AcceptsUpsertAfterDefaultValues => true;
+
+    /// <summary>
+    /// Gets a value indicating whether the row proposed for insertion in an upsert is named <c>excluded</c>: PostgreSQL's and
+    /// SQLite's special table, and MySQL's row alias. MariaDB reads it with <c>VALUES(a)</c> (§10).
+    /// </summary>
+    public virtual bool NamesProposedRowExcluded => true;
+
+    /// <summary>
+    /// Writes a column of the row proposed for insertion in an upsert: <c>"excluded"."a"</c> (§10.1).
+    /// </summary>
+    /// <param name="context">The rendering context.</param>
+    /// <param name="column">The column name.</param>
+    public virtual void RenderExcludedColumn(SqlRenderContext context, string column)
+    {
+        context.WriteIdentifier(TableAlias.ExcludedName);
+        context.Write('.');
+        context.WriteIdentifier(column);
+    }
+
+    /// <summary>
     /// Gets a value indicating whether parameters are unnamed and bound by position (PostgreSQL, §5.12).
     /// </summary>
     public virtual bool UsesPositionalParameters => false;

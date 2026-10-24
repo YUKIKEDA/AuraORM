@@ -779,6 +779,7 @@ void MutationReturning(StringBuilder s)
         ("InsertStatement", "IInsertReturningDialect", "INSERT"),
         ("UpdateStatement", "IUpdateReturningDialect", "UPDATE"),
         ("DeleteStatement", "IDeleteReturningDialect", "DELETE"),
+        ("UpsertStatement", "IInsertReturningDialect", "upsert"),
     ];
     s.Append(
         """

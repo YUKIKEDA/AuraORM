@@ -8,4 +8,7 @@ internal static class MutationMessages
 {
     public const string OptionalCondition =
         "UPDATE and DELETE do not take a condition that may be empty (the And or Or of a list), because an empty one would change every row; check the list, and write AllRows() for every row.";
+
+    public const string OptionalUpsertCondition =
+        "DO UPDATE does not take a condition that may be empty (the And or Or of a list); check the list, and leave out Where to update every conflicting row.";
 }

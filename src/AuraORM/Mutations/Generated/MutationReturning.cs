@@ -1162,4 +1162,386 @@ public static class MutationReturning
             )
         );
     }
+
+    /// <summary>
+    /// Returns the values of the rows that the upsert changed: <c>RETURNING …</c> (SQL Server: <c>OUTPUT …</c>).
+    /// </summary>
+    /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+    /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
+    /// <typeparam name="TColumns">The column set of the table.</typeparam>
+    /// <typeparam name="TResult">The type that each row is read as.</typeparam>
+    /// <param name="statement">The statement.</param>
+    /// <param name="projection">The projection, from the columns of the table.</param>
+    /// <returns>The statement, which returns rows.</returns>
+    public static ReturningQuery<TDialect, TMode, TResult> Returning<TDialect, TMode, TColumns, TResult>(
+        this UpsertStatement<TDialect, TMode, TColumns> statement,
+        Func<TColumns, IProjection<TResult, PerRow>> projection
+    )
+        where TDialect : IInsertReturningDialect
+        where TMode : ExecutionMode
+        where TColumns : ITableColumns<TColumns>
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(projection);
+        return new(statement, projection(statement.Table));
+    }
+
+    /// <summary>
+    /// Returns the values of the rows that the upsert changed, as a tuple of 2 items: <c>RETURNING a, b, …</c>.
+    /// </summary>
+    /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+    /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
+    /// <typeparam name="TColumns">The column set of the table.</typeparam>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <param name="statement">The statement.</param>
+    /// <param name="projection">The items, from the columns of the table.</param>
+    /// <returns>The statement, which returns rows.</returns>
+    public static ReturningQuery<TDialect, TMode, (TItem1, TItem2)> Returning<TDialect, TMode, TColumns, TItem1, TItem2>(
+        this UpsertStatement<TDialect, TMode, TColumns> statement,
+        Func<TColumns, (IProjection<TItem1, PerRow>, IProjection<TItem2, PerRow>)> projection
+    )
+        where TDialect : IInsertReturningDialect
+        where TMode : ExecutionMode
+        where TColumns : ITableColumns<TColumns>
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, PerRow>, IProjection<TItem2, PerRow>) items = projection(statement.Table);
+        return new(statement, new TupleProjection<TItem1, TItem2, PerRow>(items.Item1, items.Item2));
+    }
+
+    /// <summary>
+    /// Returns the values of the rows that the upsert changed, as a tuple of 3 items: <c>RETURNING a, b, …</c>.
+    /// </summary>
+    /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+    /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
+    /// <typeparam name="TColumns">The column set of the table.</typeparam>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <param name="statement">The statement.</param>
+    /// <param name="projection">The items, from the columns of the table.</param>
+    /// <returns>The statement, which returns rows.</returns>
+    public static ReturningQuery<TDialect, TMode, (TItem1, TItem2, TItem3)> Returning<TDialect, TMode, TColumns, TItem1, TItem2, TItem3>(
+        this UpsertStatement<TDialect, TMode, TColumns> statement,
+        Func<TColumns, (IProjection<TItem1, PerRow>, IProjection<TItem2, PerRow>, IProjection<TItem3, PerRow>)> projection
+    )
+        where TDialect : IInsertReturningDialect
+        where TMode : ExecutionMode
+        where TColumns : ITableColumns<TColumns>
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, PerRow>, IProjection<TItem2, PerRow>, IProjection<TItem3, PerRow>) items = projection(statement.Table);
+        return new(statement, new TupleProjection<TItem1, TItem2, TItem3, PerRow>(items.Item1, items.Item2, items.Item3));
+    }
+
+    /// <summary>
+    /// Returns the values of the rows that the upsert changed, as a tuple of 4 items: <c>RETURNING a, b, …</c>.
+    /// </summary>
+    /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+    /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
+    /// <typeparam name="TColumns">The column set of the table.</typeparam>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <param name="statement">The statement.</param>
+    /// <param name="projection">The items, from the columns of the table.</param>
+    /// <returns>The statement, which returns rows.</returns>
+    public static ReturningQuery<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4)> Returning<
+        TDialect,
+        TMode,
+        TColumns,
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4
+    >(
+        this UpsertStatement<TDialect, TMode, TColumns> statement,
+        Func<
+            TColumns,
+            (IProjection<TItem1, PerRow>, IProjection<TItem2, PerRow>, IProjection<TItem3, PerRow>, IProjection<TItem4, PerRow>)
+        > projection
+    )
+        where TDialect : IInsertReturningDialect
+        where TMode : ExecutionMode
+        where TColumns : ITableColumns<TColumns>
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(projection);
+        (IProjection<TItem1, PerRow>, IProjection<TItem2, PerRow>, IProjection<TItem3, PerRow>, IProjection<TItem4, PerRow>) items = projection(
+            statement.Table
+        );
+        return new(statement, new TupleProjection<TItem1, TItem2, TItem3, TItem4, PerRow>(items.Item1, items.Item2, items.Item3, items.Item4));
+    }
+
+    /// <summary>
+    /// Returns the values of the rows that the upsert changed, as a tuple of 5 items: <c>RETURNING a, b, …</c>.
+    /// </summary>
+    /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+    /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
+    /// <typeparam name="TColumns">The column set of the table.</typeparam>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <param name="statement">The statement.</param>
+    /// <param name="projection">The items, from the columns of the table.</param>
+    /// <returns>The statement, which returns rows.</returns>
+    public static ReturningQuery<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5)> Returning<
+        TDialect,
+        TMode,
+        TColumns,
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5
+    >(
+        this UpsertStatement<TDialect, TMode, TColumns> statement,
+        Func<
+            TColumns,
+            (
+                IProjection<TItem1, PerRow>,
+                IProjection<TItem2, PerRow>,
+                IProjection<TItem3, PerRow>,
+                IProjection<TItem4, PerRow>,
+                IProjection<TItem5, PerRow>
+            )
+        > projection
+    )
+        where TDialect : IInsertReturningDialect
+        where TMode : ExecutionMode
+        where TColumns : ITableColumns<TColumns>
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, PerRow>,
+            IProjection<TItem2, PerRow>,
+            IProjection<TItem3, PerRow>,
+            IProjection<TItem4, PerRow>,
+            IProjection<TItem5, PerRow>
+        ) items = projection(statement.Table);
+        return new(
+            statement,
+            new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, PerRow>(items.Item1, items.Item2, items.Item3, items.Item4, items.Item5)
+        );
+    }
+
+    /// <summary>
+    /// Returns the values of the rows that the upsert changed, as a tuple of 6 items: <c>RETURNING a, b, …</c>.
+    /// </summary>
+    /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+    /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
+    /// <typeparam name="TColumns">The column set of the table.</typeparam>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <param name="statement">The statement.</param>
+    /// <param name="projection">The items, from the columns of the table.</param>
+    /// <returns>The statement, which returns rows.</returns>
+    public static ReturningQuery<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6)> Returning<
+        TDialect,
+        TMode,
+        TColumns,
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6
+    >(
+        this UpsertStatement<TDialect, TMode, TColumns> statement,
+        Func<
+            TColumns,
+            (
+                IProjection<TItem1, PerRow>,
+                IProjection<TItem2, PerRow>,
+                IProjection<TItem3, PerRow>,
+                IProjection<TItem4, PerRow>,
+                IProjection<TItem5, PerRow>,
+                IProjection<TItem6, PerRow>
+            )
+        > projection
+    )
+        where TDialect : IInsertReturningDialect
+        where TMode : ExecutionMode
+        where TColumns : ITableColumns<TColumns>
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, PerRow>,
+            IProjection<TItem2, PerRow>,
+            IProjection<TItem3, PerRow>,
+            IProjection<TItem4, PerRow>,
+            IProjection<TItem5, PerRow>,
+            IProjection<TItem6, PerRow>
+        ) items = projection(statement.Table);
+        return new(
+            statement,
+            new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, PerRow>(
+                items.Item1,
+                items.Item2,
+                items.Item3,
+                items.Item4,
+                items.Item5,
+                items.Item6
+            )
+        );
+    }
+
+    /// <summary>
+    /// Returns the values of the rows that the upsert changed, as a tuple of 7 items: <c>RETURNING a, b, …</c>.
+    /// </summary>
+    /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+    /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
+    /// <typeparam name="TColumns">The column set of the table.</typeparam>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <param name="statement">The statement.</param>
+    /// <param name="projection">The items, from the columns of the table.</param>
+    /// <returns>The statement, which returns rows.</returns>
+    public static ReturningQuery<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7)> Returning<
+        TDialect,
+        TMode,
+        TColumns,
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7
+    >(
+        this UpsertStatement<TDialect, TMode, TColumns> statement,
+        Func<
+            TColumns,
+            (
+                IProjection<TItem1, PerRow>,
+                IProjection<TItem2, PerRow>,
+                IProjection<TItem3, PerRow>,
+                IProjection<TItem4, PerRow>,
+                IProjection<TItem5, PerRow>,
+                IProjection<TItem6, PerRow>,
+                IProjection<TItem7, PerRow>
+            )
+        > projection
+    )
+        where TDialect : IInsertReturningDialect
+        where TMode : ExecutionMode
+        where TColumns : ITableColumns<TColumns>
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, PerRow>,
+            IProjection<TItem2, PerRow>,
+            IProjection<TItem3, PerRow>,
+            IProjection<TItem4, PerRow>,
+            IProjection<TItem5, PerRow>,
+            IProjection<TItem6, PerRow>,
+            IProjection<TItem7, PerRow>
+        ) items = projection(statement.Table);
+        return new(
+            statement,
+            new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, PerRow>(
+                items.Item1,
+                items.Item2,
+                items.Item3,
+                items.Item4,
+                items.Item5,
+                items.Item6,
+                items.Item7
+            )
+        );
+    }
+
+    /// <summary>
+    /// Returns the values of the rows that the upsert changed, as a tuple of 8 items: <c>RETURNING a, b, …</c>.
+    /// </summary>
+    /// <typeparam name="TDialect">The SQL dialect.</typeparam>
+    /// <typeparam name="TMode">Whether the statement can be run.</typeparam>
+    /// <typeparam name="TColumns">The column set of the table.</typeparam>
+    /// <typeparam name="TItem1">The type of item 1.</typeparam>
+    /// <typeparam name="TItem2">The type of item 2.</typeparam>
+    /// <typeparam name="TItem3">The type of item 3.</typeparam>
+    /// <typeparam name="TItem4">The type of item 4.</typeparam>
+    /// <typeparam name="TItem5">The type of item 5.</typeparam>
+    /// <typeparam name="TItem6">The type of item 6.</typeparam>
+    /// <typeparam name="TItem7">The type of item 7.</typeparam>
+    /// <typeparam name="TItem8">The type of item 8.</typeparam>
+    /// <param name="statement">The statement.</param>
+    /// <param name="projection">The items, from the columns of the table.</param>
+    /// <returns>The statement, which returns rows.</returns>
+    public static ReturningQuery<TDialect, TMode, (TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8)> Returning<
+        TDialect,
+        TMode,
+        TColumns,
+        TItem1,
+        TItem2,
+        TItem3,
+        TItem4,
+        TItem5,
+        TItem6,
+        TItem7,
+        TItem8
+    >(
+        this UpsertStatement<TDialect, TMode, TColumns> statement,
+        Func<
+            TColumns,
+            (
+                IProjection<TItem1, PerRow>,
+                IProjection<TItem2, PerRow>,
+                IProjection<TItem3, PerRow>,
+                IProjection<TItem4, PerRow>,
+                IProjection<TItem5, PerRow>,
+                IProjection<TItem6, PerRow>,
+                IProjection<TItem7, PerRow>,
+                IProjection<TItem8, PerRow>
+            )
+        > projection
+    )
+        where TDialect : IInsertReturningDialect
+        where TMode : ExecutionMode
+        where TColumns : ITableColumns<TColumns>
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(projection);
+        (
+            IProjection<TItem1, PerRow>,
+            IProjection<TItem2, PerRow>,
+            IProjection<TItem3, PerRow>,
+            IProjection<TItem4, PerRow>,
+            IProjection<TItem5, PerRow>,
+            IProjection<TItem6, PerRow>,
+            IProjection<TItem7, PerRow>,
+            IProjection<TItem8, PerRow>
+        ) items = projection(statement.Table);
+        return new(
+            statement,
+            new TupleProjection<TItem1, TItem2, TItem3, TItem4, TItem5, TItem6, TItem7, TItem8, PerRow>(
+                items.Item1,
+                items.Item2,
+                items.Item3,
+                items.Item4,
+                items.Item5,
+                items.Item6,
+                items.Item7,
+                items.Item8
+            )
+        );
+    }
 }

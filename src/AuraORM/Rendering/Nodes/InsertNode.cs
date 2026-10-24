@@ -11,11 +11,13 @@ namespace AuraORM;
 /// <param name="columns">The names of the columns that the rows set, in declaration order.</param>
 /// <param name="rows">The values of each row, in the order of <paramref name="columns"/>.</param>
 /// <param name="returning">The items of <c>Returning</c>, or an empty array (§9).</param>
+/// <param name="upsert">The clause that handles a conflict, or <see langword="null"/> (§10).</param>
 internal sealed class InsertNode(
     TableAlias target,
     ImmutableArray<string> columns,
     ImmutableArray<ImmutableArray<ParameterNode>> rows,
-    ImmutableArray<SqlNode> returning
+    ImmutableArray<SqlNode> returning,
+    UpsertClause? upsert
 ) : SqlNode
 {
     public override void Render(SqlRenderContext context)
@@ -40,6 +42,7 @@ internal sealed class InsertNode(
                 }
             }
 
+            upsert?.Render(context, target, columns);
             WriteReturning(context, output);
             context.ExitMutation();
             return;
@@ -76,6 +79,7 @@ internal sealed class InsertNode(
             context.Write(')');
         }
 
+        upsert?.Render(context, target, columns);
         WriteReturning(context, output);
         context.ExitMutation();
     }

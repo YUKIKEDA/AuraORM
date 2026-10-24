@@ -853,7 +853,7 @@ await db.Insert(User.Table)
 - テーブルの名前が `excluded`（大文字と小文字を区別しない）のとき、MySQL の `OnDuplicateKeyUpdate` は `InvalidOperationException` になる（§14.3）。MySQL は行の別名とテーブル名が同じだとエラー 1066 で拒む（8.4 と 9.7）。MariaDB は行の別名を使わないので受け付ける。
 - 設定した列が一つもない行は ``INSERT INTO `t` () VALUES () … ON DUPLICATE KEY UPDATE …`` を出す（MySQL は `() VALUES () AS excluded`）。
 - MySQL では、値のサブクエリが対象のテーブルを読むと（派生テーブルを通しても）、§7 の UPDATE / DELETE と同じく組み立て時に `InvalidOperationException` になる（§14.3）。MySQL 8.4 と 9.7 は、別名のないテーブル `(SELECT MAX(n) FROM t)` と、派生テーブルを通した形をエラー 1093 で拒んだ。別名を付けたテーブル `(SELECT MAX(x.n) FROM t AS x)` は通ったが、その理由は資料に見つからず、保証がないので、別名の有無で規則を分けない。MariaDB（10.11 と 12.3）は三つの形とも受け付ける。
-- 「何もしない」形は置かない。MySQL の `INSERT IGNORE` は、一意キーの衝突だけでなく、型の変換の誤りなども警告にして続けるからである。衝突した行を変えないときは `OnDuplicateKeyUpdate((u, excluded) => [Set(u.Id, u.Id)])` と書ける（Drizzle ORM の資料も同じ書き方を示す）。この書き方は XML ドキュメントに書く。
+- 「何もしない」形は置かない。MySQL の `INSERT IGNORE` は、一意キーの衝突だけでなく、型の変換の誤りなども警告にして続けるからである。衝突した行を変えないときは、代入できる列を自分自身に代入して `OnDuplicateKeyUpdate((u, excluded) => [Set(u.Name, u.Name)])` と書ける（Drizzle ORM の資料も、列を自分自身に代入する書き方を示す）。`[AutoIncrement]` の列は代入できない（§7）ので、主キーが `[AutoIncrement]` ならほかの列を使う。この書き方は XML ドキュメントに書く。
 
 ### 10.3 共通の規則
 

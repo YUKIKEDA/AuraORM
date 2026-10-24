@@ -17,6 +17,7 @@ internal sealed class SqlRenderContext : IDisposable
     private TableAlias? _mutationTarget;
     private HashSet<string>? _assignedBefore;
     private TableAlias? _returningTarget;
+    private System.Collections.Immutable.ImmutableArray<string> _insertedColumns;
     private string? _returningPrefix;
     private int _returningDepth;
 
@@ -193,6 +194,37 @@ internal sealed class SqlRenderContext : IDisposable
         ExitScope();
         ExitStatement();
     }
+
+    /// <summary>
+    /// Starts the update of an upsert: the columns of the table and of the proposed row are in scope (§10).
+    /// </summary>
+    /// <param name="target">The table of the <c>INSERT</c>.</param>
+    /// <param name="excluded">The occurrence of the proposed row.</param>
+    /// <param name="columns">The columns that the rows set, which MySQL's row alias has (§10.2).</param>
+    public void EnterUpsert(TableAlias target, TableAlias excluded, System.Collections.Immutable.ImmutableArray<string> columns)
+    {
+        // The scope of the INSERT has the table; the update's scope replaces it, so that the table is not an outer table of
+        // itself.
+        ExitScope();
+        EnterScope([target, excluded]);
+        _insertedColumns = columns;
+    }
+
+    /// <summary>
+    /// Ends the update that <see cref="EnterUpsert"/> started.
+    /// </summary>
+    /// <param name="target">The table of the <c>INSERT</c>.</param>
+    public void ExitUpsert(TableAlias target)
+    {
+        _insertedColumns = default;
+        ExitScope();
+        EnterScope([target]);
+    }
+
+    /// <summary>
+    /// Gets the columns that the rows of the upsert being written set, for MySQL's row alias (§10.2).
+    /// </summary>
+    public System.Collections.Immutable.ImmutableArray<string> InsertedColumns => _insertedColumns;
 
     /// <summary>
     /// Writes the value of an assignment. On MySQL and MariaDB, which assign from left to right, the value cannot read a

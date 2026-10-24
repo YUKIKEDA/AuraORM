@@ -644,3 +644,99 @@ public sealed class SqlServerReturningTests : UpdateReturningTests<SqlServerDial
 
     public ValueTask DisposeAsync() => _target.DisposeAsync();
 }
+
+/// <summary>
+/// <see cref="ConflictUpsertTests{TDialect}"/> on postgresql, and an empty row with <c>DEFAULT VALUES</c> (design §10.1).
+/// </summary>
+[Collection("postgresql")]
+public sealed class PostgreSqlUpsertTests : ConflictUpsertTests<PostgreSqlDialect>, IAsyncLifetime
+{
+    private readonly PostgreSqlTarget _target = new();
+
+    private protected override ITestTarget<PostgreSqlDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+
+    /// <summary>
+    /// PostgreSQL takes <c>ON CONFLICT</c> after <c>DEFAULT VALUES</c>, which inserts the row (design §10.1).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - An empty <c>notes</c> table.
+    ///
+    /// Steps:
+    /// - Insert an empty note with <c>OnConflictDoNothing()</c>.
+    ///
+    /// Expected:
+    /// - 1.
+    /// </remarks>
+    [Fact]
+    public async Task EmptyRow_TakesOnConflict()
+    {
+        Database<PostgreSqlDialect> db = await Target.CreateDatabaseAsync();
+
+        Assert.Equal(1, await db.Insert(Note.Table).Values(new Note.Insert()).OnConflictDoNothing().ExecuteAsync(Ct));
+    }
+}
+
+/// <summary>
+/// <see cref="DuplicateKeyUpsertTests{TDialect}"/> on mysql.
+/// </summary>
+[Collection("mysql")]
+public sealed class MySqlUpsertTests : DuplicateKeyUpsertTests<MySqlDialect>, IAsyncLifetime
+{
+    private readonly MySqlTarget _target = new();
+
+    private protected override ITestTarget<MySqlDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+}
+
+/// <summary>
+/// <see cref="DuplicateKeyUpsertTests{TDialect}"/> on mariadb, and what only MariaDB has: <c>Returning</c> after the clause
+/// and <c>VALUES(a)</c> of a column the rows do not set (design §10.2, §10.3).
+/// </summary>
+[Collection("mariadb")]
+public sealed class MariaDbUpsertTests : DuplicateKeyUpsertTests<MariaDbDialect>, IAsyncLifetime
+{
+    private readonly MariaDbTarget _target = new();
+
+    private protected override ITestTarget<MariaDbDialect> Target => _target;
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync() => _target.DisposeAsync();
+
+    /// <summary>
+    /// <c>Returning</c> after <c>ON DUPLICATE KEY UPDATE</c> returns the updated and the inserted rows, and a proposed column
+    /// that the rows do not set reads its default (null) (design §10.2, §10.3).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - Alice (1) and Bob (2, nickname "B").
+    ///
+    /// Steps:
+    /// - Upsert Bob as "Bobby" without a nickname and Carol (3), setting the name and the nickname from excluded, returning
+    ///   the id, the name, and the nickname.
+    ///
+    /// Expected:
+    /// - (2, Bobby, null) and (3, Carol, null).
+    /// </remarks>
+    [Fact]
+    public async Task Returning_ReadsTheUpdatedAndInsertedRows()
+    {
+        Database<MariaDbDialect> db = await UpsertSeed.SeedAsync(Target);
+
+        List<(long, string, string?)> rows = await db.Insert(Person.Table)
+            .Values([UpsertSeed.Person(2, "Bobby"), UpsertSeed.Person(3, "Carol")])
+            .OnDuplicateKeyUpdate((p, excluded) => [Sql.Set(p.Name, excluded.Name), Sql.Set(p.Nickname, excluded.Nickname)])
+            .Returning(p => (p.Id, p.Name, p.Nickname))
+            .ToListAsync(Ct);
+
+        Assert.Equal([(2L, "Bobby", (string?)null), (3L, "Carol", null)], rows.OrderBy(r => r.Item1));
+    }
+}

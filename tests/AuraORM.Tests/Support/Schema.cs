@@ -63,3 +63,9 @@ public sealed partial record Note([PrimaryKey, AutoIncrement] long Id, string? B
 /// </summary>
 [Table("accounts", Schema = "archive", Naming = ColumnNaming.SnakeCase)]
 public sealed partial record ArchivedAccount([PrimaryKey] long Id, [MaxLength(200)] string Email);
+
+/// <summary>
+/// A table named <c>Excluded</c>, the name of the row proposed for insertion in an upsert, in another case (design §10).
+/// </summary>
+[Table("Excluded")]
+public sealed partial record ExcludedRow([PrimaryKey] long Id, int N);
