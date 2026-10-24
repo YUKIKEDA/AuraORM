@@ -20,6 +20,8 @@ These are the three promises of the library (`docs/design.ja.md`). Every change 
 
 - A query that is valid SQL on the chosen dialect and that the API can express must compile. A restriction the types add beyond SQL needs a reason in the design (a common bug it prevents, such as `= NULL`), and an escape hatch.
 - A query that is invalid on the chosen dialect does not compile: a column of a table that is not in the query, operands of different types, a clause in the wrong order, a missing required column in `INSERT`, an `UPDATE` or `DELETE` without `WHERE` unless the caller says all rows, a feature the dialect lacks. A run-time exception is the last resort, for what the type system cannot express, and the design names each one.
+- A rejection by type whose compiler message does not say how to fix the call (CS1503 "cannot convert to `IReadOnlyList<long>`", CS0411 "cannot infer the type arguments") gets an overload that takes the rejected form and carries `[Obsolete("…", error: true)]`, so the error is CS0619 with the fix (D1-25).
+- A feature that puts a statement inside another (a subquery, a derived table, a CTE) checks that every guard of one statement still holds across the boundary. The alias check of §5.2 did not reach the subquery's `FROM`, and a correlation with an outer table of the same name read the outer columns as the inner ones, with no error (D1-34).
 - Raw SQL is allowed through the interpolated SQL fragment only: holes become parameters or quoted identifiers. A string reaches the SQL text unquoted only through the API whose name says it is unsafe.
 
 ## Tests for the promises

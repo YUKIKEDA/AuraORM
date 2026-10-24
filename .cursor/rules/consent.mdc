@@ -22,6 +22,8 @@ Before recommending a design, search `docs/design-decisions.md` for a rejection 
 
 Before recommending that the types reject something, check that the types carry what the check needs. An expression's type does not know the dialect, so "make it a compile error on SQLite" cannot be built for a condition inside `Where`. A recommendation that turns out not to be buildable goes back to the owner with what was found; it is not replaced by another option without asking.
 
+Before recommending a typed API, write the code that uses it and compile it (`CompileAssert`), and read the recommendation against the design's standing rules (§15: every diagnostic is an error). D1-28 recommended that a group subquery use the key `k`, but `k` is `PerGroup` and the subquery's lambdas take `PerRow`, so `Outer(k)` had to be added after the Grill; D1-32 recommended a warning, which §15 and C#'s overload rules (CS0111) did not allow.
+
 ```text
 # BAD
 Agent: recommends "SQLite decimal ordering is a compile error"; later finds Condition<TLevel> has no dialect, and ships a
