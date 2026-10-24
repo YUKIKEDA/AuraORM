@@ -124,3 +124,15 @@
 - **Reason**: SQL Server の `SUM` は `real` に `float`（`double`）を返し、型付きの取得メソッドで `float` として読めない（§12）。EF Core も同じ `CAST` を入れる。Issue #30 の実装中に結合テストで見つかり、所有者が決めた。
 - **Rejected**: 全方言で `double?` を返す案（.NET の `Sum(float)` と EF Core が `float` を返すのと違い、PostgreSQL にも `CAST` が要る）。読み取りで `double` を `float` に変える案（§12 の、広げも狭めもしない読み取りに反する）。
 
+## D1-21 列を含まない GROUP BY のキー
+
+- **Decision**: 列を一つも含まない GROUP BY のキーは、全方言で文を組み立てるときに `InvalidOperationException` にする（§5.5、§14.3）。生 SQL の断片は中を見ないので通す。
+- **Reason**: SQL Server はメッセージ 164 で必ず失敗し、MySQL と MariaDB は値一つのキーを列の位置として読む。SQLite と PostgreSQL で通る文も、表全体を一つのグループにするだけで意味がない。型では止められない（`Value` も列も `IExpr<T, PerRow>`）。#31 のレビューで見つかり、所有者が決めた。
+- **Rejected**: 失敗する方言だけで拒む案（同じ文が方言によって通ったり拒まれたりし、規則も複雑になる）。§14.2 に書くだけの案（SQL Server の実行時の失敗が残る）。
+
+## D1-22 値だけの ORDER BY のキー
+
+- **Decision**: 値だけ（パラメータ一つ）の ORDER BY のキーは、全方言で文を組み立てるときに `InvalidOperationException` にする（§5.8、§14.3）。値の式と関数は通す。
+- **Reason**: MySQL と MariaDB は値を SQL に埋め込むので `ORDER BY 1` になり、エラーにならずに 1 列目で並ぶ。SQL Server はメッセージ 1008 で失敗する。行 Q1 からあった問題で、#31 のレビューで同じ種類の問題として見つかり、所有者が #31 で直すと決めた。
+- **Rejected**: 別の行として後で直す案（結果が黙って変わる不具合がその行まで残る）。
+
