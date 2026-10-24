@@ -30,6 +30,8 @@ alwaysApply: true
 - A claim about another ORM or query builder (Drizzle ORM, EF Core, Dapper, linq2db, jOOQ, Kysely) names the file or the documentation page where it was read.
 - A sentence that says AuraORM behaves "like X" is checked item by item in X; an item X lacks is written as AuraORM's own.
 - Before the design PR of a clause, run each SQL shape the design allows on every database in the WSL containers (`./tools/db.ps1 up`), including the degenerate inputs the types accept: an expression without a column, a key repeated in a later clause, an aggregate of each column type. In row Q3, a MySQL `HAVING` that repeats an expression key, SQL Server's `SUM(real)`, and `GROUP BY` / `ORDER BY` keys of only values were all found after the design PR, and each needed a second design change.
+- A compile error that the design names (CS1503, CS0619) is compiled before the design PR: write the snippet and read the id. Row M1's design said an `OptionalCondition` in the `Where` of UPDATE gives CS1503; it gave CS0029. `Set(column, null)` matched both the value and the expression overloads (CS0121), which only the implementation's compile tests found.
+- A run behavior decided for SELECT is checked again when another kind of statement uses it. §12.2 closed a reader early with `DbCommand.Cancel()`, and the design let `First…` follow `Returning` without trying it on a DML statement; on MariaDB and SQL Server the cancel undid the whole change without an exception (#64).
 - Every type in a signature the design writes is defined in the design or the code.
 - A statement that lists dialects is a statement about each of them: the design writes the SQL for each dialect, or says which ones reject the feature and how (a compile error, never a run-time surprise).
 
