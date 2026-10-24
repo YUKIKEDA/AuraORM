@@ -375,7 +375,7 @@ db.From(User.Table).Where(u => And(filters)).Select(u => u);
 
 - 一覧が空のとき、`And` も `Or` も「条件なし」になり、`Where` は全行を返す。空の `Or` は論理としては偽だが、検索の絞り込みで「選んだ条件がない」ことを表すので、Drizzle ORM の `or()` と同じく「条件なし」にする。一方、空の値の一覧を受け取る `In(a, [])` は `1 = 0`（行なし）である。`In` は「この値のどれか」を表すので、値が一つもなければどの行も当たらない。
 - `OptionalCondition<TLevel>` は、SELECT の `Where`（と行 Q3 の `Having`）だけが受け取る。「条件なし」の `Where` は `WHERE` を出さない。条件の数が値で決まることは、`In` の要素の数と同じく文の形の一部である（§0.1）。
-- UPDATE と DELETE の `Where` は `Condition<PerRow>` だけを受け取り、`OptionalCondition` は CS1503 になる（§7、§8）。条件が一つもないときに全行を更新・削除する文にならないためである。たとえば `Delete(…).Where(u => Or(選んだ ID の条件の一覧))` で何も選ばれていなければ、全行の削除になってしまう。全行は `AllRows()` で明示する。
+- UPDATE と DELETE の `Where` は `Condition<PerRow>` だけを受け取り、`OptionalCondition` は CS0619 になる（§7、§8）。条件が一つもないときに全行を更新・削除する文にならないためである。たとえば `Delete(…).Where(u => Or(選んだ ID の条件の一覧))` で何も選ばれていなければ、全行の削除になってしまう。全行は `AllRows()` で明示する。
 - Drizzle ORM の `and()` も `undefined` を飛ばし、一つもなければ `undefined` を返して、`where(undefined)` は `WHERE` を出さない。Drizzle では UPDATE / DELETE でも同じなので全行が対象になる。AuraORM はそこを型で止める（§19）。
 
 **算術**（数値型。`System.Numerics.INumber<T>` を満たす `T` と、その nullable。名前は .NET の命名の指針に合わせて略さない）
@@ -759,14 +759,15 @@ await db.Update(User.Table)
 // UPDATE "users" SET "Name" = @p0, "Age" = ("users"."Age" + @p1) WHERE "users"."Id" = @p2
 ```
 
-- `Set(column, value)` の `column` は `Column<T>` に限る。`ReadOnlyColumn<T>`、NULL 化した列、式には代入できない（CS1503）。値は `T` か `IExpr<T, PerRow>` である。
+- `Set(column, value)` の `column` は `Column<T>` に限る。`ReadOnlyColumn<T>`（`[AutoIncrement]` の列）には、それを受け取る `[Obsolete(…, error: true)]` の多重定義を置くので、CS0619 と「データベースが値を決める列」というメッセージになる。NULL 化した列と式は CS1503 になる。値は `T` か `IExpr<T, PerRow>` で、列と型が違えば CS1503 か CS0311 になる。
+- `Set(u.Nickname, null)` は、NULL を許す列に NULL を代入する。式を受け取る多重定義は、式の型を型引数（`TExpr : IExpr<T, PerRow>`）に取る。`null` からはその型引数を推論できないので、`null` は値の多重定義を選ぶ（式の型を `IExpr<T, PerRow>` の引数にすると、`null` が両方に当てはまり CS0121 になる）。NULL を許さない参照型の列に `null` や NULL を許す式を代入すると、null 許容の警告（CS8620 / CS8631）になる（§14.2）。
 - `SET` の代入先の列名は修飾しない（PostgreSQL が受け付けないため）。それ以外の列の参照は §5.2 のとおり修飾する。
 - 代入の一覧が空のとき、または同じ列に二度代入したときは、文を作るときに `ArgumentException` になる（§14.3）。
-- `Set` の後は `Where(…)` か `AllRows()` のどちらかを書く。どちらもなければ `ExecuteAsync` が存在しない（CS1061）。`AllRows()` は SQL に何も足さない。
-- `Where` は `Condition<PerRow>` だけを受け取る。一覧の `And` / `Or` の結果（`OptionalCondition`、条件なしになりうる）は CS1503 になる（§4.2）。
+- `Set` の後は `Where(…)` か `AllRows()` のどちらかを書く。どちらもなければ `ExecuteAsync` も `ToSql` も存在しない（CS1061）。`AllRows()` は SQL に何も足さない。
+- `Where` は `Condition<PerRow>` だけを受け取る。一覧の `And` / `Or` の結果（`OptionalCondition`、条件なしになりうる）は、それを受け取る `[Obsolete(…, error: true)]` の多重定義を置くので、CS0619 と「`AllRows()` を書く」というメッセージになる（§4.2）。その多重定義がないと、ラムダの戻り値の変換の誤り CS0029 になる。
 - 対象に別名付きのテーブルを渡すと `ArgumentException` になる（§6.2）。
 - 代入は、SQL の規格のとおり、すべての値を更新の前の行で評価する。MySQL と MariaDB は単一テーブルの UPDATE の代入を左から順に評価し、前の代入の結果を後の値が読む（`SET n = n + 1, m = n` で、`m` に新しい `n` が入る。SQLite、PostgreSQL、SQL Server では古い `n`）。MySQL の資料は "differs from standard SQL" と書き、MariaDB は sql_mode の `SIMULTANEOUS_ASSIGNMENT`（10.3.5 から）で同時に評価するが、既定では有効でない。そこで MySQL と MariaDB では、ある代入の値が、それより前の代入の列を読むと、文を組み立てるときに `InvalidOperationException` になる（§14.3）。値が読むとは、値の式（その中のサブクエリを含む）に対象の列があることをいう。後で代入する列を読むのは古い値なので通す。二つの列の値を入れ替える代入は一つの文で書けないので、文を分ける。
-- MySQL では、文の中のサブクエリが対象のテーブルを読むと（`WHERE`、`SET` の値のどちらでも、派生テーブルや CTE を通しても）、文を組み立てるときに `InvalidOperationException` になる（§14.3）。MySQL はこの文をエラー 1093 で拒む。資料によれば、派生テーブルを通して通るのは、その派生テーブルが外側に併合されず実体化されたときだけで、併合が既定である。どちらになるかは最適化の判断で、資料は保証しない（手元の 8.4 と 9.7 では派生テーブルと CTE を通した形が通ったが、これに頼らない）。サブクエリが読むとは、その `FROM` か `JOIN`（入れ子の内側も）に対象と同じテーブル（名前とスキーマが同じ）があることをいう。サブクエリが相関で対象の列を使うだけなら読まない。MariaDB（UPDATE は 10.3.2、DELETE は 10.3.1 から）と、ほかの方言はこの文を受け付ける。MySQL で書くときは、先に SELECT で値を読み、`In(列, 値の一覧)` で書く。
+- MySQL では、文の中のサブクエリが対象のテーブルを読むと（`WHERE`、`SET` の値のどちらでも、派生テーブルを通しても）、文を組み立てるときに `InvalidOperationException` になる（§14.3）。MySQL はこの文をエラー 1093 で拒む。資料によれば、派生テーブルを通して通るのは、その派生テーブルが外側に併合されず実体化されたときだけで、併合が既定である。どちらになるかは最適化の判断で、資料は保証しない（手元の 8.4 と 9.7 では派生テーブルを通した形が通ったが、これに頼らない）。UPDATE / DELETE には `With` がなく、`With` を持つ文はサブクエリにできない（§5.11）ので、CTE を通す形は書けない。サブクエリが読むとは、その `FROM` か `JOIN`（入れ子の内側も）に対象と同じテーブル（名前とスキーマが同じ）があることをいう。サブクエリが相関で対象の列を使うだけなら読まない。MariaDB（UPDATE は 10.3.2、DELETE は 10.3.1 から）と、ほかの方言はこの文を受け付ける。MySQL で書くときは、先に SELECT で値を読み、`In(列, 値の一覧)` で書く。
 - 対象のテーブルを外側の文として、§5.11 のサブクエリの検査（外側と同じ名前のテーブル、文の外の列）はそのまま当てはまる。
 
 ## 8. DELETE
@@ -776,7 +777,7 @@ await db.Delete(User.Table).Where(u => Eq(u.Id, 1L)).ExecuteAsync();
 // DELETE FROM "users" WHERE "users"."Id" = @p0
 ```
 
-`Where(…)` か `AllRows()` がなければ `ExecuteAsync` が存在しないのは UPDATE と同じである。`Where` が `OptionalCondition` を受け取らないのも UPDATE と同じである（§4.2）。対象の別名の例外（§6.2）、MySQL でサブクエリが対象のテーブルを読むときの例外（エラー 1093）、§5.11 のサブクエリの検査も UPDATE と同じである（§7）。
+`Where(…)` か `AllRows()` がなければ `ExecuteAsync` も `ToSql` も存在しないのは UPDATE と同じである。`Where` が `OptionalCondition` を受け取らないのも UPDATE と同じである（§4.2）。対象の別名の例外（§6.2）、MySQL でサブクエリが対象のテーブルを読むときの例外（エラー 1093）、§5.11 のサブクエリの検査も UPDATE と同じである（§7）。
 
 ## 9. RETURNING
 
@@ -927,7 +928,7 @@ var db2 = new Database<SqliteDialect>(connection);
 
 ### 12.3 `ToSql`
 
-すべての文は `ToSql()` で `SqlStatement` を返す。接続は使わない。
+すべての文は `ToSql()` で `SqlStatement` を返す。接続は使わない。`Where` も `AllRows()` もない UPDATE / DELETE は文として完成していないので、`ToSql()` もない（§7）。
 
 ```csharp
 SqlStatement s = db.From(User.Table).Where(u => Gt(u.Age, 20)).Select(u => u.Name).ToSql();
@@ -1035,14 +1036,15 @@ CREATE TABLE "users" (
 | `WHERE` に集計、`HAVING` に行の値 | 評価の段階 | CS1662 / CS0029 |
 | 外部結合の NULL になりうる側を NULL を許さない型で読む | `NullableColumns`（§5.3） | 値型は CS0029。参照型（`string`、`byte[]`、行全体）は null 許容の警告 CS8619 / CS8600（参照型とその NULL を許す形は実行時に同じ型なので、型では止められない。警告をエラーにする利用者ではエラー） |
 | `INSERT` で必須の列がない | `required`（§6.1） | CS9035 |
-| `[AutoIncrement]` の列に値を入れる、更新する | モデルにない／`ReadOnlyColumn<T>` | CS0117 / CS1503 |
-| `WHERE` のない `UPDATE` / `DELETE` | `Where` か `AllRows` の後にだけ `ExecuteAsync` がある | CS1061 |
+| `[AutoIncrement]` の列に値を入れる、更新する | モデルにない／`ReadOnlyColumn<T>` を受け取る `[Obsolete(error: true)]` の `Set`（§7） | CS0117 / CS0619（直し方のメッセージ付き） |
+| UPDATE で NULL 化した列や式に代入する、列と型の違う値を代入する（§7） | `Set` が `Column<T>` と `T` / `IExpr<T, PerRow>` だけを受け取る | CS1503 / CS0311 |
+| `WHERE` のない `UPDATE` / `DELETE` | `Where` か `AllRows` の後にだけ `ExecuteAsync` と `ToSql` がある | CS1061 |
 | 方言にない機能（§2.4 の表） | 方言のインターフェースの制約 | CS0311 / CS1061 |
 | SQL Server で `ORDER BY` のない `Limit` | 同上 | CS0311 |
 | SQLite、MySQL、MariaDB で `Limit` のない `Offset`、SQL Server で `ORDER BY` のない `Offset` | 同上（`IOffsetWithoutLimitDialect` / `IUnorderedOffsetDialect`） | CS0311 |
 | 集合演算の演算子の混在、`OrderBy` / `Limit` / `Offset` の後の集合演算 | その形を受け取る `[Obsolete(error: true)]` のメソッド（§5.10） | CS0619（直し方のメッセージ付き） |
 | `SelectDistinct` の後の `OrderBy` に選んでいない式を書く | `OrderBy` が選んだ項目だけを受け取る（§5.7） | CS1503 / CS1061 |
-| UPDATE / DELETE の `Where` に「条件なし」になりうる条件を渡す | `Where` が `Condition<PerRow>` だけを受け取る（§4.2） | CS1503 |
+| UPDATE / DELETE の `Where` に「条件なし」になりうる条件を渡す | `OptionalCondition` を受け取る `[Obsolete(error: true)]` の `Where`（§4.2、§7） | CS0619（直し方のメッセージ付き） |
 | MySQL、MariaDB で `Limit` の後のサブクエリを `In` / `NotIn` に渡す（§5.11） | 方言のインターフェースの制約（`ILimitInSubqueryDialect`） | CS0311 |
 | `OrderBy` の後で `Limit` も `Offset` もない段階をサブクエリ、派生テーブル、CTE にする（§5.11） | その段階を受け取る `[Obsolete(error: true)]` の多重定義 | CS0619（直し方のメッセージ付き） |
 | `NotIn` のサブクエリが NULL を返しうる（§5.11） | アナライザー | AURA0203 |

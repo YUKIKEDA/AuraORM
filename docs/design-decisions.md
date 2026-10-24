@@ -255,7 +255,7 @@
 
 ## D1-42 MySQL で UPDATE / DELETE のサブクエリが対象のテーブルを読む
 
-- **Decision**: MySQL では、UPDATE / DELETE の文の中のサブクエリが対象のテーブルを読むと（派生テーブルや CTE を通しても）、組み立て時の例外にする（§7、§14.3）。
+- **Decision**: MySQL では、UPDATE / DELETE の文の中のサブクエリが対象のテーブルを読むと（派生テーブルを通しても）、組み立て時の例外にする（§7、§14.3）。
 - **Reason**: MySQL はこの文をエラー 1093 で拒む。派生テーブルを通して通るのは実体化されたときだけで、既定は併合であり、どちらになるかを資料は保証しない（8.4 の `update.html`）。#56 の Grill で所有者が決めた。
 - **Rejected**: jOOQ のように `SELECT * FROM (…) AS t` で自動で包む案（書いたものと SQL が変わり、包んでも通る保証がない）。そのまま送る案（EF Core / Pomelo。MySQL でだけ実行時に失敗する）。
 
@@ -306,3 +306,15 @@
 - **Decision**: INSERT、UPDATE、DELETE の対象に別名付きのテーブルを渡すと `ArgumentException` にする（§6.2、§14.3）。
 - **Reason**: `Table.As` は同じ型を返すので型では止められない。SQL Server では対象の別名を `FROM` 句でしか付けられず（§18 の U1）、方言で規則を分けないために三つの文で揃える。対象のテーブルを読むサブクエリは、内側に別名を付ければ書ける。#56 の Grill で所有者が決めた。
 - **Rejected**: SQL Server 以外で別名を出す案（方言で規則が分かれる）。別名を捨ててテーブル名で書く案（書いたものと SQL が変わる）。
+
+## D1-51 `Set` の式の型引数
+
+- **Decision**: 式を代入する `Set` は、式の型を型引数に取る（`Set<T, TExpr>(Column<T>, TExpr) where TExpr : IExpr<T, PerRow>`）。`Set(u.Nickname, null)` は値の多重定義を選び、NULL を代入する（§7）。
+- **Reason**: 式の引数を `IExpr<T, PerRow>` にすると、`null` が値（`T`）と式の両方に当てはまり、CS0121（呼び出しがあいまい）になる。`null` からは `TExpr` を推論できないので、型引数にすると値の多重定義だけが残る。行 M1 の実装（#60）でコンパイルのテストが見つけた。
+- **Rejected**: 利用者に `(string?)null` と書かせる案（よく使う代入で型を書かせる）。C# 13 の `OverloadResolutionPriority` で優先する案（C# 12 の利用者では効かない）。
+
+## D1-52 `[AutoIncrement]` の列への代入と、UPDATE / DELETE の `OptionalCondition`
+
+- **Decision**: `ReadOnlyColumn<T>` を受け取る `Set` と、`OptionalCondition` を受け取る UPDATE / DELETE の `Where` を `[Obsolete(…, error: true)]` で置き、CS0619 と直し方のメッセージにする（§7、§14.1）。
+- **Reason**: D1-51 の型引数のため、`[AutoIncrement]` の列への代入は値の側の型引数の誤り（CS0311）として報告され、列の誤りだと分からない。`OptionalCondition` はラムダの戻り値の変換の誤り（CS0029）になり、`AllRows()` を書けばよいと分からない。D1-25 と同じ考えで、直し方を示す。行 M1 の実装（#60）で決めた。
+- **Rejected**: コンパイラーのエラーのままにする案（直し方が分からない）。

@@ -55,6 +55,24 @@ public sealed class TableAlias
         }
 
         context.CheckCteShadow(this);
+        context.CheckTargetRead(this);
+        RenderName(context);
+        if (Alias is not null)
+        {
+            context.Write(" AS ");
+            context.WriteIdentifier(Alias);
+        }
+    }
+
+    /// <summary>
+    /// Writes the table that an <c>INSERT</c>, <c>UPDATE</c>, or <c>DELETE</c> changes: <c>"schema"."table"</c>. The target has
+    /// no alias (§6.2).
+    /// </summary>
+    /// <param name="context">The rendering context.</param>
+    internal void RenderTarget(SqlRenderContext context) => RenderName(context);
+
+    private void RenderName(SqlRenderContext context)
+    {
         if (Schema is not null)
         {
             context.WriteIdentifier(Schema);
@@ -62,11 +80,6 @@ public sealed class TableAlias
         }
 
         context.WriteIdentifier(Table);
-        if (Alias is not null)
-        {
-            context.Write(" AS ");
-            context.WriteIdentifier(Alias);
-        }
     }
 
     /// <summary>

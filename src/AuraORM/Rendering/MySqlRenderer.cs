@@ -16,6 +16,16 @@ internal sealed class MySqlRenderer(bool isMariaDb) : DialectRenderer
     // §5.5: MySQL and MariaDB do not match an expression in HAVING with the GROUP BY key (MySQL bugs 24083 and 78395).
     public override bool AggregatesGroupKeysInHaving => true;
 
+    // §6.2: INSERT INTO t () VALUES (), () inserts rows of defaults (run on MySQL 8.4 and 9.7, MariaDB 10.11 and 12.3).
+    public override bool WritesEmptyValueRows => true;
+
+    // §7: "Single-table UPDATE assignments are generally evaluated from left to right" (MySQL 8.4 update.html); MariaDB does
+    // the same unless SIMULTANEOUS_ASSIGNMENT is set.
+    public override bool AssignsLeftToRight => true;
+
+    // §7: MySQL rejects a subquery on the target with error 1093; MariaDB accepts it (UPDATE since 10.3.2, DELETE since 10.3.1).
+    public override bool RejectsTargetInMutationSubquery => !IsMariaDb;
+
     protected override char IdentifierOpen => '`';
 
     protected override char IdentifierClose => '`';
