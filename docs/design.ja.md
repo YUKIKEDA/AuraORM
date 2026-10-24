@@ -672,7 +672,8 @@ db.From(Order.Table).GroupBy(o => o.UserId)
 - `GroupScalar(sub)` / `GroupExists(sub)` は、`PerGroup` の式と条件を作る。`Having`、`GroupBy` の後の `Select` と `OrderBy` で使う。その中では、外側の文の列を GROUP BY のキーを通してだけ使える。ほかの外側の列を使うと、文を組み立てるときに `InvalidOperationException` になる（§14.3）。HAVING には GROUP BY のキーと集計しか書けず、SQLite はこの誤りを報告しないためである（§4.5。外側のキーでない列を参照するサブクエリを、SQLite は黙って通し、ほかの方言はエラーにした）。C# の型は戻り値で多重定義できず、二つの段階を実装する型は推論に失敗する（CS0411）ので、名前を分けた。
 - サブクエリのラムダは行の値（`PerRow`）を受け取るので、外側のキー `k`（`PerGroup`）はそのままでは書けない。`Outer(k)` で、キーをサブクエリの中の行の値にする（`Where(q => Eq(q.UserId, Outer(k)))`。SQL はキーの列のままである）。`Outer` が受け取るのは列のキー（`k`、`k.Item1` …）だけで、集計や列でないキー（`Add(o.Price, 1)`）は `ArgumentException` になる。列のキーの参照は全方言で通るが、列でないキーは PostgreSQL、MySQL、MariaDB がそのままでは拒み、`MIN` で包むと SQLite が拒む。外側の集計の参照も SQLite が拒む。`GroupScalar` / `GroupExists` の外で `Outer` を使うと、文を組み立てるときに `InvalidOperationException` になる（§14.3）。
 - 外側のクエリのラムダの引数を内側のラムダで使えば、相関サブクエリになる。内側の列を外側の文で使うと、文の外の列として例外になる（§14.3）。
-- サブクエリにできるのは射影のある段階である: `Select` / `SelectDistinct` の後、`GroupBy` の後の射影、`Limit` / `Offset` の後、集合演算（行 Q5）。`OrderBy` の後で `Limit` も `Offset` もない段階は置けない（`In` / `NotIn` は CS1503、受け取る多重定義のない `Exists` / `Scalar` は型の推論が失敗して CS0411）。その並び順は外側では保証されず、SQL Server はメッセージ 1033 で失敗する。EF Core はこの `ORDER BY` を黙って消し、jOOQ は `TOP` を足すが、どちらも書いたものと違う SQL になる（§19）。
+- 外側の文と同じ名前（別名があれば別名）のテーブルを内側の文の `FROM` に置き、外側の列を内側で使うと、文を組み立てるときに `InvalidOperationException` になる（§14.3）。どちらの列も同じ修飾（`"accounts"."email"`）で出て、SQL は内側のテーブルの列と解釈するので、例外もエラーもなく誤った結果になる（自己相関の `Exists(… Gt(x.Id, a.Id) …)` が常に偽になる）。どちらかに `As("…")` を付ける。§5.2 の、同じテーブルを別名なしで二度使う検査を、文をまたいで広げたものである。外側の列を使わない（相関しない）サブクエリは、同じ名前でも誤らないので通す。
+- サブクエリにできるのは射影のある段階である: `Select` / `SelectDistinct` の後、`GroupBy` の後の射影、`Limit` / `Offset` の後、集合演算（行 Q5）。`OrderBy` の後で `Limit` も `Offset` もない段階は置けない。その段階を受け取る多重定義を `[Obsolete(…, error: true)]` で置くので、CS0619 と「`OrderBy` を外すか、`Limit` を足す」というメッセージになる（その多重定義がないと、`In` は値の一覧への変換の誤り CS1503、`Exists` / `Scalar` は型の推論の失敗 CS0411 になり、直し方が分からない。§0.2）。その並び順は外側では保証されず、SQL Server はメッセージ 1033 で失敗する。EF Core はこの `ORDER BY` を黙って消し、jOOQ は `TOP` を足すが、どちらも書いたものと違う SQL になる（§19）。
 - MySQL と MariaDB では、`Limit` の後のサブクエリを `In` / `NotIn` に渡すとコンパイルエラーになる（CS0311、`ILimitInSubqueryDialect`）。この二つはメッセージ 1235（`LIMIT & IN/ALL/ANY/SOME subquery`）で失敗する。jOOQ と linq2db はサブクエリを派生テーブルで包むが、見えないサブクエリが増えるのでそうしない（§19）。`Exists` と `Scalar` は `Limit` 付きでも全方言で通る。
 - `NotIn(a, sub)` のサブクエリが NULL を返しうるときは AURA0203 になる（§4.4）。EF Core は `NOT EXISTS` などに書き換えるが、AuraORM は書いた SQL を変えない（§19）。
 - 外側の文と方言の違うサブクエリ（`SqlBuilder<SqliteDialect>` で作ったものを SQL Server の文に入れる）は、文を組み立てるときに `InvalidOperationException` になる（§14.3）。式の型は方言を持たないので型では止められず、サブクエリの方言ごとの規則（§5.9）を素通りさせないためである。
@@ -698,7 +699,7 @@ db.From(Order.Table).GroupBy(o => o.UserId)
 
 - キーワードは大文字。要素の区切りは `, `。句の間は半角空白一つ。改行と末尾の `;` は出さない。
 - 識別子は常にクォートする。SQLite と PostgreSQL は `"x"`（中の `"` は `""`）、MySQL と MariaDB は `` `x` ``（中の `` ` `` は ``` `` ```）、SQL Server は `[x]`（中の `]` は `]]`）。
-- パラメータの名前は、PostgreSQL が `$1`、`$2`、…（名前のないパラメータ）、ほかの方言は `@p0`、`@p1`、… である。番号は、SQL の文字列に現れる順に振る（`SqlStatement.Parameters` の順でもある）。一つの式のオブジェクトを、一つの文の中の複数の場所で使うときは、同じパラメータをもう一度使う（`GroupBy` のキー `k` を SELECT で使うと `GROUP BY ("orders"."Price" + $1)` と `SELECT ("orders"."Price" + $1)`、§4.2 の SQL Server の `IsNotDistinctFrom` の展開）。同じ形の式でも、別々に書けば別のパラメータになる（`Add(o.Price, 1)` を `GroupBy` と `Select` に一度ずつ書くと `$1` と `$2`）。キーは後のラムダに `k` として渡るので、別々に書く必要はない（§5.5）。PostgreSQL は、GROUP BY のキーと SELECT の式を、パラメータの番号まで含めて比べるためである（PostgreSQL 18 で、`$1` と `$2` に分かれると `must appear in the GROUP BY clause` で失敗し、同じ `$1` なら通ることを確かめた）。`SqlStatement.Parameters` には、そのパラメータが一度だけ入る。
+- パラメータの名前は、PostgreSQL が `$1`、`$2`、…（名前のないパラメータ）、ほかの方言は `@p0`、`@p1`、… である。番号は、SQL の文字列に現れる順に振る（`SqlStatement.Parameters` の順でもある）。一つの式のオブジェクトを、一つの文の中の複数の場所で使うときは、同じパラメータをもう一度使う（`GroupBy` のキー `k` を SELECT で使うと `GROUP BY ("orders"."Price" + $1)` と `SELECT ("orders"."Price" + $1)`、§4.2 の SQL Server の `IsNotDistinctFrom` の展開）。同じ形の式でも、別々に書けば別のパラメータになる（`Add(o.Price, 1)` を `GroupBy` と `Select` に一度ずつ書くと `$1` と `$2`）。キーは後のラムダに `k` として渡るので、別々に書く必要はない（§5.5）。一つのサブクエリのオブジェクトを二か所で使うとき（`var sub = …; Or(In(a.Id, sub), NotIn(a.Id, sub))`）も、その中の値は同じパラメータになる。PostgreSQL は、GROUP BY のキーと SELECT の式を、パラメータの番号まで含めて比べるためである（PostgreSQL 18 で、`$1` と `$2` に分かれると `must appear in the GROUP BY clause` で失敗し、同じ `$1` なら通ることを確かめた）。`SqlStatement.Parameters` には、そのパラメータが一度だけ入る。
 - 複合の式（`And`、`Or`、算術、`Concat`）は常にかっこで囲む。比較とそれ以外の関数呼び出しは囲まない。
 - 本書の例では、読みやすさのために SQL を改行して示すことがある。実際の出力は一行である。
 
@@ -1016,7 +1017,7 @@ CREATE TABLE "users" (
 | `SelectDistinct` の後の `OrderBy` に選んでいない式を書く | `OrderBy` が選んだ項目だけを受け取る（§5.7） | CS1503 / CS1061 |
 | UPDATE / DELETE の `Where` に「条件なし」になりうる条件を渡す | `Where` が `Condition<PerRow>` だけを受け取る（§4.2） | CS1503 |
 | MySQL、MariaDB で `Limit` の後のサブクエリを `In` / `NotIn` に渡す（§5.11） | 方言のインターフェースの制約（`ILimitInSubqueryDialect`） | CS0311 |
-| `OrderBy` の後で `Limit` も `Offset` もない段階をサブクエリ、派生テーブル、CTE にする（§5.11） | 受け取る段階の型 | CS1503 / CS0411 |
+| `OrderBy` の後で `Limit` も `Offset` もない段階をサブクエリ、派生テーブル、CTE にする（§5.11） | その段階を受け取る `[Obsolete(error: true)]` の多重定義 | CS0619（直し方のメッセージ付き） |
 | `NotIn` のサブクエリが NULL を返しうる（§5.11） | アナライザー | AURA0203 |
 | `SqlBuilder` から作った文を実行する | 実行のメソッドは `Executable` の文にだけある（§12.3） | CS1929 |
 | 文字列の SQL を断片に入れる | 補間文字列ハンドラーだけを受け取る | CS1503 |
@@ -1030,6 +1031,7 @@ CREATE TABLE "users" (
 - 生 SQL 断片（§11）の中身。
 - データベースのスキーマが、C# の定義と一致していること。AuraORM は実行時にスキーマを調べない。
 - データベースの照合順序、タイムゾーン、数値の精度による結果の違い。
+- `GroupBy` のない集計だけのサブクエリ（`Exists(db.From(T).Select(x => Count()))`）の `Exists` が常に真になること。集計は行がなくても一行を返す。型は `GroupBy` の有無を区別しない（`PerGroup` の射影は同じ）ので止められない。全方言で同じ結果になる。
 - `Scalar` / `GroupScalar` のサブクエリが 2 行以上を返すこと。SQLite は黙って 1 行目を返し、ほかの方言はエラーになる（§5.11）。行の数はデータで決まるので、型でも組み立て時にも止められない。
 - 参照型（`string`、`byte[]`、行全体）の NULL 可否の誤り（外部結合の NULL 化した側を NULL を許さない型で読む、など）。これは C# の null 許容の警告（CS8600、CS8619 など）が知らせるもので、利用者のプロジェクトで null 許容参照型が有効で（`<Nullable>enable</Nullable>`）、その警告をエラーにしているときだけコンパイルエラーになる。`#nullable disable` の文脈や、警告を抑止した文脈では何も出ない。値型の誤りは常にコンパイルエラーである。
 
@@ -1054,6 +1056,7 @@ CREATE TABLE "users" (
 | `OrderBy` のキーが値だけ（§5.8） | `InvalidOperationException` |
 | `GroupBy` のキーにサブクエリがある（§5.5。SQL Server はメッセージ 144、MySQL は相関していればメッセージ 1055 で失敗する） | `InvalidOperationException` |
 | 外側の文と方言の違うサブクエリ、派生テーブル、CTE を使った（§5.11） | `InvalidOperationException` |
+| 内側の文の `FROM` のテーブルが、内側で列を使う外側の文のテーブルと同じ名前（別名）である（§5.11） | `InvalidOperationException` |
 | `GroupScalar` / `GroupExists` の中で、外側の文の列を `Outer(k)` を通さずに使った（§5.11） | `InvalidOperationException` |
 | `GroupScalar` / `GroupExists` の外で `Outer` を使った（§5.11） | `InvalidOperationException` |
 | `Outer` に列のキーでないもの（集計、列でないキー）を渡した（§5.11） | `ArgumentException` |
