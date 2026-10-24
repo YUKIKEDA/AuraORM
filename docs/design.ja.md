@@ -833,7 +833,7 @@ await db.Insert(User.Table)
 - `DoUpdate` の後の `Where` は `DO UPDATE SET … WHERE …` を出す。条件が偽の行は更新されず、行の数にも入らない。`Where` は UPDATE と同じく `Condition<PerRow>` だけを受け取る（`OptionalCondition` は CS0619）。
 - 設定した列が一つもない行（§6.2 の `DEFAULT VALUES`）に `OnConflict` / `OnConflictDoNothing` を付けると、SQLite では `ArgumentException` になる（§14.3）。SQLite の資料に「`DEFAULT VALUES` の後には UPSERT の句を書けない」とある。PostgreSQL は `INSERT INTO "t" DEFAULT VALUES ON CONFLICT …` を出す（15 と 18 で確かめた）。
 - テーブルの名前が `excluded`（大文字と小文字を区別しない）のとき、`OnConflict` の文は `InvalidOperationException` になる（§14.3）。SQLite 3.40 は `excluded.n` をテーブルの既存の行の列と読み、挿入しようとした値ではなく既存の値で更新した。エラーにならず、誤った値が入る。PostgreSQL（15 と 18）は「`excluded` があいまい」というエラーで拒む。
-- `DoUpdate` の値や条件のサブクエリが対象のテーブルを読んでも、どの方言も受け付ける（SQLite 3.40、PostgreSQL 15 と 18 で確かめた）。§7 の MySQL の検査は UPDATE と DELETE だけのものである。
+- `DoUpdate` の値や条件のサブクエリが対象のテーブルを読んでも、SQLite と PostgreSQL は受け付ける。別名のないテーブル、別名を付けたテーブル、派生テーブルを通した形の三つとも、SQLite 3.40、PostgreSQL 15 と 18 で通った。
 
 ### 10.2 MySQL と MariaDB（`IOnDuplicateKeyDialect`）
 
@@ -852,7 +852,7 @@ await db.Insert(User.Table)
 - MySQL と MariaDB は `ON DUPLICATE KEY UPDATE` の代入も左から順に評価する（`n = n + 10, name = n` で、`name` に新しい `n` が入った。8.4 と 9.7、10.11 と 12.3 で確かめた。MySQL の資料が左から順と書くのは単一テーブルの UPDATE で、この句の頁には書いていない）。そこで §7 と同じく、代入の値がそれより前の代入の列を読むと `InvalidOperationException` になる。`excluded` の列は既存の行の列ではないので数えない。
 - テーブルの名前が `excluded`（大文字と小文字を区別しない）のとき、MySQL の `OnDuplicateKeyUpdate` は `InvalidOperationException` になる（§14.3）。MySQL は行の別名とテーブル名が同じだとエラー 1066 で拒む（8.4 と 9.7）。MariaDB は行の別名を使わないので受け付ける。
 - 設定した列が一つもない行は ``INSERT INTO `t` () VALUES () … ON DUPLICATE KEY UPDATE …`` を出す（MySQL は `() VALUES () AS excluded`）。
-- 値のサブクエリが対象のテーブルを読んでも、MySQL も MariaDB も受け付ける（8.4 と 9.7、10.11 と 12.3 で確かめた）。§7 の MySQL のエラー 1093 の検査は当てない。
+- MySQL では、値のサブクエリが対象のテーブルを読むと（派生テーブルを通しても）、§7 の UPDATE / DELETE と同じく組み立て時に `InvalidOperationException` になる（§14.3）。MySQL 8.4 と 9.7 は、別名のないテーブル `(SELECT MAX(n) FROM t)` と、派生テーブルを通した形をエラー 1093 で拒んだ。別名を付けたテーブル `(SELECT MAX(x.n) FROM t AS x)` は通ったが、その理由は資料に見つからず、保証がないので、別名の有無で規則を分けない。MariaDB（10.11 と 12.3）は三つの形とも受け付ける。
 - 「何もしない」形は置かない。MySQL の `INSERT IGNORE` は、一意キーの衝突だけでなく、型の変換の誤りなども警告にして続けるからである。衝突した行を変えないときは `OnDuplicateKeyUpdate((u, excluded) => [Set(u.Id, u.Id)])` と書ける（Drizzle ORM の資料も同じ書き方を示す）。この書き方は XML ドキュメントに書く。
 
 ### 10.3 共通の規則
@@ -1108,7 +1108,7 @@ CREATE TABLE "users" (
 | SQLite、PostgreSQL、SQL Server で、設定された列が一つもない行を二つ以上 INSERT する（§6.2） | `ArgumentException` |
 | INSERT、UPDATE、DELETE の対象に別名付きのテーブルを渡した（§6.2） | `ArgumentException` |
 | MySQL、MariaDB で、UPDATE と `OnDuplicateKeyUpdate` の代入の値が、それより前の代入の列を読む（§7、§10.2） | `InvalidOperationException` |
-| MySQL で、UPDATE / DELETE の中のサブクエリが対象のテーブルを読む（§7。エラー 1093） | `InvalidOperationException` |
+| MySQL で、UPDATE / DELETE と `OnDuplicateKeyUpdate` の中のサブクエリが対象のテーブルを読む（§7、§10.2。エラー 1093） | `InvalidOperationException` |
 | SQL Server で、`Returning` の射影にサブクエリがある（§9。メッセージ 10705） | `InvalidOperationException` |
 | `Returning` のサブクエリが対象のテーブルを読む（§9） | `InvalidOperationException` |
 | `OnConflict` に空の配列、同じ列を二度並べた配列を渡した（§10.1） | `ArgumentException` |
