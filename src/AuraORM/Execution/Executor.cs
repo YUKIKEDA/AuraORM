@@ -33,15 +33,23 @@ internal static class Executor
         }
     }
 
-    public static async Task<List<T>> ListAsync<T>(
+    public static Task<List<T>> ListAsync<T>(
         IStatementRunner session,
         SqlStatement statement,
         RowFactory<T> factory,
         CancellationToken cancellationToken
+    ) => ListAsync(session, statement, factory, cancelUnread: true, cancellationToken);
+
+    public static async Task<List<T>> ListAsync<T>(
+        IStatementRunner session,
+        SqlStatement statement,
+        RowFactory<T> factory,
+        bool cancelUnread,
+        CancellationToken cancellationToken
     )
     {
         var rows = new List<T>();
-        await foreach (T row in StreamAsync(session, statement, factory, cancellationToken).ConfigureAwait(false))
+        await foreach (T row in StreamAsync(session, statement, factory, cancelUnread, cancellationToken).ConfigureAwait(false))
         {
             rows.Add(row);
         }
@@ -53,6 +61,7 @@ internal static class Executor
         IStatementRunner session,
         SqlStatement statement,
         RowFactory<T> factory,
+        bool cancelUnread,
         [EnumeratorCancellation] CancellationToken cancellationToken
     )
     {
@@ -73,7 +82,9 @@ internal static class Executor
             }
             finally
             {
-                if (!readAll)
+                // §12.2: a SELECT with rows left is cancelled so that SqlClient does not read them; a statement with Returning
+                // is not, because a cancel can undo its change (§9).
+                if (!readAll && cancelUnread)
                 {
                     CancelUnread(command);
                 }

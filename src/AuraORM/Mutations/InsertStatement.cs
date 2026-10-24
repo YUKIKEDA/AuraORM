@@ -20,15 +20,22 @@ public sealed class InsertStatement<TDialect, TMode, TColumns> : MutationStateme
     internal InsertStatement(
         IStatementRunner? session,
         TableAlias target,
+        TColumns table,
         ImmutableArray<string> columns,
         ImmutableArray<ImmutableArray<ParameterNode>> rows
     )
         : base(session)
     {
         _target = target;
+        Table = table;
         _columns = columns;
         _rows = rows;
     }
 
-    private protected override SqlNode CreateNode() => new InsertNode(_target, _columns, _rows);
+    /// <summary>
+    /// Gets the columns of the table, which the lambda of <c>Returning</c> gets.
+    /// </summary>
+    internal TColumns Table { get; }
+
+    internal override SqlNode CreateNode(ImmutableArray<SqlNode> returning) => new InsertNode(_target, _columns, _rows, returning);
 }

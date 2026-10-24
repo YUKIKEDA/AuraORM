@@ -51,6 +51,12 @@ internal abstract class DialectRenderer
     public virtual bool RejectsTargetInMutationSubquery => false;
 
     /// <summary>
+    /// Gets a value indicating whether the rows that a statement changed are returned by <c>OUTPUT INSERTED.…</c> /
+    /// <c>OUTPUT DELETED.…</c> inside the statement (SQL Server), not by a trailing <c>RETURNING</c> (§9).
+    /// </summary>
+    public virtual bool ReturnsWithOutput => false;
+
+    /// <summary>
     /// Gets a value indicating whether parameters are unnamed and bound by position (PostgreSQL, §5.12).
     /// </summary>
     public virtual bool UsesPositionalParameters => false;

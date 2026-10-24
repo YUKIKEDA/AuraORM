@@ -16,6 +16,9 @@ internal sealed class SqlRenderContext : IDisposable
     private int _keyDepth;
     private TableAlias? _mutationTarget;
     private HashSet<string>? _assignedBefore;
+    private TableAlias? _returningTarget;
+    private string? _returningPrefix;
+    private int _returningDepth;
 
     public SqlRenderContext(DialectRenderer dialect)
     {
@@ -206,12 +209,77 @@ internal sealed class SqlRenderContext : IDisposable
     }
 
     /// <summary>
-    /// Throws when a table in a <c>FROM</c> or a join inside an <c>UPDATE</c> or <c>DELETE</c> is the table that the
-    /// statement changes, on a dialect that rejects it (MySQL, error 1093, §7).
+    /// Writes the <c>RETURNING</c> of an <c>INSERT</c>, <c>UPDATE</c>, or <c>DELETE</c>, or SQL Server's <c>OUTPUT</c>, with
+    /// a space before it; nothing when there are no items (§9). The target's columns are written unqualified, or after
+    /// <c>INSERTED.</c> / <c>DELETED.</c>; inside a subquery they keep their table.
+    /// </summary>
+    /// <param name="target">The table that the statement changes.</param>
+    /// <param name="items">The items.</param>
+    /// <param name="outputPrefix">SQL Server's <c>INSERTED</c> or <c>DELETED</c>, or <see langword="null"/> for <c>RETURNING</c>.</param>
+    /// <exception cref="InvalidOperationException">An item holds a subquery on SQL Server, or a subquery that reads the target.</exception>
+    public void WriteReturning(TableAlias target, System.Collections.Immutable.ImmutableArray<SqlNode> items, string? outputPrefix)
+    {
+        if (items.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        Write(outputPrefix is null ? " RETURNING " : " OUTPUT ");
+        _returningTarget = target;
+        _returningPrefix = outputPrefix;
+        _returningDepth = _statementDepth;
+        int subqueries = SubqueriesWritten;
+        WriteList(items);
+        _returningTarget = null;
+        _returningPrefix = null;
+        if (outputPrefix is not null && SubqueriesWritten != subqueries)
+        {
+            throw new InvalidOperationException(
+                "Returning holds a subquery, and SQL Server does not accept a subquery in OUTPUT (message 10705). Read the value with a SELECT after the statement."
+            );
+        }
+    }
+
+    /// <summary>
+    /// Writes the table of a column of the statement's <c>RETURNING</c> or <c>OUTPUT</c>, if the column needs one: nothing
+    /// for <c>RETURNING</c>, <c>INSERTED.</c> or <c>DELETED.</c> for <c>OUTPUT</c> (§9).
+    /// </summary>
+    /// <param name="table">The column's table.</param>
+    /// <returns><see langword="true"/> when the column is a top-level column of the target in <c>RETURNING</c> or
+    /// <c>OUTPUT</c>, which then needs only its name.</returns>
+    public bool WriteReturningQualifier(TableAlias table)
+    {
+        if (_returningTarget is null || !ReferenceEquals(table, _returningTarget) || _statementDepth != _returningDepth)
+        {
+            return false;
+        }
+
+        if (_returningPrefix is not null)
+        {
+            Write(_returningPrefix);
+            Write('.');
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Throws when a table in a <c>FROM</c> or a join is the table that the statement changes, where that is not accepted: in
+    /// a subquery of <c>Returning</c> on every dialect (§9), and in a subquery of an <c>UPDATE</c> or <c>DELETE</c> on MySQL
+    /// (error 1093, §7).
     /// </summary>
     /// <param name="table">The table's occurrence.</param>
     public void CheckTargetRead(TableAlias table)
     {
+        if (_returningTarget is not null && table.Table == _returningTarget.Table && table.Schema == _returningTarget.Schema)
+        {
+            throw new InvalidOperationException(
+                "A subquery of Returning reads "
+                    + table.Table
+                    + ", the table that the statement changes. Databases differ on whether it sees the table before or after the change, and SQLite leaves it undefined; read the value with a SELECT after the statement."
+            );
+        }
+
         if (
             _mutationTarget is not null
             && Dialect.RejectsTargetInMutationSubquery

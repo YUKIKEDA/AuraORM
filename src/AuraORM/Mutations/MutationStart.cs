@@ -15,7 +15,11 @@ internal static class MutationStart
         where TRow : class
         where TColumns : TableColumns<TRow>, ITableColumns<TColumns>
         where TNullable : NullableTableColumns<TRow>, ITableColumns<TNullable>
-        where TInsert : InsertModel => new(session, Target(table), table.Info);
+        where TInsert : InsertModel
+    {
+        TableAlias target = Target(table);
+        return new(session, target, table.Info, TColumns.Create(target));
+    }
 
     public static UpdateTable<TDialect, TMode, TColumns> Update<TDialect, TMode, TRow, TColumns, TNullable, TInsert>(
         IStatementRunner? session,

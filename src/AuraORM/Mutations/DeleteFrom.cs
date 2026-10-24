@@ -34,7 +34,7 @@ public sealed class DeleteFrom<TDialect, TMode, TColumns>
         ArgumentNullException.ThrowIfNull(condition);
         Condition<PerRow> where = condition(_columns);
         ArgumentNullException.ThrowIfNull(where, nameof(condition));
-        return new(_session, _target, where.Node);
+        return new(_session, _target, _columns, where.Node);
     }
 
     /// <summary>Not accepted: a condition that may be empty would change every row. Write <see cref="AllRows"/> for that.</summary>
@@ -48,5 +48,5 @@ public sealed class DeleteFrom<TDialect, TMode, TColumns>
     /// Deletes every row of the table. It adds nothing to the SQL.
     /// </summary>
     /// <returns>The statement.</returns>
-    public DeleteStatement<TDialect, TMode, TColumns> AllRows() => new(_session, _target, null);
+    public DeleteStatement<TDialect, TMode, TColumns> AllRows() => new(_session, _target, _columns, null);
 }

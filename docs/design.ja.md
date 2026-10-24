@@ -797,7 +797,8 @@ List<long> ids = await db.Insert(User.Table)
 | MySQL | 書けない | 書けない | 書けない |
 | SQL Server | 列の並びの後、`VALUES` の前に `OUTPUT INSERTED.[Id]` | `SET` の後、`WHERE` の前に `OUTPUT INSERTED.[Id]` | テーブル名の後、`WHERE` の前に `OUTPUT DELETED.[Id]` |
 
-- `RETURNING` の列は修飾しない（SQL Server は `INSERTED.` / `DELETED.` を付ける）。
+- `RETURNING` の列は修飾しない（SQL Server は `INSERTED.` / `DELETED.` を付ける）。`Returning` の中のサブクエリでは、内側の文として §5.2 のとおり修飾し、相関する対象の列も `"users"."Id"` と書く（SQLite と PostgreSQL と MariaDB で確かめた）。UPDATE の列は更新の後の値、DELETE の列は削除の前の値である。
+- `Returning` の結果（`ReturningQuery`）は SELECT ではないので、サブクエリにも集合演算の被演算子にもできない（CS1503）。実行のメソッドは SELECT と同じものを持つ（§12.2）。方言が対応しない `Returning`（MySQL のすべて、MariaDB の UPDATE）は、方言の制約を満たさず CS0311 になる。
 - MariaDB の `UPDATE … RETURNING` は 13.0 からで、最小バージョンの 10.11 にはないので書けない。
 - SQL Server の `OUTPUT`（`INTO` なし）は、その操作のトリガーが有効なテーブルでは失敗する。AuraORM は `OUTPUT … INTO` に書き換えない。この制約は XML ドキュメントに書く。
 - SQLite の `RETURNING` が返す行の順序は決まっていない。SQL Server も `OUTPUT` の行の順序を保証しない。PostgreSQL の `RETURNING` の順序も、AuraORM は保証しない。

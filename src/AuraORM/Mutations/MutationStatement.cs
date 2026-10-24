@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace AuraORM;
 
 /// <summary>
@@ -28,7 +30,12 @@ public abstract class MutationStatement<TDialect, TMode>
     /// <exception cref="InvalidOperationException">The statement breaks a rule that is checked when it is rendered
     /// (<c>docs/design.ja.md</c> §14.3), such as a subquery that reads the target on MySQL.</exception>
     /// <exception cref="ArgumentException">The statement has more parameters than the dialect accepts.</exception>
-    public SqlStatement ToSql() => SqlRenderContext.Render(DialectRenderer.For<TDialect>(), CreateNode());
+    public SqlStatement ToSql() => SqlRenderContext.Render(DialectRenderer.For<TDialect>(), CreateNode(ImmutableArray<SqlNode>.Empty));
 
-    private protected abstract SqlNode CreateNode();
+    /// <summary>
+    /// Creates the node of the statement.
+    /// </summary>
+    /// <param name="returning">The items of <c>Returning</c>, or an empty array (§9).</param>
+    /// <returns>The node.</returns>
+    internal abstract SqlNode CreateNode(ImmutableArray<SqlNode> returning);
 }

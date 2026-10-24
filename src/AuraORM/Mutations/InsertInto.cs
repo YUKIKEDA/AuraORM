@@ -20,12 +20,14 @@ public sealed class InsertInto<TDialect, TMode, TColumns, TInsert>
     private readonly IStatementRunner? _session;
     private readonly TableAlias _target;
     private readonly TableInfo _table;
+    private readonly TColumns _columns;
 
-    internal InsertInto(IStatementRunner? session, TableAlias target, TableInfo table)
+    internal InsertInto(IStatementRunner? session, TableAlias target, TableInfo table, TColumns columns)
     {
         _session = session;
         _target = target;
         _table = table;
+        _columns = columns;
     }
 
     /// <summary>
@@ -128,7 +130,7 @@ public sealed class InsertInto<TDialect, TMode, TColumns, TInsert>
             names.Add(_table.Columns[column].Name);
         }
 
-        return new InsertStatement<TDialect, TMode, TColumns>(_session, _target, names.MoveToImmutable(), builder.MoveToImmutable());
+        return new InsertStatement<TDialect, TMode, TColumns>(_session, _target, _columns, names.MoveToImmutable(), builder.MoveToImmutable());
     }
 
     private static bool SameColumns(int[] columns, List<(int Column, ParameterNode Value)> values)

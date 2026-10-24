@@ -1,10 +1,11 @@
 namespace AuraORM;
 
 /// <summary>
-/// The run methods of an <see cref="Executable"/> SELECT statement (<c>docs/design.ja.md</c> §12.2). A <see cref="SqlOnly"/>
-/// statement, from a <see cref="SqlBuilder{TDialect}"/>, has none of them, so running it does not compile.
+/// The run methods of an <see cref="Executable"/> statement that returns rows: a SELECT, or an <c>INSERT</c>, <c>UPDATE</c>,
+/// or <c>DELETE</c> with <c>Returning</c> (<c>docs/design.ja.md</c> §9, §12.2). A <see cref="SqlOnly"/> statement, from a
+/// <see cref="SqlBuilder{TDialect}"/>, has none of them, so running it does not compile.
 /// </summary>
-public static class SelectExecution
+public static class QueryExecution
 {
     /// <summary>
     /// Runs the statement and reads every row.
@@ -15,13 +16,13 @@ public static class SelectExecution
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The rows.</returns>
     public static Task<List<TResult>> ToListAsync<TDialect, TResult>(
-        this SelectQuery<TDialect, Executable, TResult> query,
+        this ResultQuery<TDialect, Executable, TResult> query,
         CancellationToken cancellationToken = default
     )
         where TDialect : IDialect
     {
         ArgumentNullException.ThrowIfNull(query);
-        return Executor.ListAsync(query.Session!, query.ToSql(), query.Factory, cancellationToken);
+        return Executor.ListAsync(query.Session!, query.ToSql(), query.Factory, query.CancelsUnreadRows, cancellationToken);
     }
 
     /// <summary>
@@ -34,13 +35,13 @@ public static class SelectExecution
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The rows.</returns>
     public static IAsyncEnumerable<TResult> AsAsyncEnumerable<TDialect, TResult>(
-        this SelectQuery<TDialect, Executable, TResult> query,
+        this ResultQuery<TDialect, Executable, TResult> query,
         CancellationToken cancellationToken = default
     )
         where TDialect : IDialect
     {
         ArgumentNullException.ThrowIfNull(query);
-        return Executor.StreamAsync(query.Session!, query.ToSql(), query.Factory, cancellationToken);
+        return Executor.StreamAsync(query.Session!, query.ToSql(), query.Factory, query.CancelsUnreadRows, cancellationToken);
     }
 
     /// <summary>
@@ -55,7 +56,7 @@ public static class SelectExecution
     /// <returns>The first row.</returns>
     /// <exception cref="InvalidOperationException">The statement returned no row.</exception>
     public static async Task<TResult> FirstAsync<TDialect, TResult>(
-        this SelectQuery<TDialect, Executable, TResult> query,
+        this ResultQuery<TDialect, Executable, TResult> query,
         CancellationToken cancellationToken = default
     )
         where TDialect : IDialect
@@ -79,7 +80,7 @@ public static class SelectExecution
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The first row, or <see langword="default"/>.</returns>
     public static async Task<TResult?> FirstOrDefaultAsync<TDialect, TResult>(
-        this SelectQuery<TDialect, Executable, TResult> query,
+        this ResultQuery<TDialect, Executable, TResult> query,
         CancellationToken cancellationToken = default
     )
         where TDialect : IDialect
@@ -102,7 +103,7 @@ public static class SelectExecution
     /// <returns>The only row.</returns>
     /// <exception cref="InvalidOperationException">The statement returned no row, or more than one.</exception>
     public static async Task<TResult> SingleAsync<TDialect, TResult>(
-        this SelectQuery<TDialect, Executable, TResult> query,
+        this ResultQuery<TDialect, Executable, TResult> query,
         CancellationToken cancellationToken = default
     )
         where TDialect : IDialect
@@ -123,7 +124,7 @@ public static class SelectExecution
     /// <returns>The only row, or <see langword="default"/>.</returns>
     /// <exception cref="InvalidOperationException">The statement returned more than one row.</exception>
     public static async Task<TResult?> SingleOrDefaultAsync<TDialect, TResult>(
-        this SelectQuery<TDialect, Executable, TResult> query,
+        this ResultQuery<TDialect, Executable, TResult> query,
         CancellationToken cancellationToken = default
     )
         where TDialect : IDialect
@@ -133,7 +134,7 @@ public static class SelectExecution
     }
 
     private static async Task<(bool Found, TResult? Row)> SingleCoreAsync<TDialect, TResult>(
-        SelectQuery<TDialect, Executable, TResult> query,
+        ResultQuery<TDialect, Executable, TResult> query,
         CancellationToken cancellationToken
     )
         where TDialect : IDialect

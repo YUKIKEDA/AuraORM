@@ -23,7 +23,7 @@ w.Line("var " + GeneratedNames.Local(i) + " = " + GeneratedNames.ReaderParameter
 ```
 - Private fields are `_camelCase`, static ones included. Constants are PascalCase. No `this.` unless needed to disambiguate. Interfaces start with `I`.
 - Namespaces follow assembly names (`AuraORM`, `AuraORM.Generators`), not folders. A public type is never named like a namespace (CA1724).
-- One type per file by default. A file name matches its main type. Families of generated-by-arity types may share a file per arity. The SELECT stages in `src/AuraORM/Select/Generated/` are written by `tools/AuraORM.StageGenerator`: change the generator, run it, then `dotnet csharpier format src/AuraORM/Select/Generated`; never edit the output by hand (CI fails on a difference).
+- One type per file by default. A file name matches its main type. Families of generated-by-arity types may share a file per arity. The SELECT stages in `src/AuraORM/Select/Generated/` and the `Returning` methods in `src/AuraORM/Mutations/Generated/` are written by `tools/AuraORM.StageGenerator`: change the generator, run it, then `dotnet csharpier format src/AuraORM/Select/Generated src/AuraORM/Mutations/Generated`; never edit the output by hand (CI fails on a difference).
 - No `using` alias to shorten a BCL type name. Qualify the name where it collides.
 - Library `await` uses `ConfigureAwait(false)`. `CancellationToken` is the last parameter.
 - No alignment component in an interpolated string (`{value, 4}`): CSharpier and StyleCop disagree on its spacing. Pad with `PadLeft` instead.
