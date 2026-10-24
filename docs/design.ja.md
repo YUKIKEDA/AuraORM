@@ -563,6 +563,7 @@ db.From(Order.Table)
 - 後の段階のラムダは、最初の引数にキー（`k`）を、続いて各テーブルの列の集合を受け取る。キーが一つの式なら `k` はその式（`PerGroup`）で、タプルなら `k.Item1` から順に `PerGroup` の式である（`GroupBy(o => o.Customer).Select((k, o) => (k, Count()))`）。
 - キーにパラメータを含む式（`Add(o.Price, 1)`）を書いてもよい。キーの式を SELECT や HAVING で使うと、同じパラメータが使われる（§5.12）。
 - MySQL と MariaDB では、列ではないキー（`Add(o.Price, 1)` など）を `HAVING` に書くと `MIN(キー)` と出力する（``HAVING MIN((`orders`.`Price` + @p0)) > @p1``）。この二つは `HAVING` の中の式を `GROUP BY` の式と照らし合わせず、`Unknown column` で失敗するためである（MySQL のバグ 24083 と 78395、MariaDB 12 でも同じことを確かめた）。キーはグループの中で一つの値（NULL を含む）なので、`MIN` を付けても結果は変わらない。列のキー、SELECT、ORDER BY ではそのまま出す。
+- キーの式には列が一つ以上なければならない。列を含まないキー（`Value(2)`、`Add(Value(1), Value(2))`、`CurrentTimestamp()`）は、文を組み立てるときに `InvalidOperationException` になる（§14.3）。SQL Server は GROUP BY の式ごとに列を求め、メッセージ 164 で失敗する。MySQL と MariaDB では値が SQL に埋め込まれるので、値一つのキーが `GROUP BY 2` と列の位置として読まれ、`Can't group on 'COUNT(*)'` で失敗する（どちらも SQL Server 2025、MySQL 9、MariaDB 12、MySqlConnector 2.6.2 で確かめた）。SQLite と PostgreSQL では通るが、表全体を一つのグループにするだけの文である。生 SQL の断片（`Raw<T>`）は中を見ないので、列を含むものとして通す。
 - 列の集合は集計関数の引数にだけ使える（§4.5）。
 
 ### 5.6 射影
@@ -604,6 +605,7 @@ db.From(User.Table).SelectDistinct(u => (u.Status, u.Age)).OrderBy(s => [Asc(s.I
 - `Asc` と `Desc` は常に明示し、出力にも常に `ASC` / `DESC` を書く。
 - `NULLS FIRST` / `NULLS LAST` は方言によって構文がないので v0.1 には入れない（§18 の DF1）。
 - `GroupBy` のあとでは、ラムダはキーと列の集合を受け取り、`PerGroup` の式だけを並べられる。
+- 値だけのキー（`Desc(Value(1))`、パラメータ一つ）は、文を組み立てるときに `InvalidOperationException` になる（§14.3）。MySQL と MariaDB では値が SQL に埋め込まれて `ORDER BY 1` になり、エラーにならずに 1 列目で並ぶ。SQL Server はメッセージ 1008 で失敗する（MySQL 9、MariaDB 12、SQL Server 2025 で確かめた）。値の式（`Add(Value(1), Value(0))`）と関数（`CurrentTimestamp()`）は全方言で式として扱われるので許す。生 SQL の断片は中を見ない。
 
 ### 5.9 LIMIT と OFFSET
 
@@ -996,6 +998,8 @@ CREATE TABLE "users" (
 | `Limit` / `Offset` に負の値を渡した | `ArgumentOutOfRangeException` |
 | SQL Server で `Limit(0)` を書いた（§5.9。`FETCH NEXT 0 ROWS` はメッセージ 10744 で失敗する） | `ArgumentOutOfRangeException` |
 | `OrderBy` に空の配列を返した（§5.8） | `ArgumentException` |
+| `GroupBy` のキーに列が一つもない（§5.5） | `InvalidOperationException` |
+| `OrderBy` のキーが値だけ（§5.8） | `InvalidOperationException` |
 
 ## 15. 診断 ID
 
