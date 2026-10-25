@@ -1,0 +1,10 @@
+<Project>
+  <!-- The settings of the repository, then the benchmarks' own. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <PropertyGroup>
+    <!-- BenchmarkDotNet needs a newer Roslyn (4.14) than the 4.8 that the generator and the compile tests pin
+         (docs/design.ja.md §2.1); pinning the transitive versions would downgrade it (NU1109). Set here, not in the project,
+         so the project that BenchmarkDotNet generates under bin/ for each run gets it too. The benchmarks ship nothing. -->
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+</Project>

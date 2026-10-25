@@ -25,6 +25,11 @@ internal sealed class FakeConnection : DbConnection
     /// </summary>
     public IReadOnlyList<object> Rows { get; init; } = [];
 
+    /// <summary>
+    /// Gets the reader that every reader command returns instead of <see cref="Rows"/>, or null.
+    /// </summary>
+    public Func<DbDataReader>? Reader { get; init; }
+
     public List<FakeCommand> Commands { get; } = [];
 
     [AllowNull]
@@ -124,6 +129,11 @@ internal sealed class FakeCommand(FakeConnection connection) : DbCommand
 
     protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
     {
+        if (connection.Reader is { } reader)
+        {
+            return reader();
+        }
+
         var table = new DataTable();
         table.Columns.Add("value", connection.Rows.Count > 0 ? connection.Rows[0].GetType() : typeof(object));
         foreach (object row in connection.Rows)
