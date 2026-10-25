@@ -20,6 +20,9 @@ Correctness comes first. A performance claim comes with a measurement in the sam
 - Compare both sides with the same configuration, data, and machine state, interleaved (A, B, B, A), three rounds or more. A difference inside the spread is not a result.
 - A benchmark against a database separates the library's cost from the database's: measure SQL rendering and row materialization on their own (an in-memory reader), and the whole round trip on SQLite in memory.
 - Fix the counts of a run (`--launchCount 3 --warmupCount 5 --iterationCount 15 --iterationTime 250`) and write them with the results. BenchmarkDotNet's default job adds iterations, up to 100, while a measurement is noisy: on #95 its estimate for the whole suite was 17 hours, and the fixed counts took 35 minutes.
+- Allocations are measured with BenchmarkDotNet's `[MemoryDiagnoser]`. A measurement of its own (`GC.GetAllocatedBytesForCurrentThread`) calls the code until the JIT has optimized it with dynamic PGO (on the order of a million calls) and says so: the same statement allocated 3,024 B in its first thousand calls, 3,000 B without dynamic PGO, and 2,864 B after the optimization, which is what BenchmarkDotNet reported (#99, found by the review).
+- A breakdown is the difference between chains that each add one step, measured the same way, and it adds up to the whole. Steps measured apart added up to 2,952 B for a whole of 3,024 B (#99).
+- A profile counts the time of an inlined call in its caller, so a profile alone does not choose a change: a prototype measures it. #94 read most of the gap of row reading as two async state machines per row; a prototype that removed one of them took a tenth.
 - A call shorter than the clock's resolution is repeated inside one sample until the sample is long enough.
 - A figure that moved is explained from the data, not from a guess (`.cursor/rules/open-ends.mdc`).
 - A target names what it measures before it gets a number.
