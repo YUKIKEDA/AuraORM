@@ -19,6 +19,7 @@ Correctness comes first. A performance claim comes with a measurement in the sam
 - Profile before a speed row, and write on the Issue where the time goes.
 - Compare both sides with the same configuration, data, and machine state, interleaved (A, B, B, A), three rounds or more. A difference inside the spread is not a result.
 - A benchmark against a database separates the library's cost from the database's: measure SQL rendering and row materialization on their own (an in-memory reader), and the whole round trip on SQLite in memory.
+- Fix the counts of a run (`--launchCount 3 --warmupCount 5 --iterationCount 15 --iterationTime 250`) and write them with the results. BenchmarkDotNet's default job adds iterations, up to 100, while a measurement is noisy: on #95 its estimate for the whole suite was 17 hours, and the fixed counts took 35 minutes.
 - A call shorter than the clock's resolution is repeated inside one sample until the sample is long enough.
 - A figure that moved is explained from the data, not from a guess (`.cursor/rules/open-ends.mdc`).
 - A target names what it measures before it gets a number.
