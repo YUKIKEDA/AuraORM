@@ -12,6 +12,8 @@ A PR is opened when its work is finished, not when it runs. Two sentences do not
 
 What is out of the row's scope is a roadmap row that names when (`.cursor/rules/defer.mdc`), not a caveat. A finding about code the row did not change becomes its own Issue at once (`.cursor/rules/pace.mdc`).
 
+A CI failure that does not come back on the next runs is not explained by the reruns. When its log does not show the cause, the PR says that the cause was not found and what was read, and a change that makes the test steadier keeps it failing on the fault it guards (shown with a mutant). #95 wrote a single 536-byte difference on macOS as a recompilation of the JIT, which nothing had shown.
+
 A reason written as likely ("probably", 「と考えられる」) is checked first when a cheap check exists: reading the generated SQL with `ToSql()`, reading the database's documentation or its log, one more run.
 
 A comment in the code is held to the same line: it says what was observed, and marks a cause that was not confirmed as not confirmed, with the Issue number.
