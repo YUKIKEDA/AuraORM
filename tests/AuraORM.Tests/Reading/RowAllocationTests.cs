@@ -40,8 +40,9 @@ public sealed class RowAllocationTests
     ///   that do not allow null.
     ///
     /// Steps:
-    /// - After a warm-up, measure the bytes allocated on the thread by <c>ToListAsync</c> of the whole row, and by a
-    ///   hand-written loop that reads each column by ordinal with its typed getter into a <see cref="List{T}"/>, for each
+    /// - After three warm-ups, take the least of five measurements of the bytes allocated on the thread by
+    ///   <c>ToListAsync</c> of the whole row, and by a hand-written loop that reads each column by ordinal with its typed
+    ///   getter into a <see cref="List{T}"/>, for each
     ///   row count.
     ///
     /// Expected:
@@ -81,12 +82,25 @@ public sealed class RowAllocationTests
     // The allocation that 990 more rows add.
     private static long PerRows(Func<int, Action> run) => Allocated(run(1000)) - Allocated(run(10));
 
+    // The least of five measurements after three warm-ups: a one-time allocation of the runtime (a method recompiled by the
+    // tiered JIT) can fall into one measurement, as it did once on macOS (536 bytes on net8.0), and is not a cost per row.
+    // An allocation per row is in every measurement.
     private static long Allocated(Action action)
     {
-        action();
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        action();
-        return GC.GetAllocatedBytesForCurrentThread() - before;
+        for (int i = 0; i < 3; i++)
+        {
+            action();
+        }
+
+        long least = long.MaxValue;
+        for (int i = 0; i < 5; i++)
+        {
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            action();
+            least = Math.Min(least, GC.GetAllocatedBytesForCurrentThread() - before);
+        }
+
+        return least;
     }
 
     // The fake reader completes every call at once, so the whole read runs on this thread.
