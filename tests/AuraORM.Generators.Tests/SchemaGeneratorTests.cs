@@ -413,9 +413,93 @@ public sealed class SchemaGeneratorTests
     [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(300)] byte Count);""")]
     [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(40000)] short Count);""")]
     [InlineData("AURA0113", """public enum E { A, B } [Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(1)] E State);""")]
+    [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(null)] string Name);""")]
+    [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(new byte[] { 1 })] byte[] Data);""")]
+    [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(double.NaN)] double Value);""")]
+    [InlineData(
+        "AURA0113",
+        """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(double.PositiveInfinity)] double Value);"""
+    )]
+    [InlineData("AURA0113", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(float.NegativeInfinity)] float Value);""")]
+    [InlineData(
+        "AURA0108",
+        """[Table("u")] public sealed partial record U([PrimaryKey] long Id, long Code); [Table("t")] public sealed partial record T([PrimaryKey] long Id, [References(typeof(U), nameof(U.Code))] long UCode);"""
+    )]
+    [InlineData(
+        "AURA0108",
+        """[Table("u")] public sealed partial record U([PrimaryKey] long A, [PrimaryKey] long B); [Table("t")] public sealed partial record T([PrimaryKey] long Id, [References(typeof(U), nameof(U.A))] long UA);"""
+    )]
+    [InlineData(
+        "AURA0117",
+        """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(SqlDefault.CurrentTimestamp)] DateOnly Day);"""
+    )]
+    [InlineData(
+        "AURA0117",
+        """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(SqlDefault.CurrentTimestamp)] TimeOnly Time);"""
+    )]
+    [InlineData(
+        "AURA0117",
+        """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(SqlDefault.CurrentTimestamp)] long Ticks);"""
+    )]
+    [InlineData(
+        "AURA0118",
+        """[Table("t")] [Index("ix", nameof(A))] [Index("ix", nameof(B))] public sealed partial record T([PrimaryKey] long Id, int A, int B);"""
+    )]
+    [InlineData(
+        "AURA0118",
+        """[Table("t")] [Index("ix", nameof(A))] public sealed partial record T([PrimaryKey] long Id, int A); [Table("u")] [Index("ix", nameof(B))] public sealed partial record U([PrimaryKey] long Id, int B);"""
+    )]
+    [InlineData(
+        "AURA0118",
+        """[Table("t", Schema = "s")] [Index("ix", nameof(A))] public sealed partial record T([PrimaryKey] long Id, int A); [Table("u", Schema = "s")] [Index("ix", nameof(B))] public sealed partial record U([PrimaryKey] long Id, int B);"""
+    )]
+    [InlineData("AURA0119", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [MaxLength(0)] string Name);""")]
+    [InlineData("AURA0119", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [MaxLength(-1)] byte[] Data);""")]
+    [InlineData("AURA0119", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Precision(0, 0)] decimal Price);""")]
+    [InlineData("AURA0119", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Precision(5, -1)] decimal Price);""")]
+    [InlineData("AURA0119", """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Precision(5, 6)] decimal Price);""")]
     public void Generate_SchemaError_ReportsDiagnostic(string id, string declaration)
     {
         GeneratorHarness.Fails(Usings + declaration, id);
+    }
+
+    /// <summary>
+    /// The forms beside each check of row S1 compile: null on a nullable column, a reference to a <c>[Unique]</c> column and
+    /// to a single primary key, the current time on each date and time type, an index name reused in another schema, and
+    /// the smallest length, precision, and scale (design §13.3, §13.4, §13.5, §13.7).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - One table declaration per case, valid at the edge of AURA0108, AURA0113, AURA0117, AURA0118, or AURA0119.
+    ///
+    /// Steps:
+    /// - Run the generator and compile.
+    ///
+    /// Expected:
+    /// - No diagnostic.
+    /// </remarks>
+    /// <param name="declaration">The declaration.</param>
+    [Theory]
+    [InlineData("""[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(null)] string? Name, [Default(null)] int? Count);""")]
+    [InlineData("""[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(null)] byte[]? Data, [Default(1.5)] double Value);""")]
+    [InlineData(
+        """[Table("u")] public sealed partial record U([PrimaryKey] long A, [PrimaryKey] long B, [Unique] long Code); [Table("t")] public sealed partial record T([PrimaryKey] long Id, [References(typeof(U), nameof(U.Code))] long UCode);"""
+    )]
+    [InlineData(
+        """[Table("u")] public sealed partial record U([PrimaryKey] long Id); [Table("t")] public sealed partial record T([PrimaryKey] long Id, [References(typeof(U), nameof(U.Id))] long? UId);"""
+    )]
+    [InlineData(
+        """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [Default(SqlDefault.CurrentTimestamp)] DateTime A, [Default(SqlDefault.CurrentTimestamp)] DateTime? B, [Default(SqlDefault.CurrentTimestamp)] DateTimeOffset C, [Default(SqlDefault.CurrentTimestamp)] DateTimeOffset? D);"""
+    )]
+    [InlineData(
+        """[Table("t", Schema = "a")] [Index("ix", nameof(A))] public sealed partial record T([PrimaryKey] long Id, int A); [Table("u", Schema = "b")] [Index("ix", nameof(B))] public sealed partial record U([PrimaryKey] long Id, int B); [Table("v")] [Index("ix", nameof(C))] public sealed partial record V([PrimaryKey] long Id, int C);"""
+    )]
+    [InlineData(
+        """[Table("t")] public sealed partial record T([PrimaryKey] long Id, [MaxLength(1)] string Name, [Precision(1, 0)] decimal A, [Precision(5, 5)] decimal B);"""
+    )]
+    public void Generate_EdgeOfRowS1Checks_Compiles(string declaration)
+    {
+        _ = GeneratorHarness.Compiles(Usings + declaration);
     }
 
     /// <summary>

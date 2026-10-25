@@ -60,3 +60,13 @@ public interface ICreateTableIfNotExistsDialect : IDialect;
 /// A dialect with <c>CREATE INDEX IF NOT EXISTS</c>.
 /// </summary>
 public interface ICreateIndexIfNotExistsDialect : IDialect;
+
+/// <summary>
+/// A dialect with <c>DROP INDEX IF EXISTS</c>.
+/// </summary>
+public interface IDropIndexIfExistsDialect : IDialect;
+
+/// <summary>
+/// A dialect whose DDL a transaction can roll back. MySQL and MariaDB commit implicitly before DDL (design §13.1).
+/// </summary>
+public interface ITransactionalDdlDialect : IDialect;

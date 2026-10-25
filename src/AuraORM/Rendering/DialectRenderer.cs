@@ -17,6 +17,9 @@ internal abstract class DialectRenderer
     /// </summary>
     public abstract string Name { get; }
 
+    // §13: the DDL of the dialect.
+    public abstract DdlRenderer Ddl { get; }
+
     /// <summary>
     /// Gets the largest number of parameters one statement may have (§12.4).
     /// </summary>

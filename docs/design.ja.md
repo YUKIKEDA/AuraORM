@@ -183,7 +183,7 @@ public sealed partial record User(
 | `[AutoIncrement]` | 列 | データベースが値を振る整数の列。テーブルに一つだけで、単独の主キーでなければならない（複合主キーの一部にはできない。SQLite の `AUTOINCREMENT` は単独の `INTEGER PRIMARY KEY` にしか付かないため） |
 | `[MaxLength(n)]` | 列 | 文字列とバイト列の最大長（DDL の型に使う）。1 以上（AURA0119）。方言の上限は §13.7 |
 | `[Precision(p, s)]` | 列 | `decimal` の精度と位取り（DDL の型に使う）。`decimal` の列には必須（AURA0112）。精度は 1 以上、位取りは 0 以上で精度以下（AURA0119）。方言の上限は §13.7 |
-| `[Default(...)]` | 列 | データベースの既定値。`SqlDefault` の値か、定数。定数は、C# の代入と同じく列の型に暗黙に変換できなければならない（`long` の列の `[Default(0)]`、範囲内の定数として `byte` の列の `[Default(1)]` は書ける。`byte` の列の `[Default(300)]` は AURA0113）。`SqlDefault.CurrentTimestamp` は `DateTime` と `DateTimeOffset` の列だけで、UTC の現在時刻になる（AURA0117、§13.3）。`null` は NULL を許す列だけで、配列と有限でない数は書けない（AURA0113）。INSERT で省略できるようになる。コンストラクターは `object` を取る一つだけである（`SqlDefault` を取る多重定義があると、リテラルの `0` が列挙型に変換され `CurrentTimestamp` になるため） |
+| `[Default(...)]` | 列 | データベースの既定値。`SqlDefault` の値か、定数。定数は、C# の代入と同じく列の型に暗黙に変換できなければならない（`long` の列の `[Default(0)]`、範囲内の定数として `byte` の列の `[Default(1)]` は書ける。`byte` の列の `[Default(300)]` は AURA0113）。`SqlDefault.CurrentTimestamp` は `DateTime` と `DateTimeOffset` の列だけで、UTC の現在時刻になる（AURA0117、§13.3）。`null` は NULL を許す列だけで、配列と有限でない数は書けない（AURA0113）。INSERT で省略できるようになる。コンストラクターは `object?` を取る一つだけである（`SqlDefault` を取る多重定義があると、リテラルの `0` が列挙型に変換され `CurrentTimestamp` になるため） |
 | `[DefaultSql(sql)]` | 列 | 既定値を生 SQL で書く。DDL にそのまま出る。INSERT で省略できるようになる |
 | `[Unique]` | 列 | 単一列の一意制約。CREATE TABLE の表の制約になる（§13.4） |
 | `[Index(name, members)]` | 型（複数可） | インデックス。列はメンバー名を `nameof` で並べ（`Members`）、`Unique` で一意にできる。`CreateIndexes` が作る（§13.4）。名前は同じスキーマのテーブルの間で一意（AURA0118） |
@@ -1055,7 +1055,7 @@ public sealed partial record Order(
 
 ### 13.1 文と実行
 
-- 文は `CreateTable`、`CreateIndexes`、`DropIndexes`、`DropTable` の四つで、`Database<TDialect>`、`Transaction<TDialect>`、`SqlBuilder<TDialect>` から作る。`SqlBuilder` の文は `ToSql()` だけを持つ（§12.3）。
+- 文は `CreateTable`、`CreateIndexes`、`DropIndexes`、`DropTable` の四つで、`Database<TDialect>`、`Transaction<TDialect>`、`SqlBuilder<TDialect>` から作る。DDL はテーブルそのものを取り、別名付きのテーブル（`User.Table.As("u")`）は `ArgumentException` になる（§14.3）。`SqlBuilder` の文は `ToSql()` だけを持つ（§12.3）。
 - `CreateTable` と `DropTable` は、一つのテーブルの一つの文である。`ToSql()` は `SqlStatement` を返す。
 - `CreateIndexes` と `DropIndexes` は、テーブルの `[Index]` を宣言の順に並べ、索引ごとに一つの文にする。`ToSql()` は `IReadOnlyList<SqlStatement>` を返す。`[Index]` がなければ一覧は空で、`ExecuteAsync` は何もしない。`ExecuteAsync` は文を順に一つずつ実行し、例外が起きたらそこで止める。先に実行した文は戻らない。戻したいときは、トランザクションの中で実行する。
 - `ExecuteAsync` は `Task` を返す。DDL の影響行数には意味がないので返さない。
@@ -1170,6 +1170,7 @@ DROP INDEX [ix_orders_user] ON [orders]        -- SQL Server（IfExists は DROP
 - `[Table]` の `Schema` があれば、テーブルの名前をスキーマで修飾する（`"s"."orders"`）。スキーマそのものは作らない。
 - SQLite の索引は、索引の名前を修飾し、テーブルの名前は修飾しない（`CREATE INDEX "main"."ix" ON "orders" (…)`、`DROP INDEX "main"."ix"`。SQLite の CREATE INDEX の構文）。PostgreSQL の CREATE INDEX は、索引の名前を修飾できず、索引はテーブルのスキーマに作られる（PostgreSQL の CREATE INDEX の資料）。PostgreSQL の DROP INDEX は索引の名前を修飾する（`DROP INDEX "s"."ix"`）。MySQL、MariaDB、SQL Server は `ON` の後のテーブルの名前を修飾する。
 - 外部キーの参照先に `Schema` があれば、参照先の名前を修飾する。参照先に `Schema` がなく、参照する側に `Schema` があるとき、MySQL と MariaDB では CREATE TABLE の組み立てで `InvalidOperationException` になる（§14.3）。この二つは修飾のない参照先を、作るテーブルのデータベースの中で探すためである（`aura_s` に作るテーブルから修飾のない `parent` を参照すると、MySQL はエラー 1824、MariaDB はエラー 150 になった。修飾すれば通った）。修飾のない参照先が指すのは接続の既定のデータベースで、AuraORM は組み立ての時にそれを知らない。PostgreSQL と SQL Server は、修飾のない参照先を接続の既定のスキーマで探し、通った。
+- SQLite の REFERENCES は参照先をスキーマで修飾できず（`REFERENCES "main"."parent"` は構文エラー）、参照先は参照する側と同じデータベースになければならない（添付したデータベースのテーブルから修飾のない `parent` を参照すると、INSERT が「no such table: o.parent」で失敗した。SQLite 3.40）。そこで SQLite では参照先を修飾せずに書き、参照する側と参照先の `Schema` が違えば（片方だけにあるときも）、CREATE TABLE の組み立てで `InvalidOperationException` になる（§14.3）。行 S1 の実装で見つかった。
 
 ### 13.7 方言の上限
 
@@ -1289,7 +1290,7 @@ DROP TABLE [orders]             -- SQL Server
 | SQL Server の複数行の INSERT が 1000 行を超えた（§6.2） | `ArgumentException` |
 | INSERT の `Values` に空の一覧を渡した（§6.2） | `ArgumentException` |
 | SQLite、PostgreSQL、SQL Server で、設定された列が一つもない行を二つ以上 INSERT する（§6.2） | `ArgumentException` |
-| INSERT、UPDATE、DELETE の対象に別名付きのテーブルを渡した（§6.2） | `ArgumentException` |
+| INSERT、UPDATE、DELETE、DDL の対象に別名付きのテーブルを渡した（§6.2、§13.1） | `ArgumentException` |
 | MySQL、MariaDB で、UPDATE と `OnDuplicateKeyUpdate` の代入の値が、それより前の代入の列を読む（§7、§10.2） | `InvalidOperationException` |
 | MySQL で、UPDATE / DELETE と `OnDuplicateKeyUpdate` の中のサブクエリが対象のテーブルを読む（§7、§10.2。エラー 1093） | `InvalidOperationException` |
 | SQL Server で、`Returning` の射影にサブクエリがある（§9。メッセージ 10705） | `InvalidOperationException` |
@@ -1308,6 +1309,8 @@ DROP TABLE [orders]             -- SQL Server
 | 型の長さ、精度、位取り、キーの大きさが、方言の上限を超えた DDL（§13.7） | `InvalidOperationException` |
 | 名前（スキーマ、テーブル、列、索引）の長さが方言の上限を超えた DDL、MySQL、MariaDB で名前に U+0000 か基本多言語面の外の文字がある DDL、MySQL、MariaDB でデータベースが付ける外部キーの名前（`テーブル名_ibfk_N`）が上限を超える CREATE TABLE（§13.7） | `InvalidOperationException` |
 | MySQL、MariaDB で、スキーマのあるテーブルから、スキーマのないテーブルを参照する外部キー（§13.6） | `InvalidOperationException` |
+| SQLite で、別のスキーマのテーブルを参照する外部キー（§13.6） | `InvalidOperationException` |
+| 手で作った `TableInfo` の DDL で、ジェネレーターが拒む宣言（`DateTime` / `DateTimeOffset` でない列の `SqlDefault.CurrentTimestamp`、テーブルにない列の索引） | `InvalidOperationException` |
 | MySQL、MariaDB で、バックスラッシュを含む文字列の `[Default]` の定数（§13.3） | `InvalidOperationException` |
 | 生のクエリで、結果の型のメンバーに対応する列がない、または二つ以上ある（§11.3） | `InvalidOperationException` |
 | `Limit` / `Offset` に負の値を渡した | `ArgumentOutOfRangeException` |

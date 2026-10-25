@@ -9,6 +9,8 @@ internal sealed class PostgreSqlRenderer : DialectRenderer
 {
     public override string Name => "PostgreSQL";
 
+    public override DdlRenderer Ddl => field ??= new PostgreSqlDdlRenderer(this);
+
     // The protocol carries the parameter count as a 16-bit number; Npgsql rejects more than 65535.
     public override int MaxParameters => 65535;
 

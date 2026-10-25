@@ -12,7 +12,9 @@ public sealed class SqliteDialect
         IUnorderedLimitDialect,
         IOnConflictDialect,
         ICreateTableIfNotExistsDialect,
-        ICreateIndexIfNotExistsDialect
+        ICreateIndexIfNotExistsDialect,
+        IDropIndexIfExistsDialect,
+        ITransactionalDdlDialect
 {
     private SqliteDialect() { }
 }

@@ -9,7 +9,9 @@ public sealed class SqlServerDialect
         IInsertReturningDialect,
         IUpdateReturningDialect,
         IDeleteReturningDialect,
-        IOffsetWithoutLimitDialect
+        IOffsetWithoutLimitDialect,
+        IDropIndexIfExistsDialect,
+        ITransactionalDdlDialect
 {
     private SqlServerDialect() { }
 }

@@ -2,7 +2,7 @@
 
 作業の順序と状態だけを置く。受け入れ条件は各 Issue に書く。行の追加と削除は Grill を経る（`.cursor/rules/workflow.mdc`）。設計は [design.ja.md](./design.ja.md) にある。
 
-**今**: S1
+**今**: P1
 
 ## v0.1
 
@@ -25,7 +25,7 @@
 | M1 | INSERT / UPDATE / DELETE と RETURNING、SQLite の最小版（3.39）の結合テスト（§6〜§9、§17） | #60、#61 | done |
 | M2 | UPSERT（§10） | #74 | done |
 | V1 | 値コンバーター（§3.6） | #82 | done |
-| S1 | DDL（§13） | - | planned |
+| S1 | DDL（§13） | #86、#90 | done |
 | P1 | ベンチマークと性能の目標（§16.1） | - | planned |
 | R1 | リリースの仕組み: NuGet の Trusted Publishing、パッケージの検査（ジェネレーターが `analyzers/dotnet/cs` に入り、依存が空であること。NativeAOT のサンプルをパックしたパッケージで参照する）、README のサンプルの検査、README に null 許容参照型の設定（`<Nullable>enable</Nullable>` と null 許容の警告をエラーにすること）が参照型の保証に要ると書く（§14.2） | - | planned |
 

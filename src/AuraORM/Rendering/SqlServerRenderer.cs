@@ -7,6 +7,8 @@ internal sealed class SqlServerRenderer : DialectRenderer
 {
     public override string Name => "SQL Server";
 
+    public override DdlRenderer Ddl => field ??= new SqlServerDdlRenderer(this);
+
     // An RPC request carries at most 2100 parameters.
     public override int MaxParameters => 2100;
 
