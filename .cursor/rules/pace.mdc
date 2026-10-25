@@ -26,6 +26,8 @@ After two attempts that change nothing, stop and decide before a third:
 
 Report to the owner at that point, in a line: what stands, what was tried, what happens next. Do not go on silently.
 
+An investigation starts with a time limit, told to the owner with the plan, and each report says how much of it is used. On #106 the owner asked how many hours the investigation of `ListAsync` would take, and could not tell whether it was moving.
+
 ## What comes next is decided, not read off a list
 
 Before starting a piece of work, write one line for it: what a user of the library has after it that they do not have now. Write the same line for everything else that is open. Start the one with the strongest line. The classes, strongest first:

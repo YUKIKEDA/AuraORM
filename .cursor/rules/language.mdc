@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Language
 
-Reports and replies to the owner in chat are in Japanese: the end-of-turn report, answers to questions, and the questions put to the owner. Identifiers, file names, and quoted English text stay as they are.
+Reports and replies to the owner in chat are in Japanese: the end-of-turn report, the progress lines while a background run goes, answers to questions, and the questions put to the owner. On #106 the progress lines of a measurement drifted into English, and the owner had to ask. Identifiers, file names, and quoted English text stay as they are.
 
 ## English
 
