@@ -48,4 +48,6 @@ A benchmark, a NativeAOT publish, or an integration run against every dialect ke
 
 A CI run (a push, `gh workflow run`, `gh run rerun`) is a long run too: while it runs, go on with work that does not need its result, on another branch. Do not wait on reruns with the next row's research undone.
 
+A run that takes more than ten minutes is reported with the time it is expected to end when it starts, and again when the estimate moves. On #103 the owner asked twice when a measurement would end.
+
 Before a long run, a short one: run the script on one case, and look at the output of a background run within its first minute.

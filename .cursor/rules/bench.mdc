@@ -23,6 +23,7 @@ Correctness comes first. A performance claim comes with a measurement in the sam
 - Allocations are measured with BenchmarkDotNet's `[MemoryDiagnoser]`. A measurement of its own (`GC.GetAllocatedBytesForCurrentThread`) calls the code until the JIT has optimized it with dynamic PGO (on the order of a million calls) and says so: the same statement allocated 3,024 B in its first thousand calls, 3,000 B without dynamic PGO, and 2,864 B after the optimization, which is what BenchmarkDotNet reported (#99, found by the review).
 - A breakdown is the difference between chains that each add one step, measured the same way, and it adds up to the whole. Steps measured apart added up to 2,952 B for a whole of 3,024 B (#99).
 - A profile counts the time of an inlined call in its caller, so a profile alone does not choose a change: a prototype measures it. #94 read most of the gap of row reading as two async state machines per row; a prototype that removed one of them took a tenth.
+- A median is read from BenchmarkDotNet's JSON (`--exporters json`, `Statistics.Median`). The Median column of its table appears only for some distributions; a script that read the table stopped on #103.
 - A call shorter than the clock's resolution is repeated inside one sample until the sample is long enough.
 - A figure that moved is explained from the data, not from a guess (`.cursor/rules/open-ends.mdc`).
 - A target names what it measures before it gets a number.
