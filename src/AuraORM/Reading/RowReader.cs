@@ -38,6 +38,16 @@ public ref struct RowReader
         where TLevel : EvaluationLevel => projection.Read(ref this);
 
     /// <summary>
+    /// Reads the value of the next column of the row. Generated code reads a column of a table with it instead of
+    /// <see cref="Read{T, TLevel}(IProjection{T, TLevel})"/>: it has one type parameter and no interface call, so a value
+    /// type is read by code that the JIT specializes for it (<c>docs/design.ja.md</c> §16.1).
+    /// </summary>
+    /// <typeparam name="T">The CLR type of the column, including whether it can be null.</typeparam>
+    /// <param name="column">The column; it names the type, and its value is not used.</param>
+    /// <returns>The value.</returns>
+    public T ReadColumn<T>(IExpr<T, PerRow> column) => ReadValue<T>();
+
+    /// <summary>
     /// Reads a column that the row type declares as not nullable. A <c>NULL</c> there means that the database schema does
     /// not match the C# declaration.
     /// </summary>
@@ -49,7 +59,7 @@ public ref struct RowReader
         where T : class
     {
         int ordinal = _ordinal;
-        T? value = column.Read(ref this);
+        T? value = ReadValue<T>();
         return value
             ?? throw new InvalidOperationException(
                 string.Format(

@@ -61,12 +61,11 @@ public static class QueryExecution
     )
         where TDialect : IDialect
     {
-        await foreach (TResult row in query.AsAsyncEnumerable(cancellationToken).ConfigureAwait(false))
-        {
-            return row;
-        }
-
-        throw new InvalidOperationException("The statement returned no row.");
+        ArgumentNullException.ThrowIfNull(query);
+        (bool found, TResult? row) = await Executor
+            .FirstAsync(query.Session!, query.ToSql(), query.Factory, query.CancelsUnreadRows, cancellationToken)
+            .ConfigureAwait(false);
+        return found ? row! : throw new InvalidOperationException("The statement returned no row.");
     }
 
     /// <summary>
@@ -85,12 +84,11 @@ public static class QueryExecution
     )
         where TDialect : IDialect
     {
-        await foreach (TResult row in query.AsAsyncEnumerable(cancellationToken).ConfigureAwait(false))
-        {
-            return row;
-        }
-
-        return default;
+        ArgumentNullException.ThrowIfNull(query);
+        (_, TResult? row) = await Executor
+            .FirstAsync(query.Session!, query.ToSql(), query.Factory, query.CancelsUnreadRows, cancellationToken)
+            .ConfigureAwait(false);
+        return row;
     }
 
     /// <summary>
@@ -139,19 +137,9 @@ public static class QueryExecution
     )
         where TDialect : IDialect
     {
-        bool found = false;
-        TResult? single = default;
-        await foreach (TResult row in query.AsAsyncEnumerable(cancellationToken).ConfigureAwait(false))
-        {
-            if (found)
-            {
-                throw new InvalidOperationException("The statement returned more than one row.");
-            }
-
-            found = true;
-            single = row;
-        }
-
-        return (found, single);
+        ArgumentNullException.ThrowIfNull(query);
+        return await Executor
+            .SingleAsync(query.Session!, query.ToSql(), query.Factory, query.CancelsUnreadRows, cancellationToken)
+            .ConfigureAwait(false);
     }
 }
