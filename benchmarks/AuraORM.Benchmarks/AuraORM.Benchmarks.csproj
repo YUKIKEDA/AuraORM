@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Micro-benchmarks of row P1 (docs/design.ja.md §16.1, .cursor/rules/bench.mdc). CI builds this project and does not run
+       it; benchmarks/README.md says how to run it. It uses the library and the generator as a consumer does. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Dapper.AOT rewrites the Dapper calls of the types marked [DapperAot] with interceptors. -->
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Dapper.AOT</InterceptorsNamespaces>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AuraORM\AuraORM.csproj" />
+    <ProjectReference Include="..\..\src\AuraORM.Generators\AuraORM.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Dapper.AOT" />
+    <PackageReference Include="linq2db" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The reader without allocations and the fake connection of the tests, so the benchmarks and the allocation test
+         of N4 read the same rows the same way. -->
+    <Compile Include="..\..\tests\AuraORM.Tests\Support\ArrayDataReader.cs" Link="Support\ArrayDataReader.cs" />
+    <Compile Include="..\..\tests\AuraORM.Tests\Support\FakeConnection.cs" Link="Support\FakeConnection.cs" />
+  </ItemGroup>
+</Project>
