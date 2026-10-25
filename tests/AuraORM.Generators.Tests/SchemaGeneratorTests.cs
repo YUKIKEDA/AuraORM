@@ -64,6 +64,97 @@ public sealed class SchemaGeneratorTests
     }
 
     /// <summary>
+    /// The generated <c>ReadRow</c> reads a column of each type of design §3.3 with <c>RowReader</c>'s typed method, the
+    /// nullable one for a nullable member, and an enum and a converted type with <c>ReadColumn</c> (design §16.1).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - A table with a column of each type of §3.3, nullable and not, an enum, a nullable enum, and a converted type.
+    ///
+    /// Steps:
+    /// - Run the generator, compile, and read the <c>ReadRow</c> of <c>Columns</c> in the generated source.
+    ///
+    /// Expected:
+    /// - <c>ReadInt64()</c>, <c>ReadString()</c>, <c>ReadNullableString()</c>, <c>ReadBinary()</c>,
+    ///   <c>ReadNullableBinary()</c>, and the typed method of each value type and its nullable form, in column order.
+    /// - <c>ReadColumn(this.@State)</c>, <c>ReadColumn(this.@MaybeState)</c>, and <c>ReadColumn(this.@Link)</c>.
+    /// </remarks>
+    [Fact]
+    public void Generate_ReadRow_ReadsEachTypeWithItsMethod()
+    {
+        IReadOnlyDictionary<string, string> sources = GeneratorHarness.Compiles(
+            Usings
+                + """
+                [assembly: ValueConverter(typeof(UriConverter))]
+
+                public enum Status : short { Off, On }
+
+                public sealed class UriConverter : IValueConverter<Uri, string>
+                {
+                    public static string ToProvider(Uri value) => value.ToString();
+
+                    public static Uri FromProvider(string value) => new(value);
+                }
+
+                [Table("t")]
+                public sealed partial record T(
+                    [PrimaryKey] long Id, string Name, string? Note, byte[] Blob, byte[]? MaybeBlob,
+                    bool Flag, bool? MaybeFlag, byte Tiny, byte? MaybeTiny, short Short, short? MaybeShort, int Number, int? MaybeNumber,
+                    float Single, float? MaybeSingle, double Real, double? MaybeReal, [Precision(10, 2)] decimal Money, [Precision(10, 2)] decimal? MaybeMoney,
+                    Guid Key, Guid? MaybeKey, DateTime At, DateTime? MaybeAt, DateTimeOffset Off, DateTimeOffset? MaybeOff,
+                    DateOnly Day, DateOnly? MaybeDay, TimeOnly Time, TimeOnly? MaybeTime,
+                    Status State, Status? MaybeState, Uri Link);
+                """
+        );
+
+        string source = sources["T.Table.g.cs"];
+        int start = source.IndexOf("protected override T ReadRow", StringComparison.Ordinal);
+        string readRow = source[start..source.IndexOf("return new", start, StringComparison.Ordinal)];
+        string[] reads = readRow
+            .Split('\n')
+            .Where(l => l.Contains("__auraReader.", StringComparison.Ordinal))
+            .Select(l => l[(l.IndexOf("__auraReader.", StringComparison.Ordinal) + "__auraReader.".Length)..].TrimEnd(';', '\r'))
+            .ToArray();
+        Assert.Equal(
+            [
+                "ReadInt64()",
+                "ReadString()",
+                "ReadNullableString()",
+                "ReadBinary()",
+                "ReadNullableBinary()",
+                "ReadBoolean()",
+                "ReadNullableBoolean()",
+                "ReadByte()",
+                "ReadNullableByte()",
+                "ReadInt16()",
+                "ReadNullableInt16()",
+                "ReadInt32()",
+                "ReadNullableInt32()",
+                "ReadSingle()",
+                "ReadNullableSingle()",
+                "ReadDouble()",
+                "ReadNullableDouble()",
+                "ReadDecimal()",
+                "ReadNullableDecimal()",
+                "ReadGuid()",
+                "ReadNullableGuid()",
+                "ReadDateTime()",
+                "ReadNullableDateTime()",
+                "ReadDateTimeOffset()",
+                "ReadNullableDateTimeOffset()",
+                "ReadDateOnly()",
+                "ReadNullableDateOnly()",
+                "ReadTimeOnly()",
+                "ReadNullableTimeOnly()",
+                "ReadColumn(this.@State)",
+                "ReadColumn(this.@MaybeState)",
+                "ReadNotNull(this.@Link)",
+            ],
+            reads
+        );
+    }
+
+    /// <summary>
     /// Member names that are lowercase, that equal the names of generated parameters and locals, or that are keywords, and
     /// negative default constants, compile in the generated code.
     /// </summary>
