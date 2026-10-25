@@ -35,6 +35,7 @@ Make an invalid state unrepresentable; do not document it away or catch it at ru
 - One choice, one slot: an enum, a sealed class hierarchy, or a generic parameter, not a `bool` plus a nullable that the `bool` makes meaningless.
 - A clause that may appear once is a state of the builder type, not a field checked at run time.
 - A method that cannot fail returns its value, not a `bool` / `out` pair or a nullable.
+- A public parameter that takes null, an attribute's included, is declared nullable, and the code the generator writes for that value is compiled in a test. `[Default(null)]` took `object`, so the consumer's code got CS8625, and on an `int?` column the generator wrote `(int)(null)`, which does not compile; both were there from row G1 until #91.
 - A public method does not throw because the caller used the wrong phase of the same type; split the type instead.
 - The public surface is small: the entry points, the builder stages, the expression types, the attributes, the dialect markers, and the exceptions. Rendering, binding, and the expression tree internals are `internal`.
 
