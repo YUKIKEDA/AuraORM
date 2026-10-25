@@ -72,7 +72,8 @@ internal sealed record ColumnModel(
     int Scale,
     string? DefaultCode,
     string? ReferenceCode,
-    ConverterModel? Converter = null
+    ConverterModel? Converter = null,
+    string? DirectRead = null
 )
 {
     /// <summary>

@@ -157,8 +157,13 @@ internal static class TableEmitter
         for (int i = 0; i < table.Columns.Count; i++)
         {
             ColumnModel column = table.Columns[i];
-            string read = column.Member.IsReferenceType && !column.Member.IsNullable ? "ReadNotNull" : "ReadColumn";
-            w.Line("var " + Local(i) + " = " + ReaderParameter + "." + read + "(" + This(column) + ");");
+
+            // §16.1: a column of a type of §3.3 is read with RowReader's typed method; an enum or a converted type with
+            // ReadColumn<T> (or ReadNotNull<T> for a reference type that is not nullable).
+            string read = column.DirectRead is { } direct
+                ? (column.Member.IsNullable ? "ReadNullable" : "Read") + direct + "()"
+                : (column.Member.IsReferenceType && !column.Member.IsNullable ? "ReadNotNull" : "ReadColumn") + "(" + This(column) + ")";
+            w.Line("var " + Local(i) + " = " + ReaderParameter + "." + read + ";");
         }
 
         w.Line("return " + Construct(table, row, Local) + ";");

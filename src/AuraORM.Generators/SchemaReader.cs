@@ -232,7 +232,8 @@ internal static class SchemaReader
             Scale: precision?.ConstructorArguments[1].Value as int? ?? -1,
             DefaultCode: ReadDefault(member, compilation, diagnostics),
             ReferenceCode: ReadReference(member, diagnostics),
-            Converter: converter
+            Converter: converter,
+            DirectRead: converter is null && Underlying(member.Type).TypeKind != TypeKind.Enum ? columnType : null
         );
     }
 
