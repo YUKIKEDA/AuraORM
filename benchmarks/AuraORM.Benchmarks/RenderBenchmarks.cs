@@ -3,6 +3,11 @@ using LinqToDB;
 using LinqToDB.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using SqExpress;
+using SqExpress.SqlExport;
+using Sqlify.Core;
+using SqlKata;
+using SqlKata.Compilers;
 using static AuraORM.Sql;
 
 namespace AuraORM.Benchmarks;
@@ -25,7 +30,15 @@ public class RenderBenchmarks : IDisposable
         Active = true,
     };
 
+    private readonly SqPeople _sqPeople = new();
+    private readonly SqPets _sqPets = new();
+    private readonly SqToys _sqToys = new();
+    private readonly ISqlifyPeople _sqlifyPeople = Sqlify.Sql.Table<ISqlifyPeople>();
+    private readonly ISqlifyPets _sqlifyPets = Sqlify.Sql.Table<ISqlifyPets>();
+    private readonly ISqlifyToys _sqlifyToys = Sqlify.Sql.Table<ISqlifyToys>();
+
     private readonly SqlBuilder<SqliteDialect> _sql = new();
+    private readonly SqliteCompiler _sqlKata = new();
     private SqliteConnection _connection = null!;
     private BenchContext _ef = null!;
     private DataConnection _linq2Db = null!;
@@ -58,6 +71,40 @@ public class RenderBenchmarks : IDisposable
     [Benchmark]
     [BenchmarkCategory("Select")]
     public string EfCoreSelect() => _ef.People.Where(p => p.Age > 30).ToQueryString();
+
+    [Benchmark]
+    [BenchmarkCategory("Select")]
+    public string SqExpressSelect() =>
+        SqQueryBuilder
+            .Select(_sqPeople.Id, _sqPeople.Name, _sqPeople.Age, _sqPeople.Balance, _sqPeople.CreatedAt, _sqPeople.Active)
+            .From(_sqPeople)
+            .Where(_sqPeople.Age > 30)
+            .Done()
+            .ToSql(SqliteExporter.Default);
+
+    [Benchmark]
+    [BenchmarkCategory("Select")]
+    public string SqlKataSelect() =>
+        _sqlKata
+            .Compile(
+                new Query("people")
+                    .Select("people.Id", "people.Name", "people.Age", "people.Balance", "people.CreatedAt", "people.Active")
+                    .Where("people.Age", ">", 30)
+            )
+            .Sql;
+
+    [Benchmark]
+    [BenchmarkCategory("Select")]
+    public string SqlifySelect()
+    {
+        var writer = new SqlWriter();
+        Sqlify
+            .Sql.Select(_sqlifyPeople.Id, _sqlifyPeople.Name, _sqlifyPeople.Age, _sqlifyPeople.Balance, _sqlifyPeople.CreatedAt, _sqlifyPeople.Active)
+            .From(_sqlifyPeople)
+            .Where(_sqlifyPeople.Age > 30)
+            .Format(writer);
+        return writer.GetCommand();
+    }
 
     [Benchmark]
     [BenchmarkCategory("JoinGroup")]
@@ -93,6 +140,47 @@ public class RenderBenchmarks : IDisposable
             group p by p.Name into g
             select new { g.Key, Count = g.Count() }
         ).ToQueryString();
+
+    [Benchmark]
+    [BenchmarkCategory("JoinGroup")]
+    public string SqExpressJoinGroup() =>
+        SqQueryBuilder
+            .Select(_sqPeople.Name, SqQueryBuilder.CountOne())
+            .From(_sqPeople)
+            .InnerJoin(_sqPets, on: _sqPets.OwnerId == _sqPeople.Id)
+            .InnerJoin(_sqToys, on: _sqToys.PetId == _sqPets.Id)
+            .GroupBy(_sqPeople.Name)
+            .Done()
+            .ToSql(SqliteExporter.Default);
+
+    [Benchmark]
+    [BenchmarkCategory("JoinGroup")]
+    public string SqlKataJoinGroup() =>
+        _sqlKata
+            .Compile(
+                new Query("people")
+                    .Join("pets", "pets.OwnerId", "people.Id")
+                    .Join("toys", "toys.PetId", "pets.Id")
+                    .GroupBy("people.Name")
+                    .Select("people.Name")
+                    .SelectRaw("COUNT(*)")
+            )
+            .Sql;
+
+    [Benchmark]
+    [BenchmarkCategory("JoinGroup")]
+    public string SqlifyJoinGroup()
+    {
+        var writer = new SqlWriter();
+        Sqlify
+            .Sql.Select(_sqlifyPeople.Name, Sqlify.Sql.Count())
+            .From(_sqlifyPeople)
+            .Join(_sqlifyPets, _sqlifyPets.OwnerId == _sqlifyPeople.Id)
+            .Join(_sqlifyToys, _sqlifyToys.PetId == _sqlifyPets.Id)
+            .GroupBy(_sqlifyPeople.Name)
+            .Format(writer);
+        return writer.GetCommand();
+    }
 
     [Benchmark]
     [BenchmarkCategory("Insert")]

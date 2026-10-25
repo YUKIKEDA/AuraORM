@@ -20,6 +20,9 @@
     <PackageReference Include="linq2db" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="SqExpress" />
+    <PackageReference Include="SqlKata" />
+    <PackageReference Include="Sqlify" />
   </ItemGroup>
   <ItemGroup>
     <!-- The reader without allocations and the fake connection of the tests, so the benchmarks and the allocation test
