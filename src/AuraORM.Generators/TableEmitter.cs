@@ -157,7 +157,7 @@ internal static class TableEmitter
         for (int i = 0; i < table.Columns.Count; i++)
         {
             ColumnModel column = table.Columns[i];
-            string read = column.Member.IsReferenceType && !column.Member.IsNullable ? "ReadNotNull" : "Read";
+            string read = column.Member.IsReferenceType && !column.Member.IsNullable ? "ReadNotNull" : "ReadColumn";
             w.Line("var " + Local(i) + " = " + ReaderParameter + "." + read + "(" + This(column) + ");");
         }
 
@@ -213,7 +213,7 @@ internal static class TableEmitter
         w.Open("protected override " + row + "? ReadRow(ref " + Lib + "RowReader " + ReaderParameter + ")");
         for (int i = 0; i < table.Columns.Count; i++)
         {
-            w.Line("var " + Local(i) + " = " + ReaderParameter + ".Read(" + This(table.Columns[i]) + ");");
+            w.Line("var " + Local(i) + " = " + ReaderParameter + ".ReadColumn(" + This(table.Columns[i]) + ");");
         }
 
         List<int> keys = Enumerable.Range(0, table.Columns.Count).Where(i => table.Columns[i].IsPrimaryKey).ToList();

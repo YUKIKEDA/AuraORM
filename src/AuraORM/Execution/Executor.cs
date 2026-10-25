@@ -48,13 +48,141 @@ internal static class Executor
         CancellationToken cancellationToken
     )
     {
-        var rows = new List<T>();
-        await foreach (T row in StreamAsync(session, statement, factory, cancelUnread, cancellationToken).ConfigureAwait(false))
+        // §16.1: the rows are read here, not through StreamAsync, so a row does not pass through the state machines of an
+        // async iterator and of its consumer.
+        ConnectionLease lease = await session.LeaseAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            rows.Add(row);
-        }
+            await using DbCommand command = CreateCommand(lease, statement, session);
+            await using DbDataReader reader = await command.ExecuteReaderAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
+            var rows = new List<T>();
+            bool readAll = false;
+            try
+            {
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    rows.Add(Read(reader, factory));
+                }
 
-        return rows;
+                readAll = true;
+            }
+            finally
+            {
+                if (!readAll && cancelUnread)
+                {
+                    CancelUnread(command);
+                }
+            }
+
+            return rows;
+        }
+        finally
+        {
+            await lease.ReleaseAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Reads the first row and closes the reader (<c>docs/design.ja.md</c> §12.2). When there is a row, the rows after it
+    /// are not read: a SELECT is cancelled first (<paramref name="cancelUnread"/>), as when an enumeration stops.
+    /// </summary>
+    /// <typeparam name="T">The row type.</typeparam>
+    /// <param name="session">The session.</param>
+    /// <param name="statement">The statement.</param>
+    /// <param name="factory">Reads a row.</param>
+    /// <param name="cancelUnread">Whether to cancel the command when rows are left unread.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>Whether there was a row, and the row.</returns>
+    public static async Task<(bool Found, T? Row)> FirstAsync<T>(
+        IStatementRunner session,
+        SqlStatement statement,
+        RowFactory<T> factory,
+        bool cancelUnread,
+        CancellationToken cancellationToken
+    )
+    {
+        ConnectionLease lease = await session.LeaseAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using DbCommand command = CreateCommand(lease, statement, session);
+            await using DbDataReader reader = await command.ExecuteReaderAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
+            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return (false, default);
+            }
+
+            try
+            {
+                return (true, Read(reader, factory));
+            }
+            finally
+            {
+                if (cancelUnread)
+                {
+                    CancelUnread(command);
+                }
+            }
+        }
+        finally
+        {
+            await lease.ReleaseAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Reads the only row (<c>docs/design.ja.md</c> §12.2): no row gives <c>(false, default)</c>, and a second row throws
+    /// after a SELECT is cancelled (<paramref name="cancelUnread"/>), as when an enumeration stops.
+    /// </summary>
+    /// <typeparam name="T">The row type.</typeparam>
+    /// <param name="session">The session.</param>
+    /// <param name="statement">The statement.</param>
+    /// <param name="factory">Reads a row.</param>
+    /// <param name="cancelUnread">Whether to cancel the command when rows are left unread.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>Whether there was a row, and the row.</returns>
+    /// <exception cref="InvalidOperationException">The statement returned more than one row.</exception>
+    public static async Task<(bool Found, T? Row)> SingleAsync<T>(
+        IStatementRunner session,
+        SqlStatement statement,
+        RowFactory<T> factory,
+        bool cancelUnread,
+        CancellationToken cancellationToken
+    )
+    {
+        ConnectionLease lease = await session.LeaseAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using DbCommand command = CreateCommand(lease, statement, session);
+            await using DbDataReader reader = await command.ExecuteReaderAsync(CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
+            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return (false, default);
+            }
+
+            bool readAll = false;
+            try
+            {
+                T row = Read(reader, factory);
+                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    throw new InvalidOperationException("The statement returned more than one row.");
+                }
+
+                readAll = true;
+                return (true, row);
+            }
+            finally
+            {
+                if (!readAll && cancelUnread)
+                {
+                    CancelUnread(command);
+                }
+            }
+        }
+        finally
+        {
+            await lease.ReleaseAsync().ConfigureAwait(false);
+        }
     }
 
     public static async IAsyncEnumerable<T> StreamAsync<T>(
