@@ -19,6 +19,8 @@ A claim that a rule was followed, or that a change is faster, is a measurement (
 
 - SQL is written into a pooled buffer (`ArrayPool<char>.Shared` or a reusable builder), not built by `string` concatenation or interpolation.
 - No LINQ, `params` arrays, or capturing lambdas inside the renderer and the binder. A `static` lambda is fine.
+- No `foreach` over an interface (`IReadOnlyList<T>`, `IEnumerable<T>`) inside the renderer: each loop allocates an enumerator. Loop with an index. On #111 the scope check of each column allocated 32 B this way. Arrays, `List<T>`, and `ImmutableArray<T>` have enumerators that do not allocate.
+- No `Dictionary` for a map that holds a few entries per statement (the names of its parameters): search an array, and make the dictionary only past a threshold (16 on #111), so a long `IN` list does not become quadratic. On #111 the dictionary of parameter names cost 152 B per SELECT.
 - Number formatting in SQL text uses `CultureInfo.InvariantCulture` (and is rare: values are parameters).
 
 ## Dispatch and generics
