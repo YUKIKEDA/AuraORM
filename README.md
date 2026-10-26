@@ -5,7 +5,7 @@ English | [日本語](https://github.com/YUKIKEDA/AuraORM/blob/main/README.ja.md
 [![CI](https://github.com/YUKIKEDA/AuraORM/actions/workflows/ci.yml/badge.svg)](https://github.com/YUKIKEDA/AuraORM/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/YUKIKEDA/AuraORM/blob/main/LICENSE)
 
-A type-safe SQL query builder for .NET, in the spirit of [Drizzle ORM](https://orm.drizzle.team/): you write SQL clause by clause in C#, the compiler rejects the queries that are wrong, and you can read the SQL before it runs.
+A type-safe SQL query builder for .NET: you write SQL clause by clause in C#, the compiler rejects the queries that are wrong, and you can read the SQL before it runs.
 
 - **SQL stays SQL.** One builder call is one SQL clause. AuraORM adds no query, join, subquery, `DISTINCT`, `ORDER BY`, `LIMIT`, or round trip that you did not write, and the same chain gives the same SQL text for any value. What the API cannot express, a raw SQL fragment can, with its values still parameters.
 - **Types reject only invalid queries.** A column of a table that is not in the query, operands of different types, a clause in the wrong order, a missing required column in `INSERT`, an `UPDATE` or `DELETE` without `WHERE`, an aggregate mixed with row values, a feature the database lacks: these do not compile.
@@ -427,27 +427,14 @@ Whether a `string` or `byte[]` value can be `NULL` is part of its type only when
 
 Measured with BenchmarkDotNet on Windows 11, an Intel Core i5-13400F, and .NET 10.0.13 (Release, JIT); the method and every figure are in [the design, §16.1](https://github.com/YUKIKEDA/AuraORM/blob/main/docs/design.ja.md#161-目標).
 
-| | AuraORM | For comparison |
+| | Time | Allocated |
 | --- | --- | --- |
-| Reading a row of six columns from an in-memory reader | 22.7 ns (1.71 × a loop written by hand, 13.3 ns) | |
-| Building and rendering a `SELECT` with `WHERE` | 562 ns, 2,488 B | Sqlify 224 ns, SqExpress 565 ns, linq2db 1,703 ns, EF Core 4,266 ns, SqlKata 7,672 ns |
-| Building and rendering two joins with `GROUP BY` | 730 ns, 3,640 B | Sqlify 391 ns, SqExpress 802 ns, linq2db 12,246 ns, SqlKata 15,880 ns, EF Core 18,102 ns |
+| Reading a row of six columns from an in-memory reader | 22.7 ns (1.71 × a loop written by hand, 13.3 ns) | The row only |
+| Building and rendering a `SELECT` with `WHERE` | 562 ns | 2,488 B |
+| Building and rendering two joins with `GROUP BY` | 730 ns | 3,640 B |
 | A round trip on SQLite in memory, 100 rows | 1.09 × hand-written ADO.NET | |
 
-Sqlify is faster at building SQL: it does not quote identifiers and has no dialects, and AuraORM's remaining cost is the structure that ties each column to its statement. SqExpress puts values in the SQL as literals unless it runs the statement itself.
-
-## Compared with other libraries
-
-| | AuraORM | Dapper | EF Core | linq2db | SqlKata | SqExpress | Sqlify |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| How a query is written | Builder, one call per clause | SQL text | LINQ, translated | LINQ, translated | Builder, names as strings | Builder | Builder |
-| Columns checked by the compiler | Yes | No | Yes | Yes | No | Yes | Yes |
-| Clause order checked by the compiler | Yes | No | n/a | n/a | No | Yes | No |
-| Values in the SQL | Parameters | Parameters | Variables as parameters, constants as literals | Variables as parameters, constants as literals | Parameters | Literals in `ToSql` | Parameters |
-| Dialects | 5 | Any (SQL text) | Provider | Provider | 6 | 4 | Standard SQL, part of PostgreSQL |
-| Change tracking | No | No | Yes | No | No | No | No |
-
-The cells about other libraries come from their documentation and from the benchmarks of this repository ([`benchmarks/`](https://github.com/YUKIKEDA/AuraORM/tree/main/benchmarks)), which run each library's SQL on SQLite and check that it returns the same rows as AuraORM's.
+Most of the time of building a statement is its allocations: the stage, the alias, and the column objects that tie each column to its statement, and the rendering. A statement that runs many times is built again each time; reusing a built statement is planned after version 0.1.
 
 ## Documentation
 

@@ -5,7 +5,7 @@
 [![CI](https://github.com/YUKIKEDA/AuraORM/actions/workflows/ci.yml/badge.svg)](https://github.com/YUKIKEDA/AuraORM/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/YUKIKEDA/AuraORM/blob/main/LICENSE)
 
-[Drizzle ORM](https://orm.drizzle.team/) の考え方を取り入れた、.NET 向けの型安全な SQL クエリビルダー。SQL を句ごとに C# で書き、誤ったクエリはコンパイラーが拒み、実行する前に SQL を確認できる。
+.NET 向けの型安全な SQL クエリビルダー。SQL を句ごとに C# で書き、誤ったクエリはコンパイラーが拒み、実行する前に SQL を確認できる。
 
 - **SQL は SQL のまま。** ビルダーの呼び出し一つが SQL の句一つになる。書いていないクエリ、結合、サブクエリ、`DISTINCT`、`ORDER BY`、`LIMIT`、往復を足さず、同じ連鎖は値によらず同じ SQL の文字列になる。API で書けないところは生 SQL の断片で書ける。その場合も値はパラメータになる。
 - **型が拒むのは不正なクエリだけ。** クエリにないテーブルの列、型の違う比較、順序の誤った句、`INSERT` での必須列の欠落、`WHERE` のない `UPDATE` / `DELETE`、集計と行の値の混在、そのデータベースにない機能は、コンパイルが通らない。
@@ -427,27 +427,14 @@ public sealed class IsbnConverter : IValueConverter<Isbn, string>
 
 BenchmarkDotNet で、Windows 11、Intel Core i5-13400F、.NET 10.0.13（Release、JIT）で測った。測り方とすべての値は[設計書の §16.1](https://github.com/YUKIKEDA/AuraORM/blob/main/docs/design.ja.md#161-目標)にある。
 
-| | AuraORM | 比べたもの |
+| | 時間 | 確保量 |
 | --- | --- | --- |
-| メモリ上のリーダーから 6 列の行を 1 行読む | 22.7 ns（手で書いたループ 13.3 ns の 1.71 倍） | |
-| `WHERE` のある `SELECT` を組み立てて SQL にする | 562 ns、2,488 B | Sqlify 224 ns、SqExpress 565 ns、linq2db 1,703 ns、EF Core 4,266 ns、SqlKata 7,672 ns |
-| 二つの結合と `GROUP BY` を組み立てて SQL にする | 730 ns、3,640 B | Sqlify 391 ns、SqExpress 802 ns、linq2db 12,246 ns、SqlKata 15,880 ns、EF Core 18,102 ns |
+| メモリ上のリーダーから 6 列の行を 1 行読む | 22.7 ns（手で書いたループ 13.3 ns の 1.71 倍） | 行そのものだけ |
+| `WHERE` のある `SELECT` を組み立てて SQL にする | 562 ns | 2,488 B |
+| 二つの結合と `GROUP BY` を組み立てて SQL にする | 730 ns | 3,640 B |
 | メモリ上の SQLite で 100 行を往復する | 手で書いた ADO.NET の 1.09 倍 | |
 
-SQL の組み立ては Sqlify のほうが速い。Sqlify は識別子を引用符で囲まず、方言もない。AuraORM の残りの費用は、列をその文に結びつけておく仕組みによる。SqExpress は、文を自分で実行しないかぎり、値をリテラルとして SQL に入れる。
-
-## ほかのライブラリとの比較
-
-| | AuraORM | Dapper | EF Core | linq2db | SqlKata | SqExpress | Sqlify |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| クエリの書き方 | ビルダー、句ごとに一つの呼び出し | SQL の文字列 | LINQ を翻訳する | LINQ を翻訳する | ビルダー、名前は文字列 | ビルダー | ビルダー |
-| 列をコンパイラーが確かめる | はい | いいえ | はい | はい | いいえ | はい | はい |
-| 句の順序をコンパイラーが確かめる | はい | いいえ | 該当なし | 該当なし | いいえ | はい | いいえ |
-| SQL の中の値 | パラメータ | パラメータ | 変数はパラメータ、定数はリテラル | 変数はパラメータ、定数はリテラル | パラメータ | `ToSql` ではリテラル | パラメータ |
-| 方言 | 5 | どれでも（SQL の文字列） | プロバイダー | プロバイダー | 6 | 4 | 標準 SQL と PostgreSQL の一部 |
-| 変更追跡 | なし | なし | あり | なし | なし | なし | なし |
-
-ほかのライブラリの欄は、それぞれの資料と、このリポジトリのベンチマーク（[`benchmarks/`](https://github.com/YUKIKEDA/AuraORM/tree/main/benchmarks)）による。ベンチマークは、各ライブラリの SQL を SQLite で実行し、AuraORM の SQL と同じ行を返すことを確かめている。
+文の組み立ての時間の多くは、その確保である。段階、別名、列をその文に結びつける列のオブジェクト、そして SQL の出力が確保する。何度も実行する文も毎回組み立て直す。組み立てた文の再利用は、0.1 の後に予定している。
 
 ## 文書
 

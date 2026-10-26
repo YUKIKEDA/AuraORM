@@ -6,7 +6,7 @@ alwaysApply: false
 
 # README
 
-`README.md` is what a user reads to choose AuraORM, to start with it, and to know where it stops. It is also the package's README on nuget.org. On #122 the owner found it too thin: its examples were five statements, and it said nothing of what is promised and what is not, the limits, the speed, the other libraries, or the differences between dialects.
+`README.md` is what a user reads to choose AuraORM, to start with it, and to know where it stops. It is also the package's README on nuget.org. On #122 the owner found it too thin: its examples were five statements, and it said nothing of what is promised and what is not, the limits, the speed, or the differences between dialects.
 
 ## What it covers
 
@@ -18,9 +18,8 @@ In this order:
 4. **Usage**, one section per capability, each with an example: tables and column types, SELECT, joins, GROUP BY and result types, subqueries and set operations and CTEs, INSERT / UPDATE / DELETE / RETURNING, UPSERT, the dialects' differences, transactions, raw SQL, the SQL of a statement, value converters. A capability added to the library gets its section, or its line in one, in the same PR.
 5. **What is promised** and **what is not**, from `docs/design.ja.md` §14.
 6. **Limits**: .NET, the oldest database versions, providers, parameters, dependencies.
-7. **Performance**: the figures of §16.1 with the machine and the source, including the rows where another library is faster, and why.
-8. **Compared with other libraries**: a table of facts that were checked (the library's current documentation, its current release, or this repository's benchmarks), not of impressions.
-9. **Documentation**, **Verification**, **License**.
+7. **Performance**: AuraORM's figures of §16.1 with the machine and the source, against code written by hand, and where the time goes.
+8. **Documentation**, **Verification**, **License**.
 
 ## Examples
 
@@ -28,9 +27,13 @@ In this order:
 - A comment that shows SQL (`// SELECT "books"...`) is checked against what the example prints, so the SQL shown is the SQL produced.
 - An example avoids what a dialect rejects at run time (on SQLite, ordering by a `decimal`), and the README says that it does.
 
+## No other library by name
+
+The public documents (`README.md`, `README.ja.md`, the package's description and tags, `CHANGELOG.md`, and the notes of a GitHub Release) do not name another library or product: no "in the spirit of", no comparison table, no figures of another library. AuraORM is described by what it does; a speed is against code written by hand. What a user runs AuraORM with is named: .NET, the databases, and the ADO.NET providers (the install command, the limits). On #126 the owner asked to remove the names of the libraries that the first rewrite compared with, and asked whether the rules did not already say so; they did not. The design, the decisions, and the benchmarks keep their comparisons: they are where a choice is argued, and `design-docs.mdc` asks them to cite.
+
 ## Claims
 
-- A number comes with where it was measured. A claim about another library names what it rests on and is checked against the version on NuGet when the README is written; a capability of another library that was not checked is left out, not guessed.
+- A number comes with where it was measured.
 - An error code in the README is the one the design or a test names.
 
 ## README.ja.md
