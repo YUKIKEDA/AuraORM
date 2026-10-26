@@ -1,0 +1,38 @@
+---
+description: What README.md covers, how its examples are checked, and README.ja.md
+globs: "README*.md"
+alwaysApply: false
+---
+
+# README
+
+`README.md` is what a user reads to choose AuraORM, to start with it, and to know where it stops. It is also the package's README on nuget.org. On #122 the owner found it too thin: its examples were five statements, and it said nothing of what is promised and what is not, the limits, the speed, the other libraries, or the differences between dialects.
+
+## What it covers
+
+In this order:
+
+1. One line of what AuraORM is, then the promises as short bold-led bullets, and the install command.
+2. **Before the first query**: what a user must know before the first line (the dialect is a type, `using static AuraORM.Sql`, columns come from the lambdas, statements are values, asynchronous only, nullable reference types).
+3. **A first example** that declares tables and runs a query.
+4. **Usage**, one section per capability, each with an example: tables and column types, SELECT, joins, GROUP BY and result types, subqueries and set operations and CTEs, INSERT / UPDATE / DELETE / RETURNING, UPSERT, the dialects' differences, transactions, raw SQL, the SQL of a statement, value converters. A capability added to the library gets its section, or its line in one, in the same PR.
+5. **What is promised** and **what is not**, from `docs/design.ja.md` §14.
+6. **Limits**: .NET, the oldest database versions, providers, parameters, dependencies.
+7. **Performance**: the figures of §16.1 with the machine and the source, including the rows where another library is faster, and why.
+8. **Compared with other libraries**: a table of facts that were checked (the library's current documentation, its current release, or this repository's benchmarks), not of impressions.
+9. **Documentation**, **Verification**, **License**.
+
+## Examples
+
+- Every `csharp` block is compiled against the packed package and run (`tools/readme.ps1`, in CI). The blocks continue one program: a block that declares a type is its own file; the others run in order and share their variables. A block that must not compile is not a `csharp` block.
+- A comment that shows SQL (`// SELECT "books"...`) is checked against what the example prints, so the SQL shown is the SQL produced.
+- An example avoids what a dialect rejects at run time (on SQLite, ordering by a `decimal`), and the README says that it does.
+
+## Claims
+
+- A number comes with where it was measured. A claim about another library names what it rests on and is checked against the version on NuGet when the README is written; a capability of another library that was not checked is left out, not guessed.
+- An error code in the README is the one the design or a test names.
+
+## README.ja.md
+
+`README.ja.md` is the Japanese translation, in the same PR. Its code blocks are those of `README.md` byte for byte (`tools/readme.ps1` checks it), so write the Japanese around blocks copied from the English file, not by hand. It is checked with `.agents/skills/natural-japanese/`.

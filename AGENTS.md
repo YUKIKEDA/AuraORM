@@ -49,6 +49,7 @@ Read the rules that match the work before changing anything. `alwaysApply` rules
 | `csharp` | Style, naming, types, errors, XML docs (`*.cs`) |
 | `testing` | xUnit v3, test layers, test docs (`tests/**`) |
 | `dev-docs` | Figures, math, SQL blocks, and pseudo-code in `docs/` |
+| `readme` | What README.md covers; every csharp block compiled and run against the package; README.ja.md has the same code |
 
 ## Skills
 
