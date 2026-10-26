@@ -30,7 +30,22 @@ Code, comments, tests, commit subjects, pull request titles, and `README.md` are
 
 ## Versioning
 
-Packages are versioned with SemVer from `VersionPrefix` in `Directory.Build.props`. Before 1.0, a minor version may break the public API. Nothing is published to NuGet yet; publishing is done only by a release workflow, which comes with its roadmap row.
+Packages are versioned with SemVer from `VersionPrefix` in `Directory.Build.props`. Before 1.0, a minor version may break the public API. Only the release workflow (`.github/workflows/release.yml`) publishes to NuGet.
+
+## Releases
+
+The owner releases. Once, before the first release:
+
+1. On nuget.org, under the account's **Trusted Publishing**, add a policy for GitHub Actions: owner `YUKIKEDA`, repository `AuraORM`, workflow file `release.yml`, environment `release`.
+2. In the repository settings, add the variable `NUGET_USER` with the nuget.org user name. No API key is stored.
+
+For each release:
+
+1. A pull request sets `VersionPrefix`, moves the entries under `## [Unreleased]` of `CHANGELOG.md` to `## [<version>] - <date>`, and updates the status line of `README.md` and `README.ja.md`.
+2. After it is merged and CI has passed on `main`, run **Release** from the Actions tab on `main` with **dry-run** checked, and approve the `release` environment. It checks that CI passed on the commit, that `CHANGELOG.md` has the version and that neither nuget.org nor a tag has it (`./tools/release.ps1`), packs and checks the package and the README examples, and logs in to nuget.org.
+3. Run it again with **dry-run** unchecked. It pushes the package and its symbols, then creates the tag `v<version>` and a GitHub Release whose notes are the CHANGELOG section.
+
+A version on nuget.org cannot be replaced, only unlisted, so a fix is a new version.
 
 Every pull request packs the `AuraORM` package and checks what a consumer receives: the library and its XML docs, the generator under `analyzers/dotnet/cs`, the README, no package dependency, and the symbol package. Run the same check with `./tools/package.ps1`. CI publishes the NativeAOT sample from that package.
 

@@ -1,0 +1,97 @@
+name: Release
+
+# Publishes AuraORM to nuget.org (row R1, CONTRIBUTING.md). The owner runs it on main; the release environment asks the
+# owner to approve it. With dry-run (the default), it does everything except the push, the tag, and the GitHub Release.
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Stop before the push to nuget.org"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  release:
+    name: release
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      # The OIDC token of NuGet's Trusted Publishing, and the tag and the GitHub Release.
+      id-token: write
+      contents: write
+      checks: read
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+
+      # The gate ran on this commit in CI; the release does not run it again, it reads its result.
+      - name: CI passed on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $runs = gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=ci" --jq '[.check_runs[] | select(.conclusion == "success")] | length'
+          if ([int]$runs -lt 1) { Write-Error "The ci check has not passed on ${{ github.sha }}."; exit 1 }
+
+      - name: Version, CHANGELOG, nuget.org, and tag
+        id: version
+        run: ./tools/release.ps1 -Notes artifacts/notes.md
+
+      - name: Pack and check
+        id: pack
+        run: |
+          ./tools/package.ps1 -Output artifacts/packages
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path "artifacts/packages/AuraORM.${{ steps.version.outputs.version }}.nupkg")) {
+            Write-Error "The package is not AuraORM.${{ steps.version.outputs.version }}.nupkg."; exit 1
+          }
+
+      - name: README examples
+        run: ./tools/readme.ps1 -Version "${{ steps.version.outputs.version }}" -Feed artifacts/packages
+
+      - name: NuGet login (Trusted Publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Push
+        if: ${{ !inputs.dry-run }}
+        # The symbol package next to the package is pushed with it.
+        run: |
+          dotnet nuget push "artifacts/packages/AuraORM.${{ steps.version.outputs.version }}.nupkg" `
+            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Tag and GitHub Release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" --target "${{ github.sha }}" `
+            --title "v${{ steps.version.outputs.version }}" --notes-file artifacts/notes.md `
+            "artifacts/packages/AuraORM.${{ steps.version.outputs.version }}.nupkg" "artifacts/packages/AuraORM.${{ steps.version.outputs.version }}.snupkg"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Summary
+        run: |
+          $what = if ('${{ inputs.dry-run }}' -eq 'true') { 'Dry run: checked and logged in, nothing pushed' } else { 'Published' }
+          "$what AuraORM ${{ steps.version.outputs.version }}." | Tee-Object -Append -FilePath $env:GITHUB_STEP_SUMMARY
