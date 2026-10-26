@@ -113,6 +113,43 @@ public sealed class ParameterTests
     }
 
     /// <summary>
+    /// An expression written again after many other values still reuses its parameter: the rendering finds the nodes in an
+    /// array while a statement has few parameters and in a dictionary once it has more than 16 (design §5.12, §16.1).
+    /// </summary>
+    /// <remarks>
+    /// Preconditions:
+    /// - <c>key = Add(Score, 1)</c>, and <paramref name="count"/> other values on both sides of 16.
+    ///
+    /// Steps:
+    /// - Render <c>And(Gt(key, 0), Eq(Score, 100), …, Lt(key, 9))</c> on SQLite.
+    ///
+    /// Expected:
+    /// - <c>key</c> is <c>@p0</c> at both places.
+    /// - The statement has <paramref name="count"/> + 3 parameters, numbered in order of first use.
+    /// </remarks>
+    /// <param name="count">The number of values between the two uses of <c>key</c>.</param>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(13)]
+    [InlineData(14)]
+    [InlineData(15)]
+    [InlineData(40)]
+    public void ParameterName_SameExpressionAfterManyValues_ReusesItsParameter(int count)
+    {
+        IExpr<int, PerRow> key = Add(Score, 1);
+        Condition<PerRow>[] conditions = [Gt(key, 0), .. Enumerable.Range(100, count).Select(value => Eq(Score, value)), Lt(key, 9)];
+
+        SqlStatement statement = SqlRenderContext.Render(
+            DialectRenderer.For<SqliteDialect>(),
+            And(conditions[0], conditions[1], conditions[2..]).Node
+        );
+
+        Assert.Equal(2, statement.Text.Split("@p0").Length - 1);
+        Assert.Equal(Enumerable.Range(0, count + 3).Select(i => "@p" + i), statement.Parameters.Select(p => p.Name));
+        Assert.Equal([1, 0, .. Enumerable.Range(100, count).Cast<object>(), 9], statement.Parameters.Select(p => p.Value));
+    }
+
+    /// <summary>
     /// A statement with more parameters than its dialect accepts throws before it reaches the database (design §12.4).
     /// </summary>
     /// <remarks>
