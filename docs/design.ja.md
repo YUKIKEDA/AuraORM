@@ -1263,6 +1263,7 @@ DROP TABLE [orders]             -- SQL Server
 - 生 SQL 断片（§11）の中身。
 - コンバーター（§3.6）の正しさ。`FromProvider(ToProvider(x))` が `x` に戻ること、変換後の値の順がモデルの型の意味に合うことは、利用者のコードに任される。
 - データベースのスキーマが、C# の定義と一致していること。AuraORM は実行時にスキーマを調べない。
+- 参照型（`string`、`byte[]`、行の型）の NULL 可否は、利用者のプロジェクトで null 許容参照型が有効で、その警告がエラーのときだけ守られる。`string` と `string?` は実行時に同じ型なので、外部結合の NULL になりうる側の参照型の列や、NULL を許さない列への `null` は、型では止められず null 許容の警告になる。README に、`<Nullable>enable</Nullable>` と `<WarningsAsErrors>nullable</WarningsAsErrors>` の設定を書く（D1-87）。
 - データベースの照合順序、タイムゾーン、数値の精度による結果の違い。
 - PostgreSQL で集合演算の被演算子が多すぎること（`max_stack_depth` の設定で上限が決まる。既定の 2048kB で、2000 は通り 10000 は失敗した。§5.10）。
 - `GroupBy` のない集計だけのサブクエリ（`Exists(db.From(T).Select(x => Count()))`）の `Exists` が常に真になること。集計は行がなくても一行を返す。型は `GroupBy` の有無を区別しない（`PerGroup` の射影は同じ）ので止められない。全方言で同じ結果になる。

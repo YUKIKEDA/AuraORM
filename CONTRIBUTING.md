@@ -34,6 +34,8 @@ Packages are versioned with SemVer from `VersionPrefix` in `Directory.Build.prop
 
 Every pull request packs the `AuraORM` package and checks what a consumer receives: the library and its XML docs, the generator under `analyzers/dotnet/cs`, the README, no package dependency, and the symbol package. Run the same check with `./tools/package.ps1`. CI publishes the NativeAOT sample from that package.
 
+The C# examples of `README.md` are built against that package and run (`./tools/package.ps1 -Suffix local.1`, then `./tools/readme.ps1 -Version 0.1.0-local.1`). A comment that shows SQL (`// SELECT ...`) must be what the example prints, and `README.ja.md` has the same code blocks.
+
 ## Security
 
 See `SECURITY.md`. Do not report vulnerabilities in public Issues.
