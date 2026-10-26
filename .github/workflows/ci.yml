@@ -60,10 +60,37 @@ jobs:
           git diff --exit-code -- src/AuraORM/Select/Generated src/AuraORM/Mutations/Generated
           if (git status --porcelain -- src/AuraORM/Select/Generated src/AuraORM/Mutations/Generated) { Write-Error 'Run the stage generator and commit its output.'; exit 1 }
 
-  # NativeAOT check (docs/design.ja.md §16.3, .cursor/rules/aot.mdc): publish the sample with NativeAOT, fail on any
-  # trim or AOT warning (warnings are errors), run the executable, and report its size.
+  # The package a consumer receives (row R1): pack it, check its contents (tools/package.ps1), and hand it to the jobs
+  # that use it as a consumer does.
+  package:
+    name: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    outputs:
+      version: ${{ steps.pack.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Pack and check
+        id: pack
+        # The suffix makes each run's version new, so no restore reads an older package of the same version from a cache.
+        run: ./tools/package.ps1 -Output artifacts/packages -Suffix "ci.${{ github.run_id }}.${{ github.run_attempt }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: artifacts/packages
+          if-no-files-found: error
+
+  # NativeAOT check (docs/design.ja.md §16.3, .cursor/rules/aot.mdc): publish the sample with NativeAOT from the packed
+  # package, fail on any trim or AOT warning (warnings are errors), run the executable, and report its size.
   nativeaot:
     name: nativeaot (${{ matrix.rid }}, ${{ matrix.tfm }})
+    needs: package
     strategy:
       fail-fast: false
       matrix:
@@ -90,9 +117,18 @@ jobs:
         with:
           global-json-file: global.json
           dotnet-version: 8.0.x
+      - uses: actions/download-artifact@v8
+        with:
+          name: packages
+          path: artifacts/packages
       - name: Publish
-        # -warnaserror turns the ILC and ILLink warnings into errors too, not only the compiler's.
-        run: dotnet publish samples/AuraORM.Samples.Sqlite -c Release -f ${{ matrix.tfm }} -r ${{ matrix.rid }} -o artifacts/aot -warnaserror
+        # -warnaserror turns the ILC and ILLink warnings into errors too, not only the compiler's. AuraPackageVersion makes
+        # the sample reference the package instead of the projects. The folder is added to the sources as a property:
+        # `--source` with nuget.org beside it is read as a path. Its own packages folder keeps a cached package out.
+        run: |
+          $feed = (Resolve-Path artifacts/packages).Path
+          dotnet publish samples/AuraORM.Samples.Sqlite -c Release -f ${{ matrix.tfm }} -r ${{ matrix.rid }} -o artifacts/aot -warnaserror `
+            "-p:AuraPackageVersion=${{ needs.package.outputs.version }}" "-p:RestoreAdditionalProjectSources=$feed" -p:RestorePackagesPath=artifacts/nuget
       - name: Run
         run: |
           & ./artifacts/aot/${{ matrix.exe }}
@@ -274,7 +310,7 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [gate, nativeaot, plan, integration-postgresql, integration-mysql, integration-mariadb, integration-sqlserver, integration-sqlite-minimum]
+    needs: [gate, package, nativeaot, plan, integration-postgresql, integration-mysql, integration-mariadb, integration-sqlserver, integration-sqlite-minimum]
     runs-on: ubuntu-latest
     steps:
       - name: Every job passed

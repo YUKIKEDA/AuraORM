@@ -16,7 +16,7 @@ AuraORM is used from NativeAOT applications. The runtime library and every line 
 
 ## The check
 
-CI publishes the NativeAOT sample (`samples/AuraORM.Samples.Sqlite`) for every PR on Linux (x64), Windows (x64), and macOS (arm64), for `net8.0` and `net10.0` (a newer ILC can warn where an older one does not), with `-warnaserror`, and runs it against SQLite. A row that adds public API exercises it in the sample, every reading path included (each column type, nulls, result types). The job fails on any trim or AOT warning and on a failed run. A PR that changes the public surface, a dependency, or generated code reports the warning count (zero) and the executable size under `## Verification`; the job summary shows the size next to main's last size.
+CI publishes the NativeAOT sample (`samples/AuraORM.Samples.Sqlite`) for every PR on Linux (x64), Windows (x64), and macOS (arm64), for `net8.0` and `net10.0` (a newer ILC can warn where an older one does not), with `-warnaserror`, and runs it against SQLite. It references the package that the `package` job packed and checked (`tools/package.ps1`), not the projects, so the generator runs from `analyzers/dotnet/cs` as it does for a consumer. A row that adds public API exercises it in the sample, every reading path included (each column type, nulls, result types). The job fails on any trim or AOT warning and on a failed run. A PR that changes the public surface, a dependency, or generated code reports the warning count (zero) and the executable size under `## Verification`; the job summary shows the size next to main's last size.
 
 `-warnaserror` also fails the publish on a warning that only the ILC or ILLink stage reports, which the build's analyzers do not see (a trim warning inside a referenced library). This was checked once with a library that calls `Type.GetType(string)`: the build passed, and the clean publish failed with IL2057.
 
@@ -28,7 +28,17 @@ dotnet publish samples/<Sample> -c Release -r win-x64 -o <scratch>
 <scratch>/<Sample>.exe
 ```
 
-The first line is required: without the Visual Studio Installer folder on `PATH`, the link step fails with MSB3073 (`'vswhere.exe' is not recognized`) after ILC has run. The Bash tool's `PATH` lacks it too, so publish from PowerShell with the lines above.
+The sample references the projects there. To publish it from the package as CI does, pack first and pass the version and the folder:
+
+```powershell
+./tools/package.ps1 -Suffix local.1
+$feed = (Resolve-Path artifacts/packages).Path
+dotnet publish samples/AuraORM.Samples.Sqlite -c Release -f net10.0 -r win-x64 -o <scratch> -p:AuraPackageVersion=0.1.0-local.1 "-p:RestoreAdditionalProjectSources=$feed" -p:RestorePackagesPath=artifacts/nuget
+```
+
+`--source` with the folder and nuget.org does not work: MSBuild reads the nuget.org URL as a path (NU1301). A new suffix, or the separate `RestorePackagesPath`, keeps an older package of the same version out of the restore.
+
+The `PATH` line is required: without the Visual Studio Installer folder on `PATH`, the link step fails with MSB3073 (`'vswhere.exe' is not recognized`) after ILC has run. The Bash tool's `PATH` lacks it too, so publish from PowerShell with the lines above.
 
 A second publish into the same output reuses the ILC result and does not report its warnings again, so a local check after a change starts from a clean `obj/` (CI always does).
 

@@ -1411,6 +1411,7 @@ DROP TABLE [orders]             -- SQL Server
 
 - ランタイムのライブラリは `IsAotCompatible` で、トリミングと AOT の警告はビルドのエラーになる。
 - CI は、SQLite を使うサンプル（`samples/`）を `net8.0` と `net10.0` の NativeAOT で、Linux・Windows・macOS で発行して実行する。警告が一つでもあれば失敗する。ILC の段階だけが出す警告（参照するライブラリの中のトリムの警告など）でも失敗することを確かめた。
+- CI は、サンプルを、その実行でパックした `AuraORM` のパッケージから参照して発行する（D1-86）。利用者と同じく、ジェネレーターはパッケージの `analyzers/dotnet/cs` から動く。パッケージは、すべての PR で中身を確かめる（`tools/package.ps1`）。`lib/net8.0` のライブラリと XML ドキュメント、`analyzers/dotnet/cs` のジェネレーター、README があり、パッケージの依存がなく（§2.1）、シンボルのパッケージがあることである。
 - ほかの方言の NativeAOT の対応はプロバイダーに依存する（§12.6）。
 
 ## 17. テストの層

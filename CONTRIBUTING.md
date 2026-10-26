@@ -32,6 +32,8 @@ Code, comments, tests, commit subjects, pull request titles, and `README.md` are
 
 Packages are versioned with SemVer from `VersionPrefix` in `Directory.Build.props`. Before 1.0, a minor version may break the public API. Nothing is published to NuGet yet; publishing is done only by a release workflow, which comes with its roadmap row.
 
+Every pull request packs the `AuraORM` package and checks what a consumer receives: the library and its XML docs, the generator under `analyzers/dotnet/cs`, the README, no package dependency, and the symbol package. Run the same check with `./tools/package.ps1`. CI publishes the NativeAOT sample from that package.
+
 ## Security
 
 See `SECURITY.md`. Do not report vulnerabilities in public Issues.
