@@ -6,7 +6,8 @@ them: shared runners are too noisy for a timing.
 ## Run
 
 ```powershell
-# Check first that every library returns the same rows.
+# Check first that every library returns the same rows, and that the SQL each library renders returns the same rows
+# on SQLite in memory.
 dotnet run -c Release --project benchmarks/AuraORM.Benchmarks -- --check
 
 # Every benchmark, three processes each.
@@ -21,7 +22,7 @@ dotnet run -c Release --project benchmarks/AuraORM.Benchmarks -- --filter "*Read
 | Class | Measures | Compared with |
 | --- | --- | --- |
 | `ReadBenchmarks` | Reading 1, 100, and 10000 rows from an in-memory reader whose getters do not allocate (`tests/AuraORM.Tests/Support/ArrayDataReader.cs`): six columns that do not allow null, and six of which five allow null and are NULL in every other row | A loop written by hand with the typed getters by ordinal (the baseline), Dapper, Dapper.AOT |
-| `RenderBenchmarks` | Building a statement and rendering its SQL without a connection: a SELECT with WHERE, two joins with GROUP BY, an INSERT of one row, an UPDATE | linq2db (`ToSqlQuery`) and EF Core (`ToQueryString`) for the queries; neither renders an INSERT or UPDATE without running it. Dapper takes the SQL text as it is |
+| `RenderBenchmarks` | Building a statement and rendering its SQL without a connection: a SELECT with WHERE, two joins with GROUP BY, an INSERT of one row, an UPDATE | linq2db (`ToSqlQuery`) and EF Core (`ToQueryString`) for the queries; neither renders an INSERT or UPDATE without running it. The SQL builders SqExpress (`ToSql` with `SqliteExporter`), SqlKata (`SqliteCompiler`), and Sqlify (`SqlWriter`) for the queries. Dapper takes the SQL text as it is |
 | `RoundTripBenchmarks` | A query of every row of a table of 1 and 100 rows on SQLite in memory, on one open connection | Hand-written ADO.NET (the baseline), Dapper, Dapper.AOT, linq2db, EF Core with and without a compiled query |
 | `ValueReaderFormBenchmarks` | The two forms of reading one typed value that §16.1 names: a `static readonly` delegate per type, and the `typeof(T)` tests in the method | The typed getters called directly |
 

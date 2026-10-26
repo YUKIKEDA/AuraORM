@@ -41,14 +41,27 @@ internal static class Check
         failures += Same("forms nullable: branches", forms.DirectNullable(), forms.BranchesNullable());
 
         using (var render = new RenderBenchmarks())
+        using (var database = Statements.Open())
         {
             render.Setup();
-            Console.WriteLine(render.AuraOrmSelect());
-            Console.WriteLine(render.Linq2DbSelect());
-            Console.WriteLine(render.EfCoreSelect());
-            Console.WriteLine(render.AuraOrmJoinGroup());
-            Console.WriteLine(render.Linq2DbJoinGroup());
-            Console.WriteLine(render.EfCoreJoinGroup());
+            string select = render.AuraOrmSelect();
+            failures += Statements.Same(database, "SELECT: linq2db", select, render.Linq2DbSelect());
+            failures += Statements.Same(database, "SELECT: EF Core", select, render.EfCoreSelect());
+            failures += Statements.Same(database, "SELECT: SqExpress", select, render.SqExpressSelect());
+            failures += Statements.Same(database, "SELECT: SqlKata", select, render.SqlKataSelect());
+            failures += Statements.Same(database, "SELECT: Sqlify", select, render.SqlifySelect());
+            string joinGroup = render.AuraOrmJoinGroup();
+            failures += Statements.InnerJoins("inner joins: AuraORM", joinGroup);
+            failures += Statements.Same(database, "JOIN and GROUP BY: linq2db", joinGroup, render.Linq2DbJoinGroup());
+            failures += Statements.InnerJoins("inner joins: linq2db", render.Linq2DbJoinGroup());
+            failures += Statements.Same(database, "JOIN and GROUP BY: EF Core", joinGroup, render.EfCoreJoinGroup());
+            failures += Statements.InnerJoins("inner joins: EF Core", render.EfCoreJoinGroup());
+            failures += Statements.Same(database, "JOIN and GROUP BY: SqExpress", joinGroup, render.SqExpressJoinGroup());
+            failures += Statements.InnerJoins("inner joins: SqExpress", render.SqExpressJoinGroup());
+            failures += Statements.Same(database, "JOIN and GROUP BY: SqlKata", joinGroup, render.SqlKataJoinGroup());
+            failures += Statements.InnerJoins("inner joins: SqlKata", render.SqlKataJoinGroup());
+            failures += Statements.Same(database, "JOIN and GROUP BY: Sqlify", joinGroup, render.SqlifyJoinGroup());
+            failures += Statements.InnerJoins("inner joins: Sqlify", render.SqlifyJoinGroup());
             Console.WriteLine(render.AuraOrmInsert());
             Console.WriteLine(render.AuraOrmUpdate());
         }

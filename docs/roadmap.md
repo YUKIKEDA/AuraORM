@@ -45,6 +45,7 @@
 | C2 | 再帰 CTE | - | planned |
 | P2 | 組み立て済みの文の再利用 | - | planned |
 | P3 | 行の読み取りの残りの差の原因 | - | planned |
+| P4 | SQL の組み立てで Sqlify との差の原因 | #111 | planned |
 | J1 | JSON と配列の演算子 | - | planned |
 | DF1 | 方言固有の関数と並べ替えの指定 | - | planned |
 | MG1 | 差分のマイグレーション | - | planned |
