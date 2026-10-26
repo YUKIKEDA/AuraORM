@@ -1,6 +1,6 @@
 # Contributing to AuraORM
 
-Thank you for your interest. AuraORM is being rebuilt from its requirements. The design is `docs/design.ja.md` (Japanese), the order of work is `docs/roadmap.md`, and the conventions are `docs/conventions.md`. Agents start at `AGENTS.md`.
+Thank you for your interest. The design is `docs/design.ja.md` (Japanese), the order of work is `docs/roadmap.md`, and the conventions are `docs/conventions.md`. Agents start at `AGENTS.md`.
 
 ## Workflow
 
@@ -41,7 +41,7 @@ The owner releases. Once, before the first release:
 
 For each release:
 
-1. A pull request sets `VersionPrefix`, moves the entries under `## [Unreleased]` of `CHANGELOG.md` to `## [<version>] - <date>`, and updates the status line of `README.md` and `README.ja.md`.
+1. A pull request sets `VersionPrefix`, and moves the entries under `## [Unreleased]` of `CHANGELOG.md` to `## [<version>] - <date>`.
 2. After it is merged and CI has passed on `main`, run **Release** from the Actions tab on `main` with **dry-run** checked, and approve the `release` environment. It checks that CI passed on the commit, that `CHANGELOG.md` has the version and that neither nuget.org nor a tag has it (`./tools/release.ps1`), packs and checks the package and the README examples, and logs in to nuget.org.
 3. Run it again with **dry-run** unchecked. It pushes the package and its symbols, then creates the tag `v<version>` and a GitHub Release whose notes are the CHANGELOG section.
 

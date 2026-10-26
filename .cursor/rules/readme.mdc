@@ -1,0 +1,47 @@
+---
+description: What README.md covers, how its examples are checked, and README.ja.md
+globs: "README*.md"
+alwaysApply: false
+---
+
+# README
+
+`README.md` is what a user reads to choose AuraORM, to start with it, and to know where it stops. It is also the package's README on nuget.org. On #122 the owner found it too thin: its examples were five statements, and it said nothing of what is promised and what is not, the limits, the speed, or the differences between dialects.
+
+## What it covers
+
+In this order:
+
+1. One line of what AuraORM is, then the promises as short bold-led bullets, and the install command.
+2. **Before the first query**: what a user must know before the first line (the dialect is a type, `using static AuraORM.Sql`, columns come from the lambdas, statements are values, asynchronous only, nullable reference types).
+3. **A first example** that declares tables and runs a query.
+4. **Usage**, one section per capability, each with an example: tables and column types, SELECT, joins, GROUP BY and result types, subqueries and set operations and CTEs, INSERT / UPDATE / DELETE / RETURNING, UPSERT, the dialects' differences, transactions, raw SQL, the SQL of a statement, value converters. A capability added to the library gets its section, or its line in one, in the same PR.
+5. **What is promised** and **what is not**, from `docs/design.ja.md` §14.
+6. **Limits**: .NET, the oldest database versions, providers, parameters, dependencies.
+7. **Performance**: AuraORM's figures of §16.1 with the machine and the source, against code written by hand, and where the time goes.
+8. **Documentation**, **Verification**, **License**.
+
+## Examples
+
+- Every `csharp` block is compiled against the packed package and run (`tools/readme.ps1`, in CI). The blocks continue one program: a block that declares a type is its own file; the others run in order and share their variables. A block that must not compile is not a `csharp` block.
+- A comment that shows SQL (`// SELECT "books"...`) is checked against what the example prints, so the SQL shown is the SQL produced.
+- An example avoids what a dialect rejects at run time (on SQLite, ordering by a `decimal`), and the README says that it does.
+
+## No other library by name
+
+The public documents (`README.md`, `README.ja.md`, the package's description and tags, `CHANGELOG.md`, and the notes of a GitHub Release) do not name another library or product: no "in the spirit of", no comparison table, no figures of another library. AuraORM is described by what it does; a speed is against code written by hand. What a user runs AuraORM with is named: .NET, the databases, and the ADO.NET providers (the install command, the limits). On #126 the owner asked to remove the names of the libraries that the first rewrite compared with, and asked whether the rules did not already say so; they did not. The design, the decisions, and the benchmarks keep their comparisons: they are where a choice is argued, and `design-docs.mdc` asks them to cite. `AGENTS.md` describes AuraORM as the README does, without another library.
+
+## Nothing that a release makes false
+
+The public documents describe AuraORM as the package a user installs. No status line ("before the first release", "nothing is published yet", "being rebuilt"): a release would publish it as it stands, and `CHANGELOG.md`'s section becomes the release notes. On #126 the owner found such a status line kept in the README for the release. What can change between versions is said as a rule ("a 0.x minor version may break the public API") and the changes are in `CHANGELOG.md`.
+
+## Claims
+
+- A promise is the design's, with the design's exceptions: on #126 the review found "the same chain gives the same SQL for any value" without the exceptions of §2 (the number of values of an `In` list, the rows and columns of an `INSERT`, optional conditions), and "values are parameters" without the defaults of `CREATE TABLE`.
+- A claim about the tests ("each line has a test", "every statement runs on every database") is written only after it was checked line by line; otherwise the README says what the design lists, not what the tests cover.
+- A number comes with where it was measured.
+- An error code in the README is the one the design or a test names.
+
+## README.ja.md
+
+`README.ja.md` is the Japanese translation, in the same PR. Its code blocks are those of `README.md` byte for byte (`tools/readme.ps1` checks it), so write the Japanese around blocks copied from the English file, not by hand. It is checked with `.agents/skills/natural-japanese/`.

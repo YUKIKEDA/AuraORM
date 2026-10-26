@@ -97,8 +97,8 @@ try {
         exit 1
     }
 
-    # A comment that shows SQL is what the example before it prints.
-    $shown = $blocks | ForEach-Object { $_ -split "`r?`n" } | Where-Object { $_ -match '^// (SELECT|INSERT|UPDATE|DELETE|WITH) ' }
+    # A comment that shows SQL (a statement keyword, then a quoted identifier) is what the example before it prints.
+    $shown = $blocks | ForEach-Object { $_ -split "`r?`n" } | Where-Object { $_ -match '^// (SELECT|INSERT|UPDATE|DELETE|WITH) .*["\[`]' }
     foreach ($line in $shown) {
         if ($output -notcontains $line.Substring(3)) {
             Write-Host "FAIL README shows SQL that the example does not print: $($line.Substring(3))"

@@ -7,9 +7,6 @@ version may break the public API.
 
 ## [Unreleased]
 
-AuraORM is being rebuilt from its requirements (`docs/design.ja.md`). No
-version has been published to NuGet.
-
 ### Added
 
 - Expressions and functions (`using static AuraORM.Sql;`): comparisons, `NULL` handling, logic, arithmetic, strings,
