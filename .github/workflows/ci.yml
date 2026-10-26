@@ -73,13 +73,18 @@ jobs:
       version: ${{ steps.pack.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+      # The README examples run on net8.0, the oldest target a consumer can use.
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+          dotnet-version: 8.0.x
       - name: Pack and check
         id: pack
         # The suffix makes each run's version new, so no restore reads an older package of the same version from a cache.
         run: ./tools/package.ps1 -Output artifacts/packages -Suffix "ci.${{ github.run_id }}.${{ github.run_attempt }}"
+      - name: README examples
+        # The csharp blocks of README.md, built against the package and run; README.ja.md has the same code.
+        run: ./tools/readme.ps1 -Version "${{ steps.pack.outputs.version }}" -Feed artifacts/packages
       - uses: actions/upload-artifact@v7
         with:
           name: packages
