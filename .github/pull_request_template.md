@@ -37,5 +37,6 @@ N/A
 - [ ] Title follows Conventional Commits (`type(scope): subject`)
 - [ ] CSharpier applied (`dotnet csharpier format .`)
 - [ ] New public API has XML docs; new tests have `summary` + `remarks` (Preconditions / Steps / Expected)
+- [ ] `CHANGELOG.md` has an entry under `[Unreleased]` for a change a user sees — or N/A
 - [ ] `docs/`, `.cursor/rules/`, and skills updated when behavior or workflow changed — or N/A
 - [ ] Corrections from the owner written into the file they belong to (`.cursor/rules/record-corrections.mdc`) — or N/A
