@@ -7,6 +7,10 @@ version may break the public API.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-26
+
+The first release.
+
 ### Added
 
 - Expressions and functions (`using static AuraORM.Sql;`): comparisons, `NULL` handling, logic, arithmetic, strings,
@@ -17,7 +21,7 @@ version may break the public API.
 - `SqlStatement`: the SQL text and parameters of a statement.
 - The source generator, shipped inside the package: `[Table]` records and classes get `Table`, `Columns`,
   `NullableColumns`, and `Insert`; `[QueryResult]` types get `RowProjection` and `GroupProjection`. Schema errors are
-  reported as AURA0101 to AURA0114.
+  reported as AURA0101 to AURA0119.
 - `Database<TDialect>` on a `DbDataSource` or a `DbConnection`, and `Transaction<TDialect>` (`BeginTransactionAsync`,
   `InTransactionAsync`).
 - Raw SQL through interpolated strings, where values become parameters: fragments (`Raw`, `Raw<T>`, `RawAggregate<T>`,
@@ -70,3 +74,27 @@ version may break the public API.
 - On SQLite, ordering, comparing by size, and `Min` / `Max` / `Sum` / `Avg` of decimals throw when the statement is
   built, because SQLite stores decimals as text. A SQL Server `Limit(0)` and a column taken out of another query's
   lambda throw too.
+- `INSERT` of one row or many (`Insert(table).Values(...)`), with a model whose columns without a default are `required`
+  (a missing one does not compile, CS9035) and without the `[AutoIncrement]` key. `UPDATE` (`Set(column, value or
+  expression)`) and `DELETE`, which run only after `Where` or `AllRows()`; a condition that may be empty does not compile
+  there, and a column the database numbers cannot be set (CS0619). `ExecuteAsync` returns the number of rows.
+- `Returning` after `INSERT`, `UPDATE`, and `DELETE` on the dialects that have it (SQLite, PostgreSQL, SQL Server as
+  `OUTPUT`, and MariaDB for `INSERT` and `DELETE`), read like a query.
+- UPSERT: `OnConflict(columns).DoNothing()` / `.DoUpdate((row, excluded) => ...)` with an optional `Where`, and
+  `OnConflictDoNothing()`, on SQLite and PostgreSQL; `OnDuplicateKeyUpdate((row, inserted) => ...)` on MySQL and MariaDB.
+  Each dialect has only its own form.
+- Value converters: `IValueConverter<TModel, TProvider>` with static `ToProvider` and `FromProvider`, declared on the type
+  (`[ValueConverter]`) or on the assembly for a type of another assembly. A converted column compares with the model type,
+  binds the provider value, and reads back the model type, with generated code. Mistakes are AURA0105, AURA0115, and
+  AURA0116.
+- DDL: `CreateTable` (`IfNotExists()` where the dialect has it), `DropTable` (`IfExists()`), `CreateIndexes`, and
+  `DropIndexes`, from the schema: column types per dialect, `[PrimaryKey]`, `[AutoIncrement]`, `[Unique]`, `[Index]`,
+  `[References]`, `[MaxLength]`, `[Precision]`, `[Default]` (constants and `SqlDefault.CurrentTimestamp`, in UTC), and
+  `[DefaultSql]`. Names and lengths beyond a dialect's limits throw when the statement is built, and DDL runs inside a
+  transaction only on the dialects that roll it back. Schema mistakes are AURA0117 to AURA0119.
+- Reading rows allocates only the result (the row objects, their strings and arrays), checked in CI for every column
+  type. The generated code reads each column with a typed method, and a `NULL` in a column declared not nullable throws
+  with the column's position and name.
+- The package carries the library, its XML documentation, symbols, and the generator and analyzers
+  (`analyzers/dotnet/cs`), with no package dependency. CI publishes a NativeAOT sample from the package with no trim or
+  AOT warning, on Linux, Windows, and macOS, for `net8.0` and `net10.0`.
