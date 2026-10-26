@@ -29,7 +29,7 @@ In this order:
 
 ## No other library by name
 
-The public documents (`README.md`, `README.ja.md`, the package's description and tags, `CHANGELOG.md`, and the notes of a GitHub Release) do not name another library or product: no "in the spirit of", no comparison table, no figures of another library. AuraORM is described by what it does; a speed is against code written by hand. What a user runs AuraORM with is named: .NET, the databases, and the ADO.NET providers (the install command, the limits). On #126 the owner asked to remove the names of the libraries that the first rewrite compared with, and asked whether the rules did not already say so; they did not. The design, the decisions, and the benchmarks keep their comparisons: they are where a choice is argued, and `design-docs.mdc` asks them to cite.
+The public documents (`README.md`, `README.ja.md`, the package's description and tags, `CHANGELOG.md`, and the notes of a GitHub Release) do not name another library or product: no "in the spirit of", no comparison table, no figures of another library. AuraORM is described by what it does; a speed is against code written by hand. What a user runs AuraORM with is named: .NET, the databases, and the ADO.NET providers (the install command, the limits). On #126 the owner asked to remove the names of the libraries that the first rewrite compared with, and asked whether the rules did not already say so; they did not. The design, the decisions, and the benchmarks keep their comparisons: they are where a choice is argued, and `design-docs.mdc` asks them to cite. `AGENTS.md` describes AuraORM as the README does, without another library.
 
 ## Claims
 

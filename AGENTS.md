@@ -1,6 +1,6 @@
 # AuraORM: agent entry
 
-A type-safe SQL query builder for .NET in the spirit of Drizzle ORM: SQL's flexibility, types that reject only invalid queries, predictable SQL, NativeAOT. This file is the entry point for agents. Steps for people are in `CONTRIBUTING.md`. Enforced rules are in `.cursor/rules/`.
+A type-safe SQL query builder for .NET: SQL's flexibility, types that reject only invalid queries, predictable SQL, NativeAOT. This file is the entry point for agents. Steps for people are in `CONTRIBUTING.md`. Enforced rules are in `.cursor/rules/`.
 
 ## Source
 
