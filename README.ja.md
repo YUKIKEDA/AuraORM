@@ -19,8 +19,6 @@ dotnet add package AuraORM
 dotnet add package Microsoft.Data.Sqlite
 ```
 
-> **状況: 最初のリリースの前。** 0.1 の API は実装したが、NuGet にはまだ公開していない。0.x のマイナーバージョンは公開の API を壊すことがある。進み具合は [`docs/roadmap.md`](https://github.com/YUKIKEDA/AuraORM/blob/main/docs/roadmap.md) にある。
-
 ## 最初のクエリの前に
 
 - **方言は型である。** `Database<SqliteDialect>`、`Database<PostgreSqlDialect>`、`Database<MySqlDialect>`、`Database<MariaDbDialect>`、`Database<SqlServerDialect>`。データベースにない機能は、実行時のエラーではなく、その方言でのコンパイルエラーになる。
@@ -28,6 +26,7 @@ dotnet add package Microsoft.Data.Sqlite
 - **列はラムダの引数からしか得られない。** `From(Book.Table).Where(b => ...)` の `b` が、そのテーブルの出現の列である。文にないテーブルの列は書けない。
 - **文は値である。** ビルダーの呼び出しはどれも、変更できない新しい段階を返す。`ToListAsync`、`ExecuteAsync` などの実行のメソッドまで何も実行しない。`ToSql()` は、接続なしで SQL とパラメータを返す。
 - **実行はすべて非同期で**、`CancellationToken` を受け取る。同期の API はない。
+- **0.x のマイナーバージョンは公開の API を壊すことがある。** 各版の変更は [`CHANGELOG.md`](https://github.com/YUKIKEDA/AuraORM/blob/main/CHANGELOG.md) にある。
 - **null 許容参照型を有効にする**（[null 許容参照型](#null-許容参照型)）。AuraORM は `string` と `byte[]` の NULL 可否をこれに頼る。
 
 ## 最初の例

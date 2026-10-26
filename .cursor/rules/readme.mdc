@@ -31,6 +31,10 @@ In this order:
 
 The public documents (`README.md`, `README.ja.md`, the package's description and tags, `CHANGELOG.md`, and the notes of a GitHub Release) do not name another library or product: no "in the spirit of", no comparison table, no figures of another library. AuraORM is described by what it does; a speed is against code written by hand. What a user runs AuraORM with is named: .NET, the databases, and the ADO.NET providers (the install command, the limits). On #126 the owner asked to remove the names of the libraries that the first rewrite compared with, and asked whether the rules did not already say so; they did not. The design, the decisions, and the benchmarks keep their comparisons: they are where a choice is argued, and `design-docs.mdc` asks them to cite. `AGENTS.md` describes AuraORM as the README does, without another library.
 
+## Nothing that a release makes false
+
+The public documents describe AuraORM as the package a user installs. No status line ("before the first release", "nothing is published yet", "being rebuilt"): a release would publish it as it stands, and `CHANGELOG.md`'s section becomes the release notes. On #126 the owner found such a status line kept in the README for the release. What can change between versions is said as a rule ("a 0.x minor version may break the public API") and the changes are in `CHANGELOG.md`.
+
 ## Claims
 
 - A number comes with where it was measured.

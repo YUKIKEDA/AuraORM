@@ -19,8 +19,6 @@ dotnet add package AuraORM
 dotnet add package Microsoft.Data.Sqlite
 ```
 
-> **Status: before the first release.** The API of version 0.1 is implemented, and nothing is published to NuGet yet. A 0.x minor version may break the public API. Follow the progress in [`docs/roadmap.md`](https://github.com/YUKIKEDA/AuraORM/blob/main/docs/roadmap.md).
-
 ## Before the first query
 
 - **The dialect is a type.** `Database<SqliteDialect>`, `Database<PostgreSqlDialect>`, `Database<MySqlDialect>`, `Database<MariaDbDialect>`, and `Database<SqlServerDialect>`. A feature that a database lacks is a compile error on that dialect, not a run-time error.
@@ -28,6 +26,7 @@ dotnet add package Microsoft.Data.Sqlite
 - **Columns come only from the lambda's parameters.** `From(Book.Table).Where(b => ...)` gives `b`, the columns of that occurrence of the table. A column of a table that is not in the statement cannot be written.
 - **A statement is a value.** Every builder call returns a new immutable stage; nothing runs until `ToListAsync`, `ExecuteAsync`, or another execution method. `ToSql()` returns the SQL and the parameters without a connection.
 - **Every execution is asynchronous** and takes a `CancellationToken`. There is no synchronous API.
+- **A 0.x minor version may break the public API.** The changes of each version are in [`CHANGELOG.md`](https://github.com/YUKIKEDA/AuraORM/blob/main/CHANGELOG.md).
 - **Turn on nullable reference types** (see [Nullable reference types](#nullable-reference-types)). AuraORM relies on them for `string` and `byte[]`.
 
 ## A first example
