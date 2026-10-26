@@ -6,9 +6,10 @@ namespace AuraORM;
 internal sealed class SqlRenderContext : IDisposable
 {
     private readonly List<SqlStatementParameter> _parameters = [];
-    private readonly Dictionary<ParameterNode, string> _names = new(ReferenceEqualityComparer.Instance);
     private readonly List<IReadOnlyList<TableAlias>> _scopes = [];
     private readonly List<NamedQueryDefinition> _ctes = [];
+    private ParameterNode[] _nodes = [];
+    private Dictionary<ParameterNode, string>? _names;
     private IReadOnlyList<NamedQueryDefinition> _listedCtes = [];
     private string? _writingCte;
     private int _statementDepth;
@@ -113,9 +114,10 @@ internal sealed class SqlRenderContext : IDisposable
     {
         for (int inner = depth + 1; inner < _scopes.Count; inner++)
         {
-            foreach (TableAlias candidate in _scopes[inner])
+            IReadOnlyList<TableAlias> scope = _scopes[inner];
+            for (int i = 0; i < scope.Count; i++)
             {
-                if (candidate.Reference == table.Reference)
+                if (scope[i].Reference == table.Reference)
                 {
                     throw new InvalidOperationException(
                         "The column "
@@ -234,8 +236,9 @@ internal sealed class SqlRenderContext : IDisposable
         string name = Dialect.NamesProposedRowExcluded ? TableAlias.ExcludedName : target.Reference;
         foreach (IReadOnlyList<TableAlias> scope in _scopes)
         {
-            foreach (TableAlias table in scope)
+            for (int i = 0; i < scope.Count; i++)
             {
+                TableAlias table = scope[i];
                 if (!ReferenceEquals(table, target) && !table.IsExcluded && table.Reference == name)
                 {
                     throw new InvalidOperationException(
@@ -402,9 +405,9 @@ internal sealed class SqlRenderContext : IDisposable
             }
         }
 
-        foreach (NamedQueryDefinition listed in _listedCtes)
+        for (int i = 0; i < _listedCtes.Count; i++)
         {
-            if (ReferenceEquals(listed, query))
+            if (ReferenceEquals(_listedCtes[i], query))
             {
                 // §5.11, D1-41: a CTE reads only the CTEs before it.
                 throw new InvalidOperationException(
@@ -514,10 +517,11 @@ internal sealed class SqlRenderContext : IDisposable
 
         for (int depth = 0; depth < _scopes.Count; depth++)
         {
-            foreach (TableAlias candidate in _scopes[depth])
+            IReadOnlyList<TableAlias> scope = _scopes[depth];
+            for (int i = 0; i < scope.Count; i++)
             {
                 // The same occurrence, not the same name: a column of another statement on the same table is out of scope too.
-                if (ReferenceEquals(candidate, table))
+                if (ReferenceEquals(scope[i], table))
                 {
                     CheckGroupSubquery(depth, table, column);
                     CheckShadowed(depth, table, column);
@@ -550,14 +554,63 @@ internal sealed class SqlRenderContext : IDisposable
     /// <param name="parameter">The parameter node.</param>
     public void WriteParameter(ParameterNode parameter)
     {
-        if (!_names.TryGetValue(parameter, out string? name))
+        string? name = NameOf(parameter);
+        if (name is null)
         {
             name = Dialect.ParameterName(_parameters.Count);
             _parameters.Add(new SqlStatementParameter(name, parameter.ProviderValue) { DbType = Dialect.ParameterDbType(parameter) });
-            _names.Add(parameter, name);
+            Remember(parameter, name);
         }
 
         Writer.Append(name);
+    }
+
+    // §16.1: a statement has few parameters, so their nodes are searched in an array; a dictionary is made only for many.
+    private string? NameOf(ParameterNode parameter)
+    {
+        if (_names is not null)
+        {
+            return _names.TryGetValue(parameter, out string? named) ? named : null;
+        }
+
+        for (int i = 0; i < _parameters.Count; i++)
+        {
+            if (ReferenceEquals(_nodes[i], parameter))
+            {
+                return _parameters[i].Name;
+            }
+        }
+
+        return null;
+    }
+
+    private void Remember(ParameterNode parameter, string name)
+    {
+        if (_names is not null)
+        {
+            _names.Add(parameter, name);
+            return;
+        }
+
+        int count = _parameters.Count;
+        if (count > 16)
+        {
+            _names = new Dictionary<ParameterNode, string>(count * 2, ReferenceEqualityComparer.Instance);
+            for (int i = 0; i < count - 1; i++)
+            {
+                _names.Add(_nodes[i], _parameters[i].Name);
+            }
+
+            _names.Add(parameter, name);
+            return;
+        }
+
+        if (count > _nodes.Length)
+        {
+            Array.Resize(ref _nodes, Math.Max(4, _nodes.Length * 2));
+        }
+
+        _nodes[count - 1] = parameter;
     }
 
     public void WriteList(IReadOnlyList<SqlNode> nodes)
