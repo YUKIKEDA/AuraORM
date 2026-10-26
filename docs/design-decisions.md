@@ -528,3 +528,9 @@
 - **Decision**: README の C# のコードブロックを、CI がパッケージのジョブで、パックしたパッケージを参照してコンパイルし、実行する（`tools/readme.ps1`）。型を宣言するブロックはそれぞれのファイルに、ほかのブロックは順にプログラムにする。README が示す SQL のコメント（`// SELECT …`）は、実行の出力にあること、README.ja.md のコードブロックは README と同じであることも確かめる。README に、`<Nullable>enable</Nullable>` と `<WarningsAsErrors>nullable</WarningsAsErrors>` が参照型の NULL の保証に要ることを書く（§14.2）。
 - **Reason**: README の例は利用者が最初に写すコードで、API が変わると黙って古くなる。テストのプロジェクトに写すと、写しが README とずれる。例のプロジェクトはリポジトリの外に作り、利用者と同じく、リポジトリの解析器の設定を受けない。null 許容の設定は、`string` と `string?` が実行時に同じ型であるために、AuraORM が型だけでは守れない保証を利用者の設定に頼るところで、README に書かないと気づかれない。R1 の Grill で所有者が決めた。
 - **Rejected**: README の例をテストのプロジェクトに写す案（写しがずれる）。null 許容が無効なことをジェネレーターの診断で知らせる案（R1 の範囲ではなく、要るなら行を足す）。
+
+## D1-88 公開は main での手動の実行と、release 環境の承認で行う
+
+- **Decision**: 公開のワークフロー（`.github/workflows/release.yml`）は、`main` で手動で実行し（`workflow_dispatch`）、`release` 環境で所有者が承認する。版は `Directory.Build.props` の `VersionPrefix` だけで決め、`CHANGELOG.md` にその版の節があること、nuget.org とタグにその版がないこと、そのコミットで CI の `ci` のチェックが通ったことを確かめてから、パックし、パッケージと README の例を確かめる。NuGet の Trusted Publishing（OIDC、`NuGet/login`。API キーを保存しない）でログインし、`dry-run`（既定）でなければ、パッケージとシンボルを push して、タグ `v<版>` と、本文が CHANGELOG のその版の節の GitHub Release を作る。
+- **Reason**: nuget.org では公開した版を消せず、非表示にしかできない。公開は所有者の命令で行う外向きの操作で（`.cursor/rules/consent.mdc`）、承認の段と試しの実行で、push の前にすべてを確かめられる。`release` 環境はすでに所有者の承認と `main` だけを要求していて、タグの push をきっかけにするとこの設定を変えることになる。タグは公開に成功した後に作るので、失敗した公開のタグは残らない。テストのゲートは CI がそのコミットで回しているので、公開ではその結果を読む。R1 の Grill で所有者が決めた。
+- **Rejected**: タグの push で公開する案（環境の設定が要り、失敗した公開でもタグが残る）。API キーをシークレットに置く案（長く使える鍵が漏れうる）。公開の中でゲートのテストをすべて回し直す案（CI の結果と同じで、時間だけかかる）。
