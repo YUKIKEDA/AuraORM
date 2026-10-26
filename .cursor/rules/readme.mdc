@@ -37,6 +37,8 @@ The public documents describe AuraORM as the package a user installs. No status 
 
 ## Claims
 
+- A promise is the design's, with the design's exceptions: on #126 the review found "the same chain gives the same SQL for any value" without the exceptions of §2 (the number of values of an `In` list, the rows and columns of an `INSERT`, optional conditions), and "values are parameters" without the defaults of `CREATE TABLE`.
+- A claim about the tests ("each line has a test", "every statement runs on every database") is written only after it was checked line by line; otherwise the README says what the design lists, not what the tests cover.
 - A number comes with where it was measured.
 - An error code in the README is the one the design or a test names.
 

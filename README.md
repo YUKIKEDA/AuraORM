@@ -7,9 +7,9 @@ English | [日本語](https://github.com/YUKIKEDA/AuraORM/blob/main/README.ja.md
 
 A type-safe SQL query builder for .NET: you write SQL clause by clause in C#, the compiler rejects the queries that are wrong, and you can read the SQL before it runs.
 
-- **SQL stays SQL.** One builder call is one SQL clause. AuraORM adds no query, join, subquery, `DISTINCT`, `ORDER BY`, `LIMIT`, or round trip that you did not write, and the same chain gives the same SQL text for any value. What the API cannot express, a raw SQL fragment can, with its values still parameters.
+- **SQL stays SQL.** One builder call is one SQL clause. AuraORM adds no query, join, subquery, `DISTINCT`, `ORDER BY`, `LIMIT`, or round trip that you did not write, and the same chain gives the same SQL text for any value, except for what is part of the statement's shape: the number of values of an `In` list, the rows and columns of an `INSERT`, and which optional conditions are left out. What the API cannot express, a raw SQL fragment can, with its values still parameters.
 - **Types reject only invalid queries.** A column of a table that is not in the query, operands of different types, a clause in the wrong order, a missing required column in `INSERT`, an `UPDATE` or `DELETE` without `WHERE`, an aggregate mixed with row values, a feature the database lacks: these do not compile.
-- **Values are parameters.** No value reaches the SQL text, and identifiers are always quoted.
+- **Values are parameters.** No value of a query or a change reaches the SQL text, and identifiers are always quoted. The one place where a value is written as a literal is the default of a column in `CREATE TABLE` (`[Default(...)]`), a constant of the schema.
 - **Safe for code written by AI agents.** A mistake surfaces as a compile error with a stable id and a message that names the fix, not as a wrong result at run time.
 - **NativeAOT and trimming.** No reflection, no expression trees, no dynamic code. The code that reads rows is generated at compile time.
 - **Small.** The runtime library depends only on the .NET base library and `System.Data.Common`. Bring any ADO.NET provider.
@@ -398,9 +398,9 @@ Whether a `string` or `byte[]` value can be `NULL` is part of its type only when
 
 ## What is promised
 
-- **The SQL is the chain.** Each call is one clause; the same chain gives the same SQL text whatever the values, the culture, the time zone, or the machine. Values are parameters, numbered in the order they appear; an expression written twice in one statement (a `GROUP BY` key in the select list) keeps one parameter.
-- **The invalid queries of [the design's list](https://github.com/YUKIKEDA/AuraORM/blob/main/docs/design.ja.md#141-コンパイルできないもの) do not compile.** Each line of that list has a compile test.
-- **Every dialect has the same API**, and a feature a database lacks is a compile error on its dialect. The SQL of each statement on each dialect is a golden test, and the integration tests run every statement on every database at its oldest and newest supported version.
+- **The SQL is the chain.** Each call is one clause; the same chain gives the same SQL text whatever the values, the culture, the time zone, or the machine. The exceptions are part of the statement's shape and are written by the caller: the number of values of an `In` list, the number of rows of an `INSERT` and the columns it sets, and which optional conditions are `null`. Values are parameters, numbered in the order they appear; an expression written twice in one statement (a `GROUP BY` key in the select list) keeps one parameter.
+- **The invalid queries of [the design's list](https://github.com/YUKIKEDA/AuraORM/blob/main/docs/design.ja.md#141-コンパイルできないもの) do not compile.** The list gives the error that each one is.
+- **Every dialect has the same API**, and a feature a database lacks is a compile error on its dialect. The SQL of each statement on each dialect is a golden test, and the integration tests run the statements on every database at its oldest and newest supported version.
 - **Reading rows allocates only the result** (the row objects, their strings and arrays), with no boxing. A CI test checks it for every column type.
 - **NativeAOT publishes with no warning**, on Linux, Windows, and macOS, for `net8.0` and `net10.0`, from the package (CI).
 
