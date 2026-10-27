@@ -41,7 +41,7 @@ The owner releases. Once, before the first release:
 
 For each release:
 
-1. A pull request sets `VersionPrefix`, and moves the entries under `## [Unreleased]` of `CHANGELOG.md` to `## [<version>] - <date>`.
+1. A pull request sets `VersionPrefix`, and moves the entries under `## [Unreleased]` of `CHANGELOG.md` to `## [<version>] - <date>`. The date is the day of the release: the section becomes the GitHub Release's notes, which a published version keeps. When the release slips to another day, a pull request fixes the date first (0.1.0 was dated a day early and fixed in #132).
 2. After it is merged and CI has passed on `main`, run **Release** from the Actions tab on `main` with **dry-run** checked, and approve the `release` environment. It checks that CI passed on the commit, that `CHANGELOG.md` has the version and that neither nuget.org nor a tag has it (`./tools/release.ps1`), packs and checks the package and the README examples, and logs in to nuget.org.
 3. Run it again with **dry-run** unchecked. It pushes the package and its symbols, then creates the tag `v<version>` and a GitHub Release whose notes are the CHANGELOG section.
 
