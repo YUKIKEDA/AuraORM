@@ -7,7 +7,7 @@ version may break the public API.
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-10-26
+## [0.1.0] - 2026-10-27
 
 The first release.
 
