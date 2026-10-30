@@ -38,7 +38,7 @@
     <PackageVersion Include="SqExpress" Version="1.4.0" />
     <PackageVersion Include="SqlKata" Version="4.0.1" />
     <PackageVersion Include="Sqlify" Version="0.3.14" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
   </ItemGroup>
   <!-- SQLite 3.39.2, the minimum version (docs/design.ja.md §1.3, §17), for the integration tests built with
        -p:AuraSqliteMinimum=true only. Declared only for that build, because transitive pinning would hold every other
