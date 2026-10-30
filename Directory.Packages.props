@@ -20,7 +20,7 @@
   </ItemGroup>
   <ItemGroup Label="Providers">
     <!-- ADO.NET providers for the integration tests and samples only; the library depends on none (.cursor/rules/dependencies.mdc). -->
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.14" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
     <PackageVersion Include="MySqlConnector" Version="2.6.2" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />
