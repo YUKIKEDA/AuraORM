@@ -16,7 +16,7 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
   </ItemGroup>
   <ItemGroup Label="Tests">
-    <PackageVersion Include="xunit.v3" Version="4.0.2" />
+    <PackageVersion Include="xunit.v3" Version="4.0.3" />
   </ItemGroup>
   <ItemGroup Label="Providers">
     <!-- ADO.NET providers for the integration tests and samples only; the library depends on none (.cursor/rules/dependencies.mdc). -->
